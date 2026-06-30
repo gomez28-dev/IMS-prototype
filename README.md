@@ -1,142 +1,139 @@
-# Admin Inventory Management System (IMS)
+# Admin Inventory Management System (IMS) - PHP/Laravel Edition
 
-A modern, responsive, and secure prototype Admin Inventory Management System built with Python, Flask, Flask-SQLAlchemy (SQLite), Flask-Login, and Flask-WTF. The frontend is styled using Bootstrap 5 with responsive components, dynamic balance badges, and administrative safety confirmations.
+A modern, responsive, and secure Admin Inventory Management System rewritten from Python/Flask to PHP using the Laravel framework, optimized for deployment on Hostinger web hosting.
+
+The frontend is styled with a modernized Navy & White/Slate layout using Bootstrap 5, featuring clean rounded cards, responsive spacing, dynamic status/balance badges, and interactive metrics widgets.
 
 ## Table of Contents
 - [Features](#features)
 - [Database Schema & Models](#database-schema--models)
 - [Prerequisites](#prerequisites)
 - [Installation & Local Setup](#installation--local-setup)
-- [Data Seeding from Excel](#data-seeding-from-excel)
-- [Running the Application](#running-the-application)
-- [Default Credentials](#default-credentials)
-- [Code Quality & Architecture](#code-quality--architecture)
+- [Database Migrations & Seeding](#database-migrations--seeding)
+- [Excel Integration (Import & Export)](#excel-integration-import--export)
+- [SQLite Historical Data Migration](#sqlite-historical-data-migration)
+- [Deployment on Hostinger Shared Hosting](#deployment-on-hostinger-shared-hosting)
 
 ---
 
 ## Features
 
-1. **Secure Admin Authentication**: Protected routes using Flask-Login and secure password hashing via `werkzeug.security`.
-2. **Dynamic Dashboard Overview**: View all orders, ordered quantities, delivered quantities, and remaining balances at a glance.
-   - Balance badges are styled dynamically (Green for `0` remaining, Yellow for `>0` remaining).
-3. **Advanced Order Search**: Locate records instantly using the case-insensitive search bar (filters by account name or SO#).
-4. **Order & Delivery Management**:
-   - Create, edit, view, and delete sales orders.
-   - Track multiple deliveries linked to each order with status choices (`PENDING`, `FULFILLED`, `CANCELLED`).
-   - Cancelled deliveries are visually greyed out/crossed out to preserve order clarity.
-5. **Defensive Over-Shipping Validation**:
-   - Automatically prevents users from adding or editing delivery quantities that exceed the order's remaining balance.
-   - Intelligently adjusts balance when editing active deliveries so that a delivery doesn't validate against its own pre-edit quantity.
-6. **Administrative Delete/Void Safety**:
-   - Admins can delete orders (which cascade-deletes all associated deliveries) or individual deliveries.
-   - All delete actions are protected by a JavaScript confirmation dialog to prevent accidental deletion.
-7. **Excel Data Export**:
-   - Export live tracking data into an Excel spreadsheet in memory using a flattened, grouped-row layout matching the legacy sheet format.
-   - Includes automatic status mappings (`FULFILLED` -> `DONE`) and running `DELIVERY BALANCE` math.
+1. **Secure Admin Authentication**: Built-in session-based authentication with a seeded default admin account.
+2. **Sleek Navy & Slate Theme**: Premium look-and-feel using clean typography (Inter), card-based statistics, shadow effects, and subtle hover animations.
+3. **Dashboard Metrics**:
+   - Total Orders
+   - Total Qty Ordered
+   - Total Qty Delivered
+   - Total Remaining Balance (dynamic color coding: green for fully delivered, yellow for pending balance)
+4. **Interactive Order Search**: Instant searching by Account Name or Sales Order Number (`SO#`).
+5. **Order & Delivery Management (CRUD)**:
+   - Create, read, update, and delete customer orders.
+   - Record multiple deliveries against each order with status tracking (`PENDING`, `FULFILLED`, `CANCELLED`).
+   - Visually crossed-out rows for cancelled deliveries to maintain clarity.
+6. **Defensive Over-Shipping Validation**:
+   - Built-in validation rule preventing deliveries from exceeding the remaining order balance.
+   - Automatically handles active delivery edits by factoring in the pre-edit quantity when calculating the validation limit.
+7. **Excel Export**:
+   - Downloads live database state into a formatted spreadsheet in memory.
+   - Groups deliveries under their respective orders in the exact structure as the legacy spreadsheet, converting status flags (e.g., `FULFILLED` -> `DONE`).
+8. **Excel Web Import (Merge & Update)**:
+   - Upload spreadsheets from the dashboard web UI.
+   - Automatically merges and updates: updates order quantities and account names matching an existing `SO#` (or creates new orders), and updates/appends deliveries matching `DR#` under that order.
 
 ---
 
 ## Database Schema & Models
 
-The SQLite database uses three primary tables configured with SQLAlchemy:
-
-- **Admin**:
-  - `id` (Integer, Primary Key)
-  - `username` (String, Unique, Nullable=False)
-  - `password_hash` (String, Nullable=False)
-  - Implements password set/check methods.
-- **Order**:
-  - `id` (Integer, Primary Key)
-  - `account` (String, Nullable=False)
-  - `date` (DateTime, Nullable=False)
-  - `qty_ordered` (Integer, Nullable=False)
-  - `so_number` (String, Nullable=False)
-  - *Dynamic Properties*:
-    - `total_qty_out`: Calculates the sum of `qty_out` for all associated deliveries except those with `CANCELLED` status.
-    - `remaining_balance`: Calculates `qty_ordered - total_qty_out`.
-- **Delivery**:
-  - `id` (Integer, Primary Key)
-  - `order_id` (Integer, Foreign Key to `orders.id`, cascade delete enabled)
-  - `dr_number` (String, Nullable=False)
-  - `delivery_date` (DateTime, Nullable=False)
-  - `qty_out` (Integer, Nullable=False)
-  - `status` (String, default='PENDING', choices: `PENDING`, `FULFILLED`, `CANCELLED`)
-  - `remarks` (Text, Nullable=True)
+- **Admin** (`admins`):
+  - `id` (Auto-increment, Primary Key)
+  - `username` (VARCHAR 64, Unique)
+  - `password` (VARCHAR 256, Hashed)
+  - `remember_token` (VARCHAR 100)
+- **Order** (`orders`):
+  - `id` (Auto-increment, Primary Key)
+  - `account` (VARCHAR 128)
+  - `date` (DateTime)
+  - `qty_ordered` (Integer)
+  - `so_number` (VARCHAR 64)
+  - *Eloquent Attributes*:
+    - `total_qty_out`: Sum of non-cancelled deliveries' `qty_out`.
+    - `remaining_balance`: `qty_ordered - total_qty_out`.
+- **Delivery** (`deliveries`):
+  - `id` (Auto-increment, Primary Key)
+  - `order_id` (Foreign Key referencing `orders.id`, cascade delete enabled)
+  - `dr_number` (VARCHAR 64)
+  - `delivery_date` (DateTime)
+  - `qty_out` (Integer)
+  - `status` (VARCHAR 20: `PENDING`, `FULFILLED`, `CANCELLED`)
+  - `remarks` (Text, Nullable)
 
 ---
 
 ## Prerequisites
 
-- Python 3.8 or higher installed on your machine.
-- Local command line access (PowerShell, CMD, or Terminal).
+- **PHP 8.2 or higher**
+- **Composer 2**
+- **MySQL or MariaDB** (Production) / **SQLite** (Local development option)
 
 ---
 
 ## Installation & Local Setup
 
-1. **Clone the Repository**:
+If you have PHP and Composer installed locally and want to run it:
+
+1. **Clone the Repository & Install Dependencies**:
    ```bash
-   git clone https://github.com/gomez28-dev/IMS-prototype.git
-   cd IMS-prototype
+   composer install
    ```
 
-2. **Create a Virtual Environment**:
-   - **Windows**:
-     ```powershell
-     python -m venv venv
-     .\venv\Scripts\activate
-     ```
-   - **macOS/Linux**:
-     ```bash
-     python3 -m venv venv
-     source venv/bin/activate
-     ```
-
-3. **Install Dependencies**:
+2. **Configure Environment File**:
+   Copy `.env.example` to `.env` and fill in your database credentials:
    ```bash
-   pip install Flask Flask-SQLAlchemy Flask-Login Flask-WTF pandas openpyxl
+   cp .env.example .env
    ```
 
----
+3. **Generate Application Key**:
+   ```bash
+   php artisan key:generate
+   ```
 
-## Data Seeding from Excel
+4. **Run Migrations & Seed Default Admin**:
+   ```bash
+   php artisan migrate --seed
+   ```
+   *Default Admin Login:*
+   - **Username**: `admin`
+   - **Password**: `admin`
 
-The application includes an ingestion script `seed.py` that reads legacy inventory data from `DPET SALES INVENTORY.xlsx`, initializes database tables, and registers the default administrator.
-
-To seed the database, run:
-```bash
-python seed.py
-```
-
-*Note: The script parses rows, automatically grouping deliveries under their respective sales orders using the `ACCOUNT` indicator, mapping status choices (e.g. `DONE` -> `FULFILLED`), and cleaning numeric formatting (like trailing `.0` on numbers).*
-
----
-
-## Running the Application
-
-After installation and database seeding, start the development server using:
-```bash
-python run.py
-```
-
-Open your web browser and navigate to:
-```
-http://127.0.0.1:5000
-```
+5. **Start Local Development Server**:
+   ```bash
+   php artisan serve
+   ```
+   Open `http://127.0.0.1:8000` in your web browser.
 
 ---
 
-## Default Credentials
+## Excel Integration (Import & Export)
 
-Use the following default credentials to sign in to the administrator portal:
-- **Username**: `admin`
-- **Password**: `admin`
+The system uses `maatwebsite/excel` (backed by `phpoffice/phpspreadsheet`) to handle spreadsheet files:
+- **Exporting**: Accessible via the **Download Excel** button on the dashboard.
+- **Importing**: Accessible via the **Import Excel** button. You can upload any `.xlsx` or `.xls` file. The column headers must be on the 2nd row, listing: `ACCOUNT`, `DATE`, `QTY ORDERED`, `SO#`, `DR#`, `DELIVERY DATE`, `QTY OUT`, `DELIVERY STATUS`, `REMARKS`.
 
 ---
 
-## Code Quality & Architecture
+## SQLite Historical Data Migration
 
-This application adheres to modern, clean development paradigms:
-- **Application Factory Pattern**: Setup in `app/__init__.py` using Flask's `create_app()` factory method to isolate configurations.
-- **SQLAlchemy 2.0 Syntax**: Replaced legacy query patterns with modern `db.session.get()`, `db.session.scalars()`, and `db.select()` queries.
-- **CSRF Protection**: Form inputs use Flask-WTF forms integrated with security tokens.
+To import your existing Python/Flask SQLite database records into the new MySQL database:
+
+1. Ensure the SQLite database file (`inventory.db`) is placed at `instance/inventory.db`.
+2. Run the custom Artisan migration command:
+   ```bash
+   php artisan import:sqlite-data
+   ```
+3. The command will read the SQLite tables, truncate the current MySQL tables, and insert all admins, orders, and deliveries, preserving records' IDs and foreign key relationships.
+
+---
+
+## Deployment on Hostinger Shared Hosting
+
+See [DEPLOYMENT.md](file:///c:/Users/Doyen/Desktop/InventoryManagementSystem/DEPLOYMENT.md) for full instructions on setting up subdomains, MySQL databases, SSH access, storage symlinking, and running composer/migrations on Hostinger.

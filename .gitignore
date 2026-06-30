@@ -99,6 +99,20 @@ venv.bak/
 # JetBrains IDEs
 .idea/
 
-# Local SQLite databases used for dev
 *.db
 *.sqlite
+
+# Laravel specific
+/vendor/
+/bootstrap/cache/
+/storage/framework/cache/data/
+/storage/framework/views/*
+/storage/framework/testing/
+/storage/framework/sessions/*
+/storage/app/public/*
+/storage/logs/*
+.env
+.env.backup
+.env.production
+.phpunit.result.cache
+
