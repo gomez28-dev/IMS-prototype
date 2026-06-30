@@ -1,9 +1,11 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, abort
+from flask import Blueprint, render_template, redirect, url_for, flash, request, abort, send_file
 from flask_login import login_user, logout_user, login_required, current_user
 from app.extensions import db
 from app.models import Admin, Order, Delivery
 from app.forms import LoginForm, OrderForm, DeliveryForm
 from datetime import datetime
+import io
+import pandas as pd
 
 bp = Blueprint('main', __name__)
 
@@ -172,3 +174,76 @@ def delete_delivery(id):
     db.session.commit()
     flash('Delivery deleted successfully.', 'success')
     return redirect(url_for('main.order_deliveries', id=order_id))
+
+@bp.route('/export/excel')
+@login_required
+def export_excel():
+    orders = db.session.scalars(db.select(Order).order_by(Order.date.desc())).all()
+    rows = []
+    
+    for order in orders:
+        deliveries = db.session.scalars(
+            db.select(Delivery).filter_by(order_id=order.id).order_by(Delivery.delivery_date.asc())
+        ).all()
+        
+        running_balance = order.qty_ordered
+        
+        if not deliveries:
+            rows.append({
+                'ACCOUNT': order.account,
+                'DATE': order.date.strftime('%Y-%m-%d') if order.date else '',
+                'QTY ORDERED': order.qty_ordered,
+                'SO#': order.so_number,
+                'DR#': '',
+                'DELIVERY DATE': '',
+                'QTY OUT': '',
+                'DELIVERY BALANCE': running_balance,
+                'DELIVERY STATUS': '',
+                'REMARKS': ''
+            })
+        else:
+            for idx, delivery in enumerate(deliveries):
+                if delivery.status != 'CANCELLED':
+                    running_balance -= delivery.qty_out
+                
+                status_mapped = 'DONE' if delivery.status == 'FULFILLED' else delivery.status
+                
+                if idx == 0:
+                    rows.append({
+                        'ACCOUNT': order.account,
+                        'DATE': order.date.strftime('%Y-%m-%d') if order.date else '',
+                        'QTY ORDERED': order.qty_ordered,
+                        'SO#': order.so_number,
+                        'DR#': delivery.dr_number,
+                        'DELIVERY DATE': delivery.delivery_date.strftime('%Y-%m-%d') if delivery.delivery_date else '',
+                        'QTY OUT': delivery.qty_out,
+                        'DELIVERY BALANCE': running_balance,
+                        'DELIVERY STATUS': status_mapped,
+                        'REMARKS': delivery.remarks or ''
+                    })
+                else:
+                    rows.append({
+                        'ACCOUNT': '',
+                        'DATE': '',
+                        'QTY ORDERED': '',
+                        'SO#': '',
+                        'DR#': delivery.dr_number,
+                        'DELIVERY DATE': delivery.delivery_date.strftime('%Y-%m-%d') if delivery.delivery_date else '',
+                        'QTY OUT': delivery.qty_out,
+                        'DELIVERY BALANCE': running_balance,
+                        'DELIVERY STATUS': status_mapped,
+                        'REMARKS': delivery.remarks or ''
+                    })
+
+    df = pd.DataFrame(rows)
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Sheet1')
+    output.seek(0)
+    
+    return send_file(
+        output,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name='inventory_export.xlsx'
+    )

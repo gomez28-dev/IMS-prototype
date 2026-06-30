@@ -30,6 +30,9 @@ A modern, responsive, and secure prototype Admin Inventory Management System bui
 6. **Administrative Delete/Void Safety**:
    - Admins can delete orders (which cascade-deletes all associated deliveries) or individual deliveries.
    - All delete actions are protected by a JavaScript confirmation dialog to prevent accidental deletion.
+7. **Excel Data Export**:
+   - Export live tracking data into an Excel spreadsheet in memory using a flattened, grouped-row layout matching the legacy sheet format.
+   - Includes automatic status mappings (`FULFILLED` -> `DONE`) and running `DELIVERY BALANCE` math.
 
 ---
 
