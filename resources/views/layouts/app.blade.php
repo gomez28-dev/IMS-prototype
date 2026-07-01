@@ -40,25 +40,22 @@
         }
 
         .navbar-custom {
-            background: linear-gradient(135deg, var(--primary-navy) 0%, var(--secondary-navy) 100%);
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            background: #ffffff;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
             border-bottom: 3px solid var(--brand-color);
         }
 
-        .navbar-brand {
-            font-size: 1.25rem;
-            letter-spacing: -0.025em;
-        }
-
-        .nav-link.text-light {
+        .navbar-custom .nav-link {
             position: relative;
+            color: var(--text-dark);
+            font-weight: 500;
         }
 
-        .nav-link.text-light:hover {
-            opacity: 1 !important;
+        .navbar-custom .nav-link:hover {
+            color: var(--brand-color);
         }
 
-        .nav-link.text-light::after {
+        .navbar-custom .nav-link::after {
             content: '';
             position: absolute;
             bottom: -2px;
@@ -70,7 +67,7 @@
             transition: transform 0.2s ease-in-out;
         }
 
-        .nav-link.text-light:hover::after {
+        .navbar-custom .nav-link:hover::after {
             transform: scaleX(1);
         }
 
@@ -188,27 +185,27 @@
         }
 
         .badge-role-admin {
-            background-color: rgba(255, 69, 0, 0.15) !important;
+            background-color: rgba(255, 69, 0, 0.2) !important;
             color: #FF4500 !important;
-            border: 1px solid rgba(255, 69, 0, 0.3) !important;
+            border: 1px solid rgba(255, 69, 0, 0.4) !important;
             font-weight: 600;
             font-size: 0.65rem;
             letter-spacing: 0.04em;
         }
 
         .badge-role-editor {
-            background-color: rgba(96, 165, 250, 0.15) !important;
+            background-color: rgba(96, 165, 250, 0.2) !important;
             color: #60a5fa !important;
-            border: 1px solid rgba(96, 165, 250, 0.3) !important;
+            border: 1px solid rgba(96, 165, 250, 0.4) !important;
             font-weight: 600;
             font-size: 0.65rem;
             letter-spacing: 0.04em;
         }
 
         .badge-role-viewer {
-            background-color: rgba(148, 163, 184, 0.15) !important;
-            color: #94a3b8 !important;
-            border: 1px solid rgba(148, 163, 184, 0.3) !important;
+            background-color: rgba(148, 163, 184, 0.25) !important;
+            color: #64748b !important;
+            border: 1px solid rgba(148, 163, 184, 0.4) !important;
             font-weight: 600;
             font-size: 0.65rem;
             letter-spacing: 0.04em;
@@ -221,11 +218,12 @@
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark navbar-custom py-3">
+    <nav class="navbar navbar-expand-lg navbar-light navbar-custom py-4">
         <div class="container">
-            <a class="navbar-brand d-flex align-items-center fw-bold text-white" href="{{ route('dashboard') }}">
-                <i class="bi bi-box-seam me-2 text-primary"></i> IMS Admin
+            <a class="navbar-brand d-flex align-items-center" href="{{ route('dashboard') }}">
+                <img src="{{ asset('images/logo_ims.png') }}" alt="IMS Logo" height="28" class="me-2">
             </a>
+            <span class="ms-auto text-muted fw-bold d-none d-md-inline" style="font-size: 1.05rem;">Sales Inventory Portal</span>
             @auth
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -233,20 +231,20 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto align-items-center">
                     <li class="nav-item">
-                        <a class="nav-link text-light opacity-75" href="{{ route('reports.index') }}">
+                        <a class="nav-link" href="{{ route('reports.index') }}">
                             <i class="bi bi-bar-chart-line me-1"></i> Reports
                         </a>
                     </li>
                     @if (Auth::user()->isAdmin())
                     <li class="nav-item">
-                        <a class="nav-link text-light opacity-75" href="{{ route('accounts.index') }}">
+                        <a class="nav-link" href="{{ route('accounts.index') }}">
                             <i class="bi bi-people me-1"></i> Manage Accounts
                         </a>
                     </li>
                     @endif
                     @if (!Auth::user()->isViewer())
                     <li class="nav-item">
-                        <a class="nav-link text-light opacity-75" href="{{ route('audit-logs') }}">
+                        <a class="nav-link" href="{{ route('audit-logs') }}">
                             <i class="bi bi-journal-text me-1"></i> Audit Log
                         </a>
                     </li>
@@ -254,7 +252,7 @@
                 </ul>
                 <ul class="navbar-nav ms-auto align-items-center">
                     <li class="nav-item me-3">
-                        <span class="nav-link text-light opacity-75 d-flex align-items-center gap-0">
+                        <span class="nav-link d-flex align-items-center gap-0">
                             <i class="bi bi-person-circle me-1"></i> {{ Auth::user()->name }}
                             @if (Auth::user()->isAdmin())
                                 <span class="badge badge-role-admin rounded-pill ms-2 px-2 py-1">Admin</span>
@@ -268,7 +266,7 @@
                     <li class="nav-item">
                         <form action="{{ route('logout') }}" method="POST" class="d-inline">
                             @csrf
-                            <button type="submit" class="btn btn-outline-light btn-sm rounded-pill px-3">
+                            <button type="submit" class="btn btn-outline-dark btn-sm rounded-pill px-3">
                                 <i class="bi bi-box-arrow-right me-1"></i> Logout
                             </button>
                         </form>
@@ -306,7 +304,7 @@
 
     <footer class="footer mt-auto py-4 bg-white border-top text-center text-muted small">
         <div class="container">
-            &copy; 2026 Admin Inventory Management System. All rights reserved.
+            &copy; 2026 Sales Inventory Portal. All rights reserved.
         </div>
     </footer>
 
