@@ -17,8 +17,9 @@ class DatabaseSeeder extends Seeder
         Admin::updateOrCreate(
             ['username' => 'admin'],
             [
-                'password' => Hash::make('admin'),
-                'name' => 'Administrator',
+                'username' => 'portal.admin',
+                'password' => Hash::make('Doyen#Ims2026!Secure'),
+                'name' => 'Portal Administrator',
                 'role' => 'admin',
                 'is_active' => true,
             ]
