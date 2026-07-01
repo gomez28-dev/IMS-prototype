@@ -11,21 +11,27 @@
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
         :root {
             --primary-navy: #0f172a;
             --secondary-navy: #1e293b;
-            --accent-blue: #3b82f6;
+            --brand-color: #FF4500;
+            --brand-hover: #CC3700;
             --light-slate: #f8fafc;
             --border-color: #e2e8f0;
             --text-dark: #334155;
             --text-muted: #64748b;
+
+            --bs-primary: #FF4500;
+            --bs-primary-rgb: 255, 69, 0;
+            --bs-link-color: #FF4500;
+            --bs-link-hover-color: #CC3700;
         }
 
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Montserrat', sans-serif;
             background-color: #f1f5f9;
             color: var(--text-dark);
             min-height: 100vh;
@@ -36,12 +42,36 @@
         .navbar-custom {
             background: linear-gradient(135deg, var(--primary-navy) 0%, var(--secondary-navy) 100%);
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            border-bottom: 3px solid var(--brand-color);
         }
 
         .navbar-brand {
             font-size: 1.25rem;
             letter-spacing: -0.025em;
+        }
+
+        .nav-link.text-light {
+            position: relative;
+        }
+
+        .nav-link.text-light:hover {
+            opacity: 1 !important;
+        }
+
+        .nav-link.text-light::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background-color: var(--brand-color);
+            transform: scaleX(0);
+            transition: transform 0.2s ease-in-out;
+        }
+
+        .nav-link.text-light:hover::after {
+            transform: scaleX(1);
         }
 
         .card-custom {
@@ -98,6 +128,15 @@
             font-size: 0.75rem;
         }
 
+        .badge-type-pickup {
+            background-color: #e8f0fe !important;
+            color: #1967d2 !important;
+            border: 1px solid #c5d9f9 !important;
+            font-weight: 600;
+            padding: 0.5em 1em;
+            font-size: 0.75rem;
+        }
+
         .delivery-cancelled {
             background-color: var(--light-slate) !important;
             color: var(--text-muted) !important;
@@ -106,7 +145,7 @@
         }
 
         .btn-primary-custom {
-            background-color: var(--accent-blue);
+            background-color: var(--brand-color);
             border: none;
             font-weight: 500;
             border-radius: 10px;
@@ -117,9 +156,18 @@
         }
 
         .btn-primary-custom:hover {
-            background-color: #2563eb;
+            background-color: var(--brand-hover);
             transform: translateY(-1px);
             color: #ffffff;
+        }
+
+        .btn-outline-primary {
+            --bs-btn-color: var(--brand-color);
+            --bs-btn-border-color: var(--brand-color);
+            --bs-btn-hover-bg: var(--brand-color);
+            --bs-btn-hover-border-color: var(--brand-color);
+            --bs-btn-active-bg: var(--brand-color);
+            --bs-btn-active-border-color: var(--brand-color);
         }
 
         .btn-secondary-custom {
@@ -139,6 +187,33 @@
             color: var(--text-dark);
         }
 
+        .badge-role-admin {
+            background-color: rgba(255, 69, 0, 0.15) !important;
+            color: #FF4500 !important;
+            border: 1px solid rgba(255, 69, 0, 0.3) !important;
+            font-weight: 600;
+            font-size: 0.65rem;
+            letter-spacing: 0.04em;
+        }
+
+        .badge-role-editor {
+            background-color: rgba(96, 165, 250, 0.15) !important;
+            color: #60a5fa !important;
+            border: 1px solid rgba(96, 165, 250, 0.3) !important;
+            font-weight: 600;
+            font-size: 0.65rem;
+            letter-spacing: 0.04em;
+        }
+
+        .badge-role-viewer {
+            background-color: rgba(148, 163, 184, 0.15) !important;
+            color: #94a3b8 !important;
+            border: 1px solid rgba(148, 163, 184, 0.3) !important;
+            font-weight: 600;
+            font-size: 0.65rem;
+            letter-spacing: 0.04em;
+        }
+
         /* Micro-animations */
         .btn, .card-custom, .nav-link {
             transition: all 0.2s ease-in-out;
@@ -156,10 +231,38 @@
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto align-items-center">
+                    <li class="nav-item">
+                        <a class="nav-link text-light opacity-75" href="{{ route('reports.index') }}">
+                            <i class="bi bi-bar-chart-line me-1"></i> Reports
+                        </a>
+                    </li>
+                    @if (Auth::user()->isAdmin())
+                    <li class="nav-item">
+                        <a class="nav-link text-light opacity-75" href="{{ route('accounts.index') }}">
+                            <i class="bi bi-people me-1"></i> Manage Accounts
+                        </a>
+                    </li>
+                    @endif
+                    @if (!Auth::user()->isViewer())
+                    <li class="nav-item">
+                        <a class="nav-link text-light opacity-75" href="{{ route('audit-logs') }}">
+                            <i class="bi bi-journal-text me-1"></i> Audit Log
+                        </a>
+                    </li>
+                    @endif
+                </ul>
                 <ul class="navbar-nav ms-auto align-items-center">
                     <li class="nav-item me-3">
-                        <span class="nav-link text-light opacity-75">
-                            <i class="bi bi-person-circle me-1"></i> {{ Auth::user()->username }}
+                        <span class="nav-link text-light opacity-75 d-flex align-items-center gap-0">
+                            <i class="bi bi-person-circle me-1"></i> {{ Auth::user()->name }}
+                            @if (Auth::user()->isAdmin())
+                                <span class="badge badge-role-admin rounded-pill ms-2 px-2 py-1">Admin</span>
+                            @elseif (Auth::user()->isEditor())
+                                <span class="badge badge-role-editor rounded-pill ms-2 px-2 py-1">Editor</span>
+                            @else
+                                <span class="badge badge-role-viewer rounded-pill ms-2 px-2 py-1">Viewer</span>
+                            @endif
                         </span>
                     </li>
                     <li class="nav-item">

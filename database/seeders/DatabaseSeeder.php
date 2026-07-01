@@ -14,9 +14,14 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         // Seed default Admin
-        Admin::firstOrCreate(
+        Admin::updateOrCreate(
             ['username' => 'admin'],
-            ['password' => Hash::make('admin')]
+            [
+                'password' => Hash::make('admin'),
+                'name' => 'Administrator',
+                'role' => 'admin',
+                'is_active' => true,
+            ]
         );
     }
 }

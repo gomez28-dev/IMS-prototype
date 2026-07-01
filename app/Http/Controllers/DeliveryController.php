@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditLog;
 use App\Models\Order;
 use App\Models\Delivery;
 use Illuminate\Http\Request;
@@ -45,6 +46,7 @@ class DeliveryController extends Controller
             'delivery_date' => ['required', 'date'],
             'qty_out' => ['required', 'integer', 'min:0'],
             'status' => ['required', 'string', 'in:PENDING,FULFILLED,CANCELLED'],
+            'type' => ['required', 'string', 'in:PICK-UP,DELIVERY'],
             'remarks' => ['nullable', 'string'],
         ]);
 
@@ -54,7 +56,13 @@ class DeliveryController extends Controller
             }
         }
 
-        $order->deliveries()->create($validated);
+        $delivery = $order->deliveries()->create($validated);
+
+        AuditLog::create([
+            'admin_id' => auth()->id(),
+            'action' => 'created',
+            'description' => "Created delivery {$delivery->dr_number} for order #{$order->id} - {$order->account}",
+        ]);
 
         return redirect()->route('order.deliveries', $order->id)
             ->with('success', 'Delivery added successfully.');
@@ -84,6 +92,7 @@ class DeliveryController extends Controller
             'delivery_date' => ['required', 'date'],
             'qty_out' => ['required', 'integer', 'min:0'],
             'status' => ['required', 'string', 'in:PENDING,FULFILLED,CANCELLED'],
+            'type' => ['required', 'string', 'in:PICK-UP,DELIVERY'],
             'remarks' => ['nullable', 'string'],
         ]);
 
@@ -99,6 +108,12 @@ class DeliveryController extends Controller
 
         $delivery->update($validated);
 
+        AuditLog::create([
+            'admin_id' => auth()->id(),
+            'action' => 'updated',
+            'description' => "Updated delivery {$delivery->dr_number} for order #{$order->id} - {$order->account}",
+        ]);
+
         return redirect()->route('order.deliveries', $order->id)
             ->with('success', 'Delivery updated successfully.');
     }
@@ -109,6 +124,14 @@ class DeliveryController extends Controller
     public function destroy(Delivery $delivery): RedirectResponse
     {
         $orderId = $delivery->order_id;
+        $order = $delivery->order;
+
+        AuditLog::create([
+            'admin_id' => auth()->id(),
+            'action' => 'deleted',
+            'description' => "Deleted delivery {$delivery->dr_number} for order #{$order->id} - {$order->account}",
+        ]);
+
         $delivery->delete();
 
         return redirect()->route('order.deliveries', $orderId)

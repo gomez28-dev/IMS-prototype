@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditLog;
 use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
@@ -32,7 +33,13 @@ class OrderController extends Controller
             'so_number' => ['required', 'string', 'max:64'],
         ]);
 
-        Order::create($validated);
+        $order = Order::create($validated);
+
+        AuditLog::create([
+            'admin_id' => auth()->id(),
+            'action' => 'created',
+            'description' => "Created order #{$order->id} - {$order->account}",
+        ]);
 
         return redirect()->route('dashboard')
             ->with('success', 'Order created successfully.');
@@ -63,6 +70,12 @@ class OrderController extends Controller
 
         $order->update($validated);
 
+        AuditLog::create([
+            'admin_id' => auth()->id(),
+            'action' => 'updated',
+            'description' => "Updated order #{$order->id} - {$order->account}",
+        ]);
+
         return redirect()->route('dashboard')
             ->with('success', 'Order updated successfully.');
     }
@@ -72,6 +85,12 @@ class OrderController extends Controller
      */
     public function destroy(Order $order): RedirectResponse
     {
+        AuditLog::create([
+            'admin_id' => auth()->id(),
+            'action' => 'deleted',
+            'description' => "Deleted order #{$order->id} - {$order->account}",
+        ]);
+
         $order->delete();
 
         return redirect()->route('dashboard')

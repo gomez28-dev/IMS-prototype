@@ -61,9 +61,23 @@
                         </div>
                     </div>
 
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="type" class="form-label fw-medium text-secondary small">Type</label>
+                            <select name="type" id="type" class="form-control form-select @error('type') is-invalid @enderror" required>
+                                <option value="DELIVERY" {{ old('type', $delivery ? $delivery->type : 'DELIVERY') === 'DELIVERY' ? 'selected' : '' }}>DELIVERY</option>
+                                <option value="PICK-UP" {{ old('type', $delivery ? $delivery->type : '') === 'PICK-UP' ? 'selected' : '' }}>PICK-UP</option>
+                            </select>
+                            @error('type')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="col-md-6"></div>
+                    </div>
+
                     <div class="mb-4">
-                        <label for="remarks" class="form-label fw-medium text-secondary small">Remarks</label>
-                        <textarea name="remarks" id="remarks" class="form-control @error('remarks') is-invalid @enderror" rows="3" placeholder="Optional delivery notes or remarks...">{{ old('remarks', $delivery ? $delivery->remarks : '') }}</textarea>
+                        <label for="remarks" class="form-label fw-medium text-secondary small">Additional Notes</label>
+                        <textarea name="remarks" id="remarks" class="form-control @error('remarks') is-invalid @enderror" rows="3" placeholder="Optional additional notes...">{{ old('remarks', $delivery ? $delivery->remarks : '') }}</textarea>
                         @error('remarks')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror

@@ -15,12 +15,14 @@ class Delivery extends Model
         'delivery_date',
         'qty_out',
         'status',
+        'type',
         'remarks',
     ];
 
     protected $casts = [
         'delivery_date' => 'datetime',
         'qty_out' => 'integer',
+        'type' => 'string',
     ];
 
     /**

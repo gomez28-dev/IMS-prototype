@@ -14,6 +14,9 @@ class Admin extends Authenticatable
     protected $fillable = [
         'username',
         'password',
+        'name',
+        'role',
+        'is_active',
     ];
 
     protected $hidden = [
@@ -23,5 +26,26 @@ class Admin extends Authenticatable
 
     protected $casts = [
         'password' => 'hashed',
+        'is_active' => 'boolean',
     ];
+
+    public function hasRole(string|array $roles): bool
+    {
+        return in_array($this->role, (array) $roles);
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
+    public function isEditor(): bool
+    {
+        return $this->role === 'editor';
+    }
+
+    public function isViewer(): bool
+    {
+        return $this->role === 'viewer';
+    }
 }

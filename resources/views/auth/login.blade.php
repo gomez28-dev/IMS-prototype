@@ -8,7 +8,7 @@
         <div class="card card-custom p-4 border-0">
             <div class="card-body">
                 <div class="text-center mb-4">
-                    <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 60px; height: 60px; background-color: #eff6ff !important; color: #3b82f6 !important;">
+                    <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 60px; height: 60px;">
                         <i class="bi bi-shield-lock fs-2"></i>
                     </div>
                     <h4 class="fw-bold text-dark">Admin Login</h4>

@@ -14,7 +14,7 @@
     <div class="card-body p-4">
         <div class="row align-items-center">
             <div class="col-md-6 mb-3 mb-md-0">
-                <span class="badge bg-primary bg-opacity-10 text-primary mb-2 fw-semibold px-3 py-2" style="background-color: #eff6ff !important; color: #3b82f6 !important;">
+                    <span class="badge bg-primary bg-opacity-10 text-primary mb-2 fw-semibold px-3 py-2">
                     SO# {{ $order->so_number }}
                 </span>
                 <h3 class="fw-bold mb-1 text-dark">{{ $order->account }}</h3>
@@ -51,12 +51,14 @@
 </div>
 
 <!-- Deliveries List Header -->
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h4 class="fw-bold mb-0 text-dark"><i class="bi bi-truck me-2 text-primary"></i>Deliveries</h4>
-    <a href="{{ route('delivery.create', $order->id) }}" class="btn btn-primary-custom shadow-sm d-flex align-items-center">
-        <i class="bi bi-plus-lg me-2"></i> Add Delivery
-    </a>
-</div>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="fw-bold mb-0 text-dark"><i class="bi bi-truck me-2 text-primary"></i>Deliveries</h4>
+        @if (!Auth::user()->isViewer())
+        <a href="{{ route('delivery.create', $order->id) }}" class="btn btn-primary-custom shadow-sm d-flex align-items-center">
+            <i class="bi bi-plus-lg me-2"></i> Add Delivery
+        </a>
+        @endif
+    </div>
 
 <!-- Deliveries Table -->
 <div class="card card-custom border-0 overflow-hidden">
@@ -69,7 +71,7 @@
                         <th>Delivery Date</th>
                         <th class="text-end">Qty Out</th>
                         <th class="text-center">Status</th>
-                        <th>Remarks</th>
+                        <th class="text-center">Type</th>
                         <th class="text-end pe-4">Action</th>
                     </tr>
                 </thead>
@@ -91,18 +93,28 @@
                                     <span class="badge bg-secondary rounded-pill">{{ $delivery->status }}</span>
                                 @endif
                             </td>
-                            <td class="text-muted small">{{ $delivery->remarks ?? '-' }}</td>
+                            <td class="text-center">
+                                @if ($delivery->type === 'PICK-UP')
+                                    <span class="badge badge-type-pickup rounded-pill px-3 py-1">PICK-UP</span>
+                                @else
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1">DELIVERY</span>
+                                @endif
+                            </td>
                             <td class="text-end pe-4">
                                 <div class="d-flex justify-content-end gap-1">
+                                    @if (!Auth::user()->isViewer())
                                     <a href="{{ route('delivery.edit', $delivery->id) }}" class="btn btn-sm btn-outline-secondary rounded-3 px-2 py-1">
                                         <i class="bi bi-pencil me-1"></i> Edit
                                     </a>
+                                    @endif
+                                    @if (Auth::user()->isAdmin())
                                     <form method="POST" action="{{ route('delivery.delete', $delivery->id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this delivery?');">
                                         @csrf
                                         <button type="submit" class="btn btn-sm btn-outline-danger rounded-3 px-2 py-1" title="Delete Delivery">
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </form>
+                                    @endif
                                 </div>
                             </td>
                         </tr>

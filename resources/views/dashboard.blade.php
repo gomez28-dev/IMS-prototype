@@ -10,15 +10,19 @@
         <p class="text-muted small mb-0">Manage customer accounts, sales orders, and delivery statuses.</p>
     </div>
     <div class="d-flex flex-wrap gap-2">
+        @if (!Auth::user()->isViewer())
         <a href="{{ route('import.form') }}" class="btn btn-secondary-custom shadow-sm d-flex align-items-center">
             <i class="bi bi-file-earmark-excel me-2 text-success"></i> Import Excel
         </a>
+        @endif
         <a href="{{ route('export') }}" class="btn btn-secondary-custom shadow-sm d-flex align-items-center">
             <i class="bi bi-download me-2 text-primary"></i> Download Excel
         </a>
+        @if (!Auth::user()->isViewer())
         <a href="{{ route('order.create') }}" class="btn btn-primary-custom shadow-sm d-flex align-items-center">
             <i class="bi bi-plus-lg me-2"></i> New Order
         </a>
+        @endif
     </div>
 </div>
 
@@ -33,7 +37,7 @@
     <div class="col-md-3 col-sm-6">
         <div class="card card-custom p-3 border-0">
             <div class="d-flex align-items-center">
-                <div class="rounded-3 p-3 bg-primary bg-opacity-10 text-primary me-3" style="background-color: #eff6ff !important; color: #3b82f6 !important;">
+                    <div class="rounded-3 p-3 bg-primary bg-opacity-10 text-primary me-3">
                     <i class="bi bi-journal-text fs-4"></i>
                 </div>
                 <div>
@@ -145,15 +149,19 @@
                                     <a href="{{ route('order.deliveries', $order->id) }}" class="btn btn-sm btn-outline-primary rounded-3 px-2 py-1" title="View Deliveries">
                                         <i class="bi bi-truck me-1"></i> Deliveries
                                     </a>
+                                    @if (!Auth::user()->isViewer())
                                     <a href="{{ route('order.edit', $order->id) }}" class="btn btn-sm btn-outline-secondary rounded-3 px-2 py-1" title="Edit Order">
                                         <i class="bi bi-pencil"></i>
                                     </a>
+                                    @endif
+                                    @if (Auth::user()->isAdmin())
                                     <form method="POST" action="{{ route('order.delete', $order->id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this order? This will also delete all associated deliveries.');">
                                         @csrf
                                         <button type="submit" class="btn btn-sm btn-outline-danger rounded-3 px-2 py-1" title="Delete Order">
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </form>
+                                    @endif
                                 </div>
                             </td>
                         </tr>

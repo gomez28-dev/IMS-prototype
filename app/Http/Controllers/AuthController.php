@@ -28,6 +28,13 @@ class AuthController extends Controller
         ]);
 
         if (Auth::attempt($credentials)) {
+            if (!Auth::user()->is_active) {
+                Auth::logout();
+                return back()->withErrors([
+                    'username' => 'Your account has been deactivated.',
+                ])->withInput($request->only('username'))->with('danger', 'Account deactivated.');
+            }
+
             $request->session()->regenerate();
             
             return redirect()->intended(route('dashboard'))
