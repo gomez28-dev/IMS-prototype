@@ -174,10 +174,10 @@
                             </a>
                             @endif
                             @if (Auth::user()->isAdmin())
-                            <form method="POST" action="{{ route('delivery.delete', $delivery->id) }}" class="flex-fill" onsubmit="return confirm('Are you sure you want to delete this delivery?');">
+                            <form method="POST" action="{{ route('delivery.delete', $delivery->id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this delivery?');">
                                 @csrf
-                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-3 px-3 py-2 w-100">
-                                    <i class="bi bi-trash me-1"></i> Delete
+                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-3 px-3 py-2">
+                                    <i class="bi bi-trash"></i> Delete
                                 </button>
                             </form>
                             @endif

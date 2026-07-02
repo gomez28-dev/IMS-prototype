@@ -35,6 +35,15 @@ Route::middleware('auth')->group(function () {
         Route::post('/order/{order}/delivery/new', [DeliveryController::class, 'store'])->name('delivery.store');
         Route::get('/delivery/{delivery}/edit', [DeliveryController::class, 'edit'])->name('delivery.edit');
         Route::post('/delivery/{delivery}/edit', [DeliveryController::class, 'update'])->name('delivery.update');
+
+        Route::prefix('clients')->name('clients.')->group(function () {
+            Route::get('/', [ClientController::class, 'index'])->name('index');
+            Route::get('/create', [ClientController::class, 'create'])->name('create');
+            Route::post('/', [ClientController::class, 'store'])->name('store');
+            Route::get('/{client}/edit', [ClientController::class, 'edit'])->name('edit');
+            Route::post('/{client}/edit', [ClientController::class, 'update'])->name('update');
+            Route::post('/{client}/delete', [ClientController::class, 'destroy'])->name('destroy');
+        });
     });
 
     Route::middleware('role:admin')->group(function () {
@@ -48,15 +57,6 @@ Route::middleware('auth')->group(function () {
             Route::get('/{admin}/edit', [AdminController::class, 'edit'])->name('edit');
             Route::post('/{admin}/edit', [AdminController::class, 'update'])->name('update');
             Route::post('/{admin}/toggle-active', [AdminController::class, 'toggleActive'])->name('toggle-active');
-        });
-
-        Route::prefix('clients')->name('clients.')->group(function () {
-            Route::get('/', [ClientController::class, 'index'])->name('index');
-            Route::get('/create', [ClientController::class, 'create'])->name('create');
-            Route::post('/', [ClientController::class, 'store'])->name('store');
-            Route::get('/{client}/edit', [ClientController::class, 'edit'])->name('edit');
-            Route::post('/{client}/edit', [ClientController::class, 'update'])->name('update');
-            Route::post('/{client}/delete', [ClientController::class, 'destroy'])->name('destroy');
         });
     });
 

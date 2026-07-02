@@ -14,6 +14,7 @@
 </div>
 
 <!-- Tabs toggle -->
+@if (Auth::user()->isAdmin())
 <ul class="nav nav-tabs mb-4">
     <li class="nav-item">
         <a class="nav-link" href="{{ route('accounts.index') }}">
@@ -26,6 +27,7 @@
         </a>
     </li>
 </ul>
+@endif
 
 <div class="card card-custom border-0 overflow-hidden">
     <div class="card-body p-0">
@@ -81,10 +83,10 @@
                             <a href="{{ route('clients.edit', $client->id) }}" class="btn btn-sm btn-outline-secondary rounded-3 px-3 py-2 flex-fill text-center">
                                 <i class="bi bi-pencil me-1"></i> Edit
                             </a>
-                            <form method="POST" action="{{ route('clients.destroy', $client->id) }}" class="flex-fill" onsubmit="return confirm('Are you sure you want to delete this client?');">
+                            <form method="POST" action="{{ route('clients.destroy', $client->id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this client?');">
                                 @csrf
-                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-3 px-3 py-2 w-100">
-                                    <i class="bi bi-trash me-1"></i> Delete
+                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-3 px-3 py-2">
+                                    <i class="bi bi-trash"></i> Delete
                                 </button>
                             </form>
                         </div>

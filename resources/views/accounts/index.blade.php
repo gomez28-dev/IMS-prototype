@@ -125,15 +125,15 @@
                                 <i class="bi bi-pencil me-1"></i> Edit
                             </a>
                             @if ($admin->id !== Auth::id())
-                            <form method="POST" action="{{ route('accounts.toggle-active', $admin->id) }}" class="flex-fill">
+                            <form method="POST" action="{{ route('accounts.toggle-active', $admin->id) }}" class="d-inline">
                                 @csrf
                                 @if ($admin->is_active)
-                                    <button type="submit" class="btn btn-sm btn-outline-warning rounded-3 px-3 py-2 w-100" onclick="return confirm('Deactivate this account? The user will not be able to log in.');">
-                                        <i class="bi bi-pause-circle me-1"></i> Deactivate
+                                    <button type="submit" class="btn btn-sm btn-outline-warning rounded-3 px-3 py-2" onclick="return confirm('Deactivate this account? The user will not be able to log in.');">
+                                        <i class="bi bi-pause-circle"></i> Deactivate
                                     </button>
                                 @else
-                                    <button type="submit" class="btn btn-sm btn-outline-success rounded-3 px-3 py-2 w-100">
-                                        <i class="bi bi-play-circle me-1"></i> Reactivate
+                                    <button type="submit" class="btn btn-sm btn-outline-success rounded-3 px-3 py-2">
+                                        <i class="bi bi-play-circle"></i> Reactivate
                                     </button>
                                 @endif
                             </form>

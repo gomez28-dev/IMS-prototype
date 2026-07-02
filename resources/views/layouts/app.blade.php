@@ -262,6 +262,13 @@
                         </a>
                     </li>
                     @endif
+                    @if (Auth::user()->isAdmin() || Auth::user()->isEditor())
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ route('clients.index') }}">
+                            <i class="bi bi-building me-1"></i> Manage Clients
+                        </a>
+                    </li>
+                    @endif
                     @if (!Auth::user()->isViewer())
                     <li class="nav-item">
                         <a class="nav-link" href="{{ route('audit-logs') }}">

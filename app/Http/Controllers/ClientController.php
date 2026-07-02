@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditLog;
 use App\Models\Client;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
@@ -26,7 +27,13 @@ class ClientController extends Controller
             'name' => ['required', 'string', 'max:128', 'unique:clients,name'],
         ]);
 
-        Client::create($validated);
+        $client = Client::create($validated);
+
+        AuditLog::create([
+            'admin_id' => auth()->id(),
+            'action' => 'created',
+            'description' => "Created client account: {$client->name}",
+        ]);
 
         return redirect()->route('clients.index')
             ->with('success', 'Client created successfully.');
@@ -45,12 +52,24 @@ class ClientController extends Controller
 
         $client->update($validated);
 
+        AuditLog::create([
+            'admin_id' => auth()->id(),
+            'action' => 'updated',
+            'description' => "Updated client account: {$client->name}",
+        ]);
+
         return redirect()->route('clients.index')
             ->with('success', 'Client updated successfully.');
     }
 
     public function destroy(Client $client): RedirectResponse
     {
+        AuditLog::create([
+            'admin_id' => auth()->id(),
+            'action' => 'deleted',
+            'description' => "Deleted client account: {$client->name}",
+        ]);
+
         $client->delete();
 
         return redirect()->route('clients.index')
