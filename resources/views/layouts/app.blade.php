@@ -262,7 +262,7 @@
                         </a>
                     </li>
                     @endif
-                    @if (Auth::user()->isAdmin() || Auth::user()->isEditor())
+                    @if (Auth::user()->isEditor())
                     <li class="nav-item">
                         <a class="nav-link" href="{{ route('clients.index') }}">
                             <i class="bi bi-building me-1"></i> Manage Clients
