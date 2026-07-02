@@ -44,13 +44,13 @@
                         <tr>
                             <td class="ps-4 fw-semibold text-dark">{{ $client->name }}</td>
                             <td class="text-end pe-4">
-                                <div class="d-flex justify-content-end gap-1">
-                                    <a href="{{ route('clients.edit', $client->id) }}" class="btn btn-sm btn-outline-secondary rounded-3 px-2 py-1" title="Edit Client">
+                                <div class="d-flex justify-content-end gap-2">
+                                    <a href="{{ route('clients.edit', $client->id) }}" class="btn btn-sm btn-outline-secondary rounded-3 px-3 py-1" title="Edit Client">
                                         <i class="bi bi-pencil me-1"></i> Edit
                                     </a>
                                     <form method="POST" action="{{ route('clients.destroy', $client->id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this client?');">
                                         @csrf
-                                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-3 px-2 py-1" title="Delete Client">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-3 px-3 py-1" title="Delete Client">
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </form>

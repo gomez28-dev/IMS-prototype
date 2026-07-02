@@ -211,6 +211,26 @@
             letter-spacing: 0.04em;
         }
 
+        /* Consistent action button sizing */
+        .table-custom .btn-sm {
+            padding: 0.35rem 0.7rem;
+            min-height: 32px;
+            min-width: 32px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+        }
+
+        .card .btn-sm {
+            padding: 0.45rem 0.9rem;
+            min-height: 38px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+        }
+
         /* Micro-animations */
         .btn, .card-custom, .nav-link {
             transition: all 0.2s ease-in-out;

@@ -102,16 +102,16 @@
                                 @endif
                             </td>
                             <td class="text-end pe-4">
-                                <div class="d-flex justify-content-end gap-1">
+                                <div class="d-flex justify-content-end gap-2">
                                     @if (!Auth::user()->isViewer())
-                                    <a href="{{ route('delivery.edit', $delivery->id) }}" class="btn btn-sm btn-outline-secondary rounded-3 px-2 py-1">
+                                    <a href="{{ route('delivery.edit', $delivery->id) }}" class="btn btn-sm btn-outline-secondary rounded-3 px-3 py-1">
                                         <i class="bi bi-pencil me-1"></i> Edit
                                     </a>
                                     @endif
                                     @if (Auth::user()->isAdmin())
                                     <form method="POST" action="{{ route('delivery.delete', $delivery->id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this delivery?');">
                                         @csrf
-                                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-3 px-2 py-1" title="Delete Delivery">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-3 px-3 py-1" title="Delete Delivery">
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </form>

@@ -146,19 +146,19 @@
                                 @endif
                             </td>
                             <td class="text-end pe-4">
-                                <div class="d-flex justify-content-end gap-1">
-                                    <a href="{{ route('order.deliveries', $order->id) }}" class="btn btn-sm btn-outline-primary rounded-3 px-2 py-1" title="View Deliveries">
+                                <div class="d-flex justify-content-end gap-2">
+                                    <a href="{{ route('order.deliveries', $order->id) }}" class="btn btn-sm btn-outline-primary rounded-3 px-3 py-1" title="View Deliveries">
                                         <i class="bi bi-truck me-1"></i> Deliveries
                                     </a>
                                     @if (!Auth::user()->isViewer())
-                                    <a href="{{ route('order.edit', $order->id) }}" class="btn btn-sm btn-outline-secondary rounded-3 px-2 py-1" title="Edit Order">
+                                    <a href="{{ route('order.edit', $order->id) }}" class="btn btn-sm btn-outline-secondary rounded-3 px-3 py-1" title="Edit Order">
                                         <i class="bi bi-pencil"></i>
                                     </a>
                                     @endif
                                     @if (Auth::user()->isAdmin())
                                     <form method="POST" action="{{ route('order.delete', $order->id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this order? This will also delete all associated deliveries.');">
                                         @csrf
-                                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-3 px-2 py-1" title="Delete Order">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-3 px-3 py-1" title="Delete Order">
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </form>

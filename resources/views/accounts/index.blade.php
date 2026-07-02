@@ -64,19 +64,19 @@
                                 @endif
                             </td>
                             <td class="text-end pe-4">
-                                <div class="d-flex justify-content-end gap-1">
-                                    <a href="{{ route('accounts.edit', $admin->id) }}" class="btn btn-sm btn-outline-secondary rounded-3 px-2 py-1" title="Edit Account">
+                                <div class="d-flex justify-content-end gap-2">
+                                    <a href="{{ route('accounts.edit', $admin->id) }}" class="btn btn-sm btn-outline-secondary rounded-3 px-3 py-1" title="Edit Account">
                                         <i class="bi bi-pencil me-1"></i> Edit
                                     </a>
                                     @if ($admin->id !== Auth::id())
                                     <form method="POST" action="{{ route('accounts.toggle-active', $admin->id) }}" class="d-inline">
                                         @csrf
                                         @if ($admin->is_active)
-                                            <button type="submit" class="btn btn-sm btn-outline-warning rounded-3 px-2 py-1" title="Deactivate Account" onclick="return confirm('Deactivate this account? The user will not be able to log in.');">
+                                            <button type="submit" class="btn btn-sm btn-outline-warning rounded-3 px-3 py-1" title="Deactivate Account" onclick="return confirm('Deactivate this account? The user will not be able to log in.');">
                                                 <i class="bi bi-pause-circle me-1"></i> Deactivate
                                             </button>
                                         @else
-                                            <button type="submit" class="btn btn-sm btn-outline-success rounded-3 px-2 py-1" title="Reactivate Account">
+                                            <button type="submit" class="btn btn-sm btn-outline-success rounded-3 px-3 py-1" title="Reactivate Account">
                                                 <i class="bi bi-play-circle me-1"></i> Reactivate
                                             </button>
                                         @endif
