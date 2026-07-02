@@ -241,6 +241,11 @@
                             <i class="bi bi-people me-1"></i> Manage Accounts
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ route('clients.index') }}">
+                            <i class="bi bi-building me-1"></i> Manage Clients
+                        </a>
+                    </li>
                     @endif
                     @if (!Auth::user()->isViewer())
                     <li class="nav-item">

@@ -50,7 +50,7 @@ class DeliveryController extends Controller
             'remarks' => ['nullable', 'string'],
         ]);
 
-        if ($validated['status'] !== 'CANCELLED') {
+        if ($validated['status'] === 'FULFILLED') {
             if ($validated['qty_out'] > $order->remaining_balance) {
                 return back()->withInput()->with('danger', 'Error: Delivery quantity exceeds the remaining order balance!');
             }
@@ -96,9 +96,9 @@ class DeliveryController extends Controller
             'remarks' => ['nullable', 'string'],
         ]);
 
-        if ($validated['status'] !== 'CANCELLED') {
+        if ($validated['status'] === 'FULFILLED') {
             $adjustedBalance = $order->remaining_balance;
-            if ($delivery->status !== 'CANCELLED') {
+            if ($delivery->status === 'FULFILLED') {
                 $adjustedBalance += $delivery->qty_out;
             }
             if ($validated['qty_out'] > $adjustedBalance) {

@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\ClientController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\OrderController;
@@ -47,6 +48,15 @@ Route::middleware('auth')->group(function () {
             Route::get('/{admin}/edit', [AdminController::class, 'edit'])->name('edit');
             Route::post('/{admin}/edit', [AdminController::class, 'update'])->name('update');
             Route::post('/{admin}/toggle-active', [AdminController::class, 'toggleActive'])->name('toggle-active');
+        });
+
+        Route::prefix('clients')->name('clients.')->group(function () {
+            Route::get('/', [ClientController::class, 'index'])->name('index');
+            Route::get('/create', [ClientController::class, 'create'])->name('create');
+            Route::post('/', [ClientController::class, 'store'])->name('store');
+            Route::get('/{client}/edit', [ClientController::class, 'edit'])->name('edit');
+            Route::post('/{client}/edit', [ClientController::class, 'update'])->name('update');
+            Route::post('/{client}/delete', [ClientController::class, 'destroy'])->name('destroy');
         });
     });
 

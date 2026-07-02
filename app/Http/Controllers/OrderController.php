@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
+use App\Models\Client;
 use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
@@ -18,6 +19,7 @@ class OrderController extends Controller
         return view('orders.form', [
             'title' => 'New Order',
             'order' => null,
+            'clients' => Client::orderBy('name', 'asc')->get(),
         ]);
     }
 
@@ -53,6 +55,7 @@ class OrderController extends Controller
         return view('orders.form', [
             'title' => 'Edit Order',
             'order' => $order,
+            'clients' => Client::orderBy('name', 'asc')->get(),
         ]);
     }
 

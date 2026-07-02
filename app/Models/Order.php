@@ -30,12 +30,12 @@ class Order extends Model
     }
 
     /**
-     * Get total quantity delivered (excluding CANCELLED status).
+     * Get total quantity delivered (only FULFILLED deliveries count).
      */
     public function getTotalQtyOutAttribute(): int
     {
         return $this->deliveries()
-            ->where('status', '!=', 'CANCELLED')
+            ->where('status', 'FULFILLED')
             ->sum('qty_out');
     }
 

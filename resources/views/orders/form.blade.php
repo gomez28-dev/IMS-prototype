@@ -21,7 +21,12 @@
                     
                     <div class="mb-3">
                         <label for="account" class="form-label fw-medium text-secondary small">Account</label>
-                        <input type="text" name="account" id="account" class="form-control @error('account') is-invalid @enderror" placeholder="e.g. COMPANY ABC" value="{{ old('account', $order ? $order->account : '') }}" required>
+                        <select name="account" id="account" class="form-control form-select @error('account') is-invalid @enderror" required>
+                            <option value="" disabled {{ old('account', $order ? $order->account : '') === '' ? 'selected' : '' }}>Select a client account...</option>
+                            @foreach ($clients as $client)
+                                <option value="{{ $client->name }}" {{ old('account', $order ? $order->account : '') === $client->name ? 'selected' : '' }}>{{ $client->name }}</option>
+                            @endforeach
+                        </select>
                         @error('account')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
