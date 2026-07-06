@@ -380,9 +380,7 @@
             <a class="navbar-brand d-flex align-items-center" href="{{ route('dashboard') }}">
                 <img src="{{ asset('images/logo_ims.png') }}" alt="IMS Logo" class="me-2">
         </a>
-        @guest
-        <span class="ms-auto text-muted fw-bold" style="font-size: 1.05rem;">Sales Inventory Portal</span>
-        @endguest
+        <span class="ms-auto text-muted fw-bold d-lg-none" style="font-size: 1.05rem;">Sales Inventory Portal</span>
         @auth
             <button class="hamburger-btn d-lg-none ms-2" type="button" onclick="openSidebar()" aria-label="Toggle navigation">
                 <i class="bi bi-list"></i>
