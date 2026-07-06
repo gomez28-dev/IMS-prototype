@@ -14,18 +14,14 @@
 </div>
 
 <!-- Tabs toggle -->
-<ul class="nav nav-tabs mb-4">
-    <li class="nav-item">
-        <a class="nav-link active" href="{{ route('accounts.index') }}">
-            <i class="bi bi-people me-1"></i> System Accounts
-        </a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="{{ route('clients.index') }}">
-            <i class="bi bi-building me-1"></i> Client Accounts
-        </a>
-    </li>
-</ul>
+<div class="d-flex flex-row align-items-center gap-4 mb-4 border-bottom pb-2">
+    <a class="fw-semibold text-decoration-none pb-1 {{ request()->routeIs('accounts.*') ? 'text-dark border-bottom border-2 border-primary' : 'text-muted' }}" href="{{ route('accounts.index') }}">
+        <i class="bi bi-people me-1"></i> System Accounts
+    </a>
+    <a class="fw-semibold text-decoration-none pb-1 {{ request()->routeIs('clients.*') ? 'text-dark border-bottom border-2 border-primary' : 'text-muted' }}" href="{{ route('clients.index') }}">
+        <i class="bi bi-building me-1"></i> Client Accounts
+    </a>
+</div>
 
 <div class="card card-custom border-0 overflow-hidden">
     <div class="card-body p-0">
