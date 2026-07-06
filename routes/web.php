@@ -20,9 +20,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/logout', [AuthController::class, 'logout']);
 
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/export/excel', [DashboardController::class, 'export'])->name('export');
 
     Route::middleware('role:admin,editor')->group(function () {
-        Route::get('/export/excel', [DashboardController::class, 'export'])->name('export');
         Route::get('/import/excel', [DashboardController::class, 'showImportForm'])->name('import.form');
         Route::post('/import/excel', [DashboardController::class, 'import'])->name('import');
 
