@@ -320,6 +320,7 @@
     <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 
     <!-- Mobile sidebar drawer -->
+    @auth
     <div class="sidebar-drawer d-lg-none" id="sidebarDrawer">
         <div class="d-flex flex-column h-100">
             <div class="p-3 border-bottom">
@@ -371,6 +372,7 @@
             </div>
         </div>
     </div>
+    @endauth
 
     <nav class="navbar navbar-expand-lg navbar-light navbar-custom py-4">
         <div class="container">
