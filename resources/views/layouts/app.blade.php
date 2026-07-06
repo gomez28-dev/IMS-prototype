@@ -470,7 +470,7 @@
 
     <footer class="footer mt-auto py-4 bg-white border-top text-center text-muted small">
         <div class="container">
-            &copy; 2026 Sales Inventory Portal. All rights reserved.
+            &copy; 2026 Doyen Group of Companies. All rights reserved.
         </div>
     </footer>
 
