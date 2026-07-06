@@ -3,7 +3,7 @@
 @section('title', 'Manage Accounts')
 
 @section('content')
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
     <div>
         <h2 class="fw-bold text-dark mb-1">Manage Accounts</h2>
         <p class="text-muted small mb-0">Create and manage admin accounts with role-based access.</p>
