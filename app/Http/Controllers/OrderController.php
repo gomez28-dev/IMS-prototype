@@ -52,6 +52,10 @@ class OrderController extends Controller
      */
     public function edit(Order $order): View
     {
+        if (auth()->user()->isViewer()) {
+            abort(403);
+        }
+
         return view('orders.form', [
             'title' => 'Edit Order',
             'order' => $order,
@@ -64,6 +68,10 @@ class OrderController extends Controller
      */
     public function update(Request $request, Order $order): RedirectResponse
     {
+        if (auth()->user()->isViewer()) {
+            abort(403);
+        }
+
         $validated = $request->validate([
             'account' => ['required', 'string', 'max:128'],
             'date' => ['required', 'date'],
@@ -88,6 +96,10 @@ class OrderController extends Controller
      */
     public function destroy(Order $order): RedirectResponse
     {
+        if (!auth()->user()->isAdmin()) {
+            abort(403);
+        }
+
         AuditLog::create([
             'admin_id' => auth()->id(),
             'action' => 'deleted',

@@ -23,6 +23,10 @@ class AdminController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        if (!auth()->user()->isAdmin()) {
+            abort(403);
+        }
+
         $validated = $request->validate([
             'username' => ['required', 'string', 'max:64', 'unique:admins,username'],
             'password' => ['required', 'string', 'min:8'],
@@ -44,27 +48,35 @@ class AdminController extends Controller
 
     public function edit(Admin $admin): View
     {
+        if (!auth()->user()->isAdmin()) {
+            abort(403);
+        }
+
         return view('accounts.edit', compact('admin'));
     }
 
     public function update(Request $request, Admin $admin): RedirectResponse
     {
+        if (!auth()->user()->isAdmin()) {
+            abort(403);
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:128'],
             'role' => ['required', 'string', 'in:admin,editor,viewer'],
             'password' => ['nullable', 'string', 'min:8'],
         ]);
 
-        $data = [
+        $admin->update([
             'name' => $validated['name'],
             'role' => $validated['role'],
-        ];
+        ]);
 
         if (!empty($validated['password'])) {
-            $data['password'] = Hash::make($validated['password']);
+            $admin->update([
+                'password' => Hash::make($validated['password']),
+            ]);
         }
-
-        $admin->update($data);
 
         return redirect()->route('accounts.index')
             ->with('success', 'Account updated successfully.');
@@ -72,6 +84,9 @@ class AdminController extends Controller
 
     public function toggleActive(Admin $admin): RedirectResponse
     {
+        if (!auth()->user()->isAdmin()) {
+            abort(403);
+        }
         if ($admin->id === auth()->id()) {
             return back()->with('danger', 'You cannot deactivate your own account.');
         }
