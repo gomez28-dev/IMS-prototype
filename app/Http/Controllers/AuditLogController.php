@@ -16,7 +16,7 @@ class AuditLogController extends Controller
                 $query->where('admin_id', $admin->id);
             })
             ->orderBy('created_at', 'desc')
-            ->get();
+            ->paginate(10);
 
         return view('audit_logs.index', compact('logs'));
     }

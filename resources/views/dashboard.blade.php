@@ -9,17 +9,19 @@
         <h2 class="fw-bold text-dark mb-1">Orders Dashboard</h2>
         <p class="text-muted small mb-0">Manage customer accounts, sales orders, and delivery statuses.</p>
     </div>
-    <div class="d-flex flex-wrap gap-2">
+    <div class="d-flex flex-column flex-lg-row gap-2 w-100">
+        <div class="d-flex gap-2 flex-fill">
+            @if (!Auth::user()->isViewer())
+            <a href="{{ route('import.form') }}" class="btn btn-secondary-custom shadow-sm d-flex align-items-center justify-content-center flex-fill">
+                <i class="bi bi-file-earmark-excel me-2 text-success"></i> Import Excel
+            </a>
+            @endif
+            <a href="{{ route('export') }}" class="btn btn-secondary-custom shadow-sm d-flex align-items-center justify-content-center flex-fill">
+                <i class="bi bi-download me-2 text-primary"></i> Download Excel
+            </a>
+        </div>
         @if (!Auth::user()->isViewer())
-        <a href="{{ route('import.form') }}" class="btn btn-secondary-custom shadow-sm d-flex align-items-center">
-            <i class="bi bi-file-earmark-excel me-2 text-success"></i> Import Excel
-        </a>
-        @endif
-        <a href="{{ route('export') }}" class="btn btn-secondary-custom shadow-sm d-flex align-items-center">
-            <i class="bi bi-download me-2 text-primary"></i> Download Excel
-        </a>
-        @if (!Auth::user()->isViewer())
-        <a href="{{ route('order.create') }}" class="btn btn-primary-custom shadow-sm d-flex align-items-center">
+        <a href="{{ route('order.create') }}" class="btn btn-primary-custom shadow-sm d-flex align-items-center justify-content-center w-100 w-lg-auto">
             <i class="bi bi-plus-lg me-2"></i> New Order
         </a>
         @endif
@@ -28,12 +30,7 @@
 
 <!-- Stats Overview Cards -->
 <div class="row g-4 mb-5">
-    @php
-        $totalOrders = $orders->count();
-        $totalQtyOrdered = $orders->sum('qty_ordered');
-        $totalQtyDelivered = $orders->sum(fn($o) => $o->total_qty_out);
-        $totalRemaining = $orders->sum(fn($o) => $o->remaining_balance);
-    @endphp
+
     <div class="col-md-3 col-sm-6">
         <div class="card card-custom p-3 border-0">
             <div class="d-flex align-items-center">
@@ -244,5 +241,10 @@
             @endif
         </div>
     </div>
+</div>
+
+<!-- Pagination -->
+<div class="d-flex justify-content-center mt-4">
+    {{ $orders->links() }}
 </div>
 @endsection

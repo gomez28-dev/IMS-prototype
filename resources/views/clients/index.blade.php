@@ -102,4 +102,9 @@
         </div>
     </div>
 </div>
+
+<!-- Pagination -->
+<div class="d-flex justify-content-center mt-4">
+    {{ $clients->links() }}
+</div>
 @endsection

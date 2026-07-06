@@ -60,7 +60,7 @@
 @if ($activeFilter)
 <div class="d-flex justify-content-between align-items-center mb-3">
     <p class="text-muted small mb-0">
-        Showing {{ $orders->count() }} order(s)
+        Showing {{ $orders->total() }} order(s)
         @if ($activeFilter === 'range')
             from <strong>{{ $from }}</strong> to <strong>{{ $to }}</strong>
         @elseif ($activeFilter === 'month')
@@ -135,6 +135,10 @@
             </table>
         </div>
     </div>
+</div>
+<!-- Pagination -->
+<div class="d-flex justify-content-center mt-4">
+    {{ $orders->links() }}
 </div>
 @else
 <div class="card card-custom border-0">

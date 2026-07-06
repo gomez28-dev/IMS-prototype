@@ -151,4 +151,9 @@
         </div>
     </div>
 </div>
+
+<!-- Pagination -->
+<div class="d-flex justify-content-center mt-4">
+    {{ $admins->links() }}
+</div>
 @endsection

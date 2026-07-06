@@ -38,7 +38,7 @@ class ReportController extends Controller
             $query->whereHas('deliveries', fn($q) => $q->where('type', $type));
         }
 
-        $orders = $query->orderBy('date', 'desc')->get();
+        $orders = $query->orderBy('date', 'desc')->paginate(10)->withQueryString();
 
         return view('reports.index', compact('orders', 'from', 'to', 'month', 'year', 'type', 'activeFilter'));
     }

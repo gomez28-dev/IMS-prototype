@@ -12,7 +12,7 @@ class AdminController extends Controller
 {
     public function index(): View
     {
-        $admins = Admin::orderBy('created_at', 'desc')->get();
+        $admins = Admin::orderBy('created_at', 'desc')->paginate(10);
         return view('accounts.index', compact('admins'));
     }
 

@@ -235,20 +235,154 @@
         .btn, .card-custom, .nav-link {
             transition: all 0.2s ease-in-out;
         }
+
+        /* Mobile sliding drawer sidebar */
+        .sidebar-drawer {
+            position: fixed;
+            top: 0;
+            left: -300px;
+            width: 280px;
+            height: 100vh;
+            background: #ffffff;
+            box-shadow: 4px 0 20px rgba(0,0,0,0.1);
+            z-index: 1050;
+            transition: left 0.3s ease-in-out;
+            overflow-y: auto;
+        }
+
+        .sidebar-drawer.open {
+            left: 0;
+        }
+
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.4);
+            z-index: 1040;
+            display: none;
+        }
+
+        .sidebar-overlay.open {
+            display: block;
+        }
+
+        .sidebar-drawer .nav-link {
+            padding: 0.75rem 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-dark);
+            font-weight: 500;
+        }
+
+        .sidebar-drawer .nav-link:hover {
+            background-color: var(--light-slate);
+            color: var(--brand-color);
+        }
+
+        .sidebar-drawer .nav-link i {
+            width: 1.5rem;
+        }
+
+        /* Responsive logo sizing */
+        .navbar-brand img {
+            height: 32px;
+            transition: height 0.2s ease;
+        }
+
+        @media (max-width: 991.98px) {
+            .navbar-brand img {
+                height: 24px;
+            }
+        }
+
+        /* Mobile hamburger button tweaks */
+        .hamburger-btn {
+            border: none;
+            background: transparent;
+            font-size: 1.5rem;
+            color: var(--text-dark);
+            padding: 0.25rem 0.5rem;
+            cursor: pointer;
+            display: none;
+        }
+
+        @media (max-width: 991.98px) {
+            .hamburger-btn {
+                display: block;
+            }
+        }
     </style>
 </head>
 <body>
+    <!-- Sidebar overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+    <!-- Mobile sidebar drawer -->
+    <div class="sidebar-drawer d-lg-none" id="sidebarDrawer">
+        <div class="d-flex flex-column h-100">
+            <div class="p-3 border-bottom">
+                <h5 class="fw-bold mb-0 text-dark">Menu</h5>
+            </div>
+            <nav class="flex-grow-1">
+                <a class="nav-link d-flex align-items-center" href="{{ route('dashboard') }}">
+                    <i class="bi bi-speedometer2 me-2"></i> Dashboard
+                </a>
+                <a class="nav-link d-flex align-items-center" href="{{ route('reports.index') }}">
+                    <i class="bi bi-bar-chart-line me-2"></i> Reports
+                </a>
+                @if (Auth::user()->isAdmin())
+                <a class="nav-link d-flex align-items-center" href="{{ route('accounts.index') }}">
+                    <i class="bi bi-people me-2"></i> Manage Accounts
+                </a>
+                @endif
+                @if (Auth::user()->isEditor())
+                <a class="nav-link d-flex align-items-center" href="{{ route('clients.index') }}">
+                    <i class="bi bi-building me-2"></i> Manage Clients
+                </a>
+                @endif
+                @if (!Auth::user()->isViewer())
+                <a class="nav-link d-flex align-items-center" href="{{ route('audit-logs') }}">
+                    <i class="bi bi-journal-text me-2"></i> Audit Log
+                </a>
+                @endif
+            </nav>
+            <div class="mt-auto border-top p-3">
+                <div class="d-flex align-items-center mb-3">
+                    <i class="bi bi-person-circle fs-5 me-2 text-muted"></i>
+                    <div>
+                        <div class="fw-semibold small text-dark">{{ Auth::user()->name }}</div>
+                        @if (Auth::user()->isAdmin())
+                            <span class="badge badge-role-admin rounded-pill px-2 py-0" style="font-size: 0.6rem;">Admin</span>
+                        @elseif (Auth::user()->isEditor())
+                            <span class="badge badge-role-editor rounded-pill px-2 py-0" style="font-size: 0.6rem;">Editor</span>
+                        @else
+                            <span class="badge badge-role-viewer rounded-pill px-2 py-0" style="font-size: 0.6rem;">Viewer</span>
+                        @endif
+                    </div>
+                </div>
+                <form action="{{ route('logout') }}" method="POST" class="w-100">
+                    @csrf
+                    <button type="submit" class="btn btn-outline-dark btn-sm rounded-pill w-100">
+                        <i class="bi bi-box-arrow-right me-1"></i> Logout
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <nav class="navbar navbar-expand-lg navbar-light navbar-custom py-4">
         <div class="container">
             <a class="navbar-brand d-flex align-items-center" href="{{ route('dashboard') }}">
-                <img src="{{ asset('images/logo_ims.png') }}" alt="IMS Logo" height="28" class="me-2">
+                <img src="{{ asset('images/logo_ims.png') }}" alt="IMS Logo" class="me-2">
             </a>
-            <span class="ms-auto text-muted fw-bold d-none d-md-inline" style="font-size: 1.05rem;">Sales Inventory Portal</span>
+            <span class="ms-auto text-muted fw-bold d-none d-lg-inline" style="font-size: 1.05rem;">Sales Inventory Portal</span>
             @auth
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
+            <button class="hamburger-btn d-lg-none ms-2" type="button" onclick="openSidebar()" aria-label="Toggle navigation">
+                <i class="bi bi-list"></i>
             </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
+            <div class="collapse navbar-collapse d-none d-lg-flex" id="navbarNav">
                 <ul class="navbar-nav me-auto align-items-center">
                     <li class="nav-item">
                         <a class="nav-link" href="{{ route('reports.index') }}">
@@ -337,5 +471,17 @@
 
     <!-- Bootstrap 5 JS Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function openSidebar() {
+            document.getElementById('sidebarDrawer').classList.add('open');
+            document.getElementById('sidebarOverlay').classList.add('open');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeSidebar() {
+            document.getElementById('sidebarDrawer').classList.remove('open');
+            document.getElementById('sidebarOverlay').classList.remove('open');
+            document.body.style.overflow = '';
+        }
+    </script>
 </body>
 </html>
