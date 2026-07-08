@@ -4,9 +4,15 @@
 
 @section('content')
 <div class="mb-3">
+    @if (str_contains(url()->previous(), '/reports'))
+    <a href="{{ route('reports.index') }}" class="text-decoration-none text-secondary small">
+        <i class="bi bi-arrow-left me-1"></i> Back to Reports
+    </a>
+    @else
     <a href="{{ route('dashboard') }}" class="text-decoration-none text-secondary small">
         <i class="bi bi-arrow-left me-1"></i> Back to Dashboard
     </a>
+    @endif
 </div>
 
 <!-- Order Summary Header Card -->
