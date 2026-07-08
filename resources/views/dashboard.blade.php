@@ -17,7 +17,7 @@
             </a>
         </div>
         @endif
-        <div class="col-6 col-md-auto">
+        <div class="{{ (!Auth::user()->isViewer() && !Auth::user()->isAccounting()) ? 'col-6' : 'col-12' }} col-md-auto">
             <a href="{{ route('export') }}" class="btn btn-secondary-custom shadow-sm d-flex align-items-center justify-content-center w-100">
                 <i class="bi bi-download me-2 text-primary"></i> Download Excel
             </a>
