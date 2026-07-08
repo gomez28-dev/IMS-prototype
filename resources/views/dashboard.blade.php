@@ -118,11 +118,13 @@
                 <thead>
                     <tr>
                         <th class="ps-4">Account</th>
+                        <th>PO#</th>
                         <th>Order Date</th>
                         <th>SO#</th>
                         <th class="text-end">Qty Ordered</th>
                         <th class="text-end">Qty Out</th>
                         <th class="text-center">Remaining Balance</th>
+                        <th class="text-center">Clearance</th>
                         <th class="text-end pe-4">Actions</th>
                     </tr>
                 </thead>
@@ -131,6 +133,7 @@
                         @foreach ($orders as $order)
                         <tr>
                             <td class="ps-4 fw-semibold text-dark">{{ $order->account }}</td>
+                            <td>{{ $order->po_number }}</td>
                             <td>{{ $order->date ? $order->date->format('Y-m-d') : '' }}</td>
                             <td><span class="badge bg-light text-dark border">{{ $order->so_number }}</span></td>
                             <td class="text-end fw-medium">{{ number_format($order->qty_ordered) }}</td>
@@ -145,6 +148,18 @@
                                         <i class="bi bi-clock-history me-1"></i> {{ number_format($order->remaining_balance) }}
                                     </span>
                                 @endif
+                            </td>
+                            <td class="text-center">
+                                @php
+                                    $cls = $order->clearing_status;
+                                    $badgeClass = match($cls) {
+                                        'Approved' => 'bg-success-subtle text-success border-success-subtle',
+                                        'Declined' => 'bg-danger-subtle text-danger border-danger-subtle',
+                                        'Hold' => 'bg-warning-subtle text-warning-emphasis border-warning-subtle',
+                                        default => 'bg-secondary-subtle text-secondary border-secondary-subtle',
+                                    };
+                                @endphp
+                                <span class="badge rounded-pill px-3 py-1 border {{ $badgeClass }}">{{ $cls }}</span>
                             </td>
                             <td class="text-end pe-4">
                                 <div class="d-flex justify-content-end gap-2">
@@ -170,7 +185,7 @@
                         @endforeach
                     @else
                         <tr>
-                            <td colspan="7" class="text-center py-5 text-muted">
+                            <td colspan="9" class="text-center py-5 text-muted">
                                 <i class="bi bi-inbox fs-1 d-block mb-3 text-secondary"></i>
                                 No orders found. Click "New Order" to create one.
                             </td>
@@ -190,6 +205,7 @@
                             <h5 class="fw-bold text-dark mb-0">{{ $order->account }}</h5>
                             <span class="badge bg-light text-dark border">{{ $order->so_number }}</span>
                         </div>
+                        <p class="text-muted small mb-1"><span class="fw-medium">PO#:</span> {{ $order->po_number }}</p>
                         <div class="row mb-3 small text-muted">
                             <div class="col-6">
                                 <span class="fw-medium">Date:</span> {{ $order->date ? $order->date->format('Y-m-d') : '' }}
@@ -215,6 +231,31 @@
                                     </span>
                                 @endif
                             </div>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span class="text-muted small">Clearance:</span>
+                            @php
+                                $cls = $order->clearing_status;
+                                $badgeClass = match($cls) {
+                                    'Approved' => 'bg-success-subtle text-success border-success-subtle',
+                                    'Declined' => 'bg-danger-subtle text-danger border-danger-subtle',
+                                    'Hold' => 'bg-warning-subtle text-warning-emphasis border-warning-subtle',
+                                    default => 'bg-secondary-subtle text-secondary border-secondary-subtle',
+                                };
+                            @endphp
+                            @if (auth()->user()->isAdmin() || auth()->user()->isAccounting())
+                                <form method="POST" action="{{ route('order.clearance', $order->id) }}" class="d-inline">
+                                    @csrf
+                                    <select name="clearing_status" class="form-select form-select-sm d-inline-block w-auto" onchange="this.form.submit()">
+                                        <option value="Pending" {{ $cls === 'Pending' ? 'selected' : '' }}>Pending</option>
+                                        <option value="Declined" {{ $cls === 'Declined' ? 'selected' : '' }}>Declined</option>
+                                        <option value="Hold" {{ $cls === 'Hold' ? 'selected' : '' }}>Hold</option>
+                                        <option value="Approved" {{ $cls === 'Approved' ? 'selected' : '' }}>Approved</option>
+                                    </select>
+                                </form>
+                            @else
+                                <span class="badge rounded-pill px-3 py-1 border {{ $badgeClass }}">{{ $cls }}</span>
+                            @endif
                         </div>
                         <div class="d-flex gap-2">
                             <a href="{{ route('order.deliveries', $order->id) }}" class="btn btn-sm btn-outline-primary rounded-3 px-3 py-2 flex-fill text-center">

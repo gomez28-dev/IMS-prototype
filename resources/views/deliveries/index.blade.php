@@ -53,7 +53,7 @@
 <!-- Deliveries List Header -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h4 class="fw-bold mb-0 text-dark"><i class="bi bi-truck me-2 text-primary"></i>Deliveries</h4>
-        @if (!Auth::user()->isViewer())
+        @if (!Auth::user()->isViewer() && !Auth::user()->isAccounting())
         <a href="{{ route('delivery.create', $order->id) }}" class="btn btn-primary-custom shadow-sm d-flex align-items-center">
             <i class="bi bi-plus-lg me-2"></i> Add Delivery
         </a>
