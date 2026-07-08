@@ -185,7 +185,7 @@
                                     @endif
                                 </td>
                                 <td class="text-end pe-4">
-                                    <a href="{{ route('order.deliveries', $order->id) }}" class="btn btn-sm btn-outline-primary rounded-3 px-2 py-1">
+                                    <a href="{{ route('order.deliveries', $order->id) }}?{{ http_build_query(array_filter(['from' => $from, 'to' => $to, 'month' => $month, 'year' => $year, 'type' => $type, 'account' => $account])) }}" class="btn btn-sm btn-outline-primary rounded-3 px-2 py-1">
                                         <i class="bi bi-truck me-1"></i> {{ $order->deliveries->count() }}
                                     </a>
                                 </td>
@@ -240,7 +240,7 @@
                                 </div>
                             </div>
                             <div class="d-flex gap-2">
-                                <a href="{{ route('order.deliveries', $order->id) }}" class="btn btn-sm btn-outline-primary rounded-3 px-3 py-2 flex-fill text-center">
+                                <a href="{{ route('order.deliveries', $order->id) }}?{{ http_build_query(array_filter(['from' => $from, 'to' => $to, 'month' => $month, 'year' => $year, 'type' => $type, 'account' => $account])) }}" class="btn btn-sm btn-outline-primary rounded-3 px-3 py-2 flex-fill text-center">
                                     <i class="bi bi-truck me-1"></i> Deliveries ({{ $order->deliveries->count() }})
                                 </a>
                             </div>

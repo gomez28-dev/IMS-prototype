@@ -5,7 +5,8 @@
 @section('content')
 <div class="mb-3">
     @if (str_contains(url()->previous(), '/reports'))
-    <a href="{{ route('reports.index') }}" class="text-decoration-none text-secondary small">
+    @php $filters = session('report_filters', []); @endphp
+    <a href="{{ route('reports.index') }}{{ $filters ? '?' . http_build_query($filters) : '' }}" class="text-decoration-none text-secondary small">
         <i class="bi bi-arrow-left me-1"></i> Back to Reports
     </a>
     @else

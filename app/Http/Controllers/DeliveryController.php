@@ -14,9 +14,21 @@ class DeliveryController extends Controller
     /**
      * Display a listing of deliveries for a specific order.
      */
-    public function index(Order $order): View
+    public function index(Order $order, Request $request): View
     {
         $deliveries = $order->deliveries()->orderBy('delivery_date', 'asc')->get();
+
+        // Store report filter params in session for back navigation
+        $filterKeys = ['from', 'to', 'month', 'year', 'type', 'account'];
+        $filters = [];
+        foreach ($filterKeys as $key) {
+            if ($request->has($key)) {
+                $filters[$key] = $request->input($key);
+            }
+        }
+        if (!empty($filters)) {
+            session(['report_filters' => $filters]);
+        }
 
         return view('deliveries.index', [
             'order' => $order,
