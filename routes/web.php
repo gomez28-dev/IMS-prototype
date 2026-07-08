@@ -22,6 +22,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/export/excel', [DashboardController::class, 'export'])->name('export');
 
+    // Delivery index — accessible to all authenticated users
+    Route::get('/order/{order}/deliveries', [DeliveryController::class, 'index'])->name('order.deliveries');
+
     Route::middleware('role:admin,editor')->group(function () {
         Route::get('/import/excel', [DashboardController::class, 'showImportForm'])->name('import.form');
         Route::post('/import/excel', [DashboardController::class, 'import'])->name('import');
@@ -31,7 +34,6 @@ Route::middleware('auth')->group(function () {
         Route::get('/order/{order}/edit', [OrderController::class, 'edit'])->name('order.edit');
         Route::post('/order/{order}/edit', [OrderController::class, 'update'])->name('order.update');
 
-        Route::get('/order/{order}/deliveries', [DeliveryController::class, 'index'])->name('order.deliveries');
         Route::get('/order/{order}/delivery/new', [DeliveryController::class, 'create'])->name('delivery.create');
         Route::post('/order/{order}/delivery/new', [DeliveryController::class, 'store'])->name('delivery.store');
         Route::get('/delivery/{delivery}/edit', [DeliveryController::class, 'edit'])->name('delivery.edit');

@@ -16,10 +16,6 @@ class DeliveryController extends Controller
      */
     public function index(Order $order): View
     {
-        if (auth()->user()->isViewer()) {
-            abort(403);
-        }
-
         $deliveries = $order->deliveries()->orderBy('delivery_date', 'asc')->get();
 
         return view('deliveries.index', [
@@ -33,8 +29,12 @@ class DeliveryController extends Controller
      */
     public function create(Order $order): View
     {
-        if (auth()->user()->isViewer()) {
+        if (auth()->user()->isViewer() || auth()->user()->isAccounting()) {
             abort(403);
+        }
+
+        if ($order->clearing_status !== 'Approved') {
+            return back()->with('warning', 'This order is awaiting Accounting clearance before delivery can be created.');
         }
 
         return view('deliveries.form', [
@@ -49,9 +49,14 @@ class DeliveryController extends Controller
      */
     public function store(Request $request, Order $order): RedirectResponse
     {
-        if (auth()->user()->isViewer()) {
+        if (auth()->user()->isViewer() || auth()->user()->isAccounting()) {
             abort(403);
         }
+
+        if ($order->clearing_status !== 'Approved') {
+            return back()->with('warning', 'This order is awaiting Accounting clearance before delivery can be created.');
+        }
+
         $validated = $request->validate([
             'dr_number' => ['required', 'string', 'max:64'],
             'delivery_date' => ['required', 'date'],
@@ -84,7 +89,7 @@ class DeliveryController extends Controller
      */
     public function edit(Delivery $delivery): View
     {
-        if (auth()->user()->isViewer()) {
+        if (auth()->user()->isViewer() || auth()->user()->isAccounting()) {
             abort(403);
         }
 
@@ -100,7 +105,7 @@ class DeliveryController extends Controller
      */
     public function update(Request $request, Delivery $delivery): RedirectResponse
     {
-        if (auth()->user()->isViewer()) {
+        if (auth()->user()->isViewer() || auth()->user()->isAccounting()) {
             abort(403);
         }
         $order = $delivery->order;
