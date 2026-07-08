@@ -10,7 +10,7 @@
         <p class="text-muted small mb-0">Manage customer accounts, sales orders, and delivery statuses.</p>
     </div>
     <div class="row g-2">
-        @if (!Auth::user()->isViewer())
+        @if (!Auth::user()->isViewer() && !Auth::user()->isAccounting())
         <div class="col-6 col-md-auto">
             <a href="{{ route('import.form') }}" class="btn btn-secondary-custom shadow-sm d-flex align-items-center justify-content-center w-100">
                 <i class="bi bi-file-earmark-excel me-2 text-success"></i> Import Excel
@@ -22,7 +22,7 @@
                 <i class="bi bi-download me-2 text-primary"></i> Download Excel
             </a>
         </div>
-        @if (!Auth::user()->isViewer())
+        @if (!Auth::user()->isViewer() && !Auth::user()->isAccounting())
         <div class="col-12 col-md-auto">
             <a href="{{ route('order.create') }}" class="btn btn-primary-custom shadow-sm d-flex align-items-center justify-content-center w-100">
                 <i class="bi bi-plus-lg me-2"></i> New Order
