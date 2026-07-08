@@ -48,4 +48,9 @@ class Admin extends Authenticatable
     {
         return $this->role === 'viewer';
     }
+
+    public function isAccounting(): bool
+    {
+        return $this->role === 'accounting';
+    }
 }
