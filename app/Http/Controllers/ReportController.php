@@ -38,9 +38,16 @@ class ReportController extends Controller
             $query->whereHas('deliveries', fn($q) => $q->where('type', $type));
         }
 
+        $account = $request->input('account');
+        if ($account) {
+            $query->where('account', $account);
+        }
+
         $orders = $query->orderBy('date', 'desc')->paginate(10)->withQueryString();
 
-        return view('reports.index', compact('orders', 'from', 'to', 'month', 'year', 'type', 'activeFilter'));
+        $clients = \App\Models\Client::orderBy('name')->get();
+
+        return view('reports.index', compact('orders', 'from', 'to', 'month', 'year', 'type', 'activeFilter', 'account', 'clients'));
     }
 
     public function export(Request $request): BinaryFileResponse
@@ -63,6 +70,11 @@ class ReportController extends Controller
 
         if ($type) {
             $query->whereHas('deliveries', fn($q) => $q->where('type', $type));
+        }
+
+        $account = $request->input('account');
+        if ($account) {
+            $query->where('account', $account);
         }
 
         $orders = $query->orderBy('date', 'desc')->get();

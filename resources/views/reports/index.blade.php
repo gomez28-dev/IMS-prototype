@@ -46,6 +46,15 @@
                 <option value="DELIVERY" {{ ($type ?? '') === 'DELIVERY' ? 'selected' : '' }}>DELIVERY</option>
             </select>
         </div>
+        <div class="col-md-2">
+            <label for="account" class="form-label fw-medium text-secondary small">Company</label>
+            <select name="account" id="account" class="form-control form-select">
+                <option value="">All Companies</option>
+                @foreach ($clients as $client)
+                    <option value="{{ $client->name }}" {{ ($account ?? '') === $client->name ? 'selected' : '' }}>{{ $client->name }}</option>
+                @endforeach
+            </select>
+        </div>
         <div class="col-md-2 d-flex gap-2">
             <button type="submit" class="btn btn-primary-custom flex-fill">
                 <i class="bi bi-funnel me-1"></i> Filter
@@ -76,6 +85,7 @@
             @if ($month) <input type="hidden" name="month" value="{{ $month }}"> @endif
             @if ($year) <input type="hidden" name="year" value="{{ $year }}"> @endif
             @if ($type) <input type="hidden" name="type" value="{{ $type }}"> @endif
+            @if ($account) <input type="hidden" name="account" value="{{ $account }}"> @endif
             <button type="submit" class="btn btn-secondary-custom shadow-sm d-flex align-items-center">
                 <i class="bi bi-download me-2 text-primary"></i> Download Excel
             </button>
