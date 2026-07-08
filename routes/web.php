@@ -25,6 +25,13 @@ Route::middleware('auth')->group(function () {
     // Delivery index — accessible to all authenticated users
     Route::get('/order/{order}/deliveries', [DeliveryController::class, 'index'])->name('order.deliveries');
 
+    // Reports — accessible to all authenticated users (view-only)
+    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+    Route::get('/reports/export', [ReportController::class, 'export'])->name('reports.export');
+
+    // Audit Log — accessible to all authenticated users (view-only)
+    Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('audit-logs');
+
     Route::middleware('role:admin,editor')->group(function () {
         Route::get('/import/excel', [DashboardController::class, 'showImportForm'])->name('import.form');
         Route::post('/import/excel', [DashboardController::class, 'import'])->name('import');
@@ -38,11 +45,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/order/{order}/delivery/new', [DeliveryController::class, 'store'])->name('delivery.store');
         Route::get('/delivery/{delivery}/edit', [DeliveryController::class, 'edit'])->name('delivery.edit');
         Route::post('/delivery/{delivery}/edit', [DeliveryController::class, 'update'])->name('delivery.update');
-
-        Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
-        Route::get('/reports/export', [ReportController::class, 'export'])->name('reports.export');
-
-        Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('audit-logs');
 
         Route::prefix('clients')->name('clients.')->group(function () {
             Route::get('/', [ClientController::class, 'index'])->name('index');

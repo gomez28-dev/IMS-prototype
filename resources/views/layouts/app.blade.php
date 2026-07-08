@@ -348,7 +348,7 @@
                     <i class="bi bi-building me-2"></i> Manage Clients
                 </a>
                 @endif
-                @if (!Auth::user()->isViewer())
+                @if (Auth::user()->isAdmin() || Auth::user()->isAccounting())
                 <a class="nav-link d-flex align-items-center" href="{{ route('audit-logs') }}">
                     <i class="bi bi-journal-text me-2"></i> Audit Log
                 </a>
@@ -363,6 +363,8 @@
                             <span class="badge badge-role-admin rounded-pill px-2 py-0" style="font-size: 0.6rem;">Admin</span>
                         @elseif (Auth::user()->isEditor())
                             <span class="badge badge-role-editor rounded-pill px-2 py-0" style="font-size: 0.6rem;">Editor</span>
+                        @elseif (Auth::user()->isAccounting())
+                            <span class="badge bg-purple rounded-pill px-2 py-0" style="font-size: 0.6rem;">Accounting</span>
                         @else
                             <span class="badge badge-role-viewer rounded-pill px-2 py-0" style="font-size: 0.6rem;">Viewer</span>
                         @endif
@@ -412,7 +414,7 @@
                         </a>
                     </li>
                     @endif
-                    @if (!Auth::user()->isViewer())
+                    @if (Auth::user()->isAdmin() || Auth::user()->isAccounting())
                     <li class="nav-item">
                         <a class="nav-link" href="{{ route('audit-logs') }}">
                             <i class="bi bi-journal-text me-1"></i> Audit Log
@@ -428,6 +430,8 @@
                                 <span class="badge badge-role-admin rounded-pill ms-2 px-2 py-1">Admin</span>
                             @elseif (Auth::user()->isEditor())
                                 <span class="badge badge-role-editor rounded-pill ms-2 px-2 py-1">Editor</span>
+                            @elseif (Auth::user()->isAccounting())
+                                <span class="badge bg-purple rounded-pill ms-2 px-2 py-1">Accounting</span>
                             @else
                                 <span class="badge badge-role-viewer rounded-pill ms-2 px-2 py-1">Viewer</span>
                             @endif

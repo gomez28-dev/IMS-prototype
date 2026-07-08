@@ -178,7 +178,7 @@
                                     <a href="{{ route('order.deliveries', $order->id) }}" class="btn btn-sm btn-outline-primary rounded-3 px-3 py-1" title="View Deliveries">
                                         <i class="bi bi-truck me-1"></i> Deliveries
                                     </a>
-                                    @if (!Auth::user()->isViewer())
+                                    @if (!Auth::user()->isViewer() && !Auth::user()->isAccounting())
                                     <a href="{{ route('order.edit', $order->id) }}" class="btn btn-sm btn-outline-secondary rounded-3 px-3 py-1" title="Edit Order">
                                         <i class="bi bi-pencil"></i>
                                     </a>
@@ -273,7 +273,7 @@
                             <a href="{{ route('order.deliveries', $order->id) }}" class="btn btn-sm btn-outline-primary rounded-3 px-3 py-2 flex-fill text-center">
                                 <i class="bi bi-truck me-1"></i> Deliveries
                             </a>
-                            @if (!Auth::user()->isViewer())
+                            @if (!Auth::user()->isViewer() && !Auth::user()->isAccounting())
                             <a href="{{ route('order.edit', $order->id) }}" class="btn btn-sm btn-outline-secondary rounded-3 px-3 py-2 flex-fill text-center">
                                 <i class="bi bi-pencil me-1"></i> Edit
                             </a>
