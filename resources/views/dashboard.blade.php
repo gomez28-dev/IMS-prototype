@@ -119,8 +119,8 @@
                     <tr>
                         <th class="ps-4">Account</th>
                         <th>PO#</th>
-                        <th>Order Date</th>
                         <th>SO#</th>
+                        <th>Order Date</th>
                         <th class="text-end">Qty Ordered</th>
                         <th class="text-end">Qty Out</th>
                         <th class="text-center">Remaining Balance</th>
@@ -134,8 +134,8 @@
                         <tr>
                             <td class="ps-4 fw-semibold text-dark">{{ $order->account }}</td>
                             <td>{{ $order->po_number }}</td>
-                            <td>{{ $order->date ? $order->date->format('Y-m-d') : '' }}</td>
                             <td><span class="badge bg-light text-dark border">{{ $order->so_number }}</span></td>
+                            <td>{{ $order->date ? $order->date->format('Y-m-d') : '' }}</td>
                             <td class="text-end fw-medium">{{ number_format($order->qty_ordered) }}</td>
                             <td class="text-end fw-medium text-secondary">{{ number_format($order->total_qty_out) }}</td>
                             <td class="text-center">
