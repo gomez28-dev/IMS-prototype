@@ -212,6 +212,10 @@
             letter-spacing: 0.04em;
         }
 
+        .bg-purple {
+            background-color: #7c3aed !important;
+        }
+
         /* Consistent action button sizing */
         .table-custom .btn-sm {
             padding: 0.35rem 0.7rem;

@@ -48,6 +48,8 @@
                                     <span class="badge bg-primary rounded-pill px-3 py-1">Admin</span>
                                 @elseif ($admin->role === 'editor')
                                     <span class="badge bg-info text-dark rounded-pill px-3 py-1">Editor</span>
+                                @elseif ($admin->role === 'accounting')
+                                    <span class="badge bg-purple rounded-pill px-3 py-1">Accounting</span>
                                 @else
                                     <span class="badge bg-secondary rounded-pill px-3 py-1">Viewer</span>
                                 @endif
@@ -107,6 +109,8 @@
                                 <span class="badge bg-primary rounded-pill px-3 py-1">Admin</span>
                             @elseif ($admin->role === 'editor')
                                 <span class="badge bg-info text-dark rounded-pill px-3 py-1">Editor</span>
+                            @elseif ($admin->role === 'accounting')
+                                <span class="badge bg-purple rounded-pill px-3 py-1">Accounting</span>
                             @else
                                 <span class="badge bg-secondary rounded-pill px-3 py-1">Viewer</span>
                             @endif
