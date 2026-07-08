@@ -65,4 +65,8 @@ Route::middleware('auth')->group(function () {
             Route::post('/{admin}/toggle-active', [AdminController::class, 'toggleActive'])->name('toggle-active');
         });
     });
+
+    Route::middleware('role:admin,accounting')->group(function () {
+        Route::post('/order/{order}/clearance', [OrderController::class, 'updateClearance'])->name('order.clearance');
+    });
 });

@@ -14,6 +14,8 @@ class Order extends Model
         'date',
         'qty_ordered',
         'so_number',
+        'po_number',
+        'clearing_status',
     ];
 
     protected $casts = [

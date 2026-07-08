@@ -32,7 +32,8 @@ class OrderController extends Controller
             'account' => ['required', 'string', 'max:128'],
             'date' => ['required', 'date'],
             'qty_ordered' => ['required', 'integer', 'min:0'],
-            'so_number' => ['required', 'string', 'max:64'],
+            'so_number' => ['required', 'string', 'max:64', 'unique:orders,so_number'],
+            'po_number' => ['required', 'string', 'max:64', 'unique:orders,po_number'],
         ]);
 
         $order = Order::create($validated);
@@ -76,7 +77,8 @@ class OrderController extends Controller
             'account' => ['required', 'string', 'max:128'],
             'date' => ['required', 'date'],
             'qty_ordered' => ['required', 'integer', 'min:0'],
-            'so_number' => ['required', 'string', 'max:64'],
+            'so_number' => ['required', 'string', 'max:64', 'unique:orders,so_number,' . $order->id],
+            'po_number' => ['required', 'string', 'max:64', 'unique:orders,po_number,' . $order->id],
         ]);
 
         $order->update($validated);
@@ -110,5 +112,27 @@ class OrderController extends Controller
 
         return redirect()->route('dashboard')
             ->with('success', 'Order deleted successfully.');
+    }
+
+    public function updateClearance(Request $request, Order $order): RedirectResponse
+    {
+        if (!auth()->user()->isAdmin() && !auth()->user()->isAccounting()) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'clearing_status' => ['required', 'string', 'in:Pending,Declined,Hold,Approved'],
+        ]);
+
+        $order->update(['clearing_status' => $validated['clearing_status']]);
+
+        AuditLog::create([
+            'admin_id' => auth()->id(),
+            'action' => 'updated',
+            'description' => "Updated clearance status for order #{$order->id} ({$order->account}) to {$validated['clearing_status']}",
+        ]);
+
+        return redirect()->route('dashboard')
+            ->with('success', 'Clearance status updated successfully.');
     }
 }
