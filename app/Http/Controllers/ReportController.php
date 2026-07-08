@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
+use App\Models\Delivery;
 use App\Exports\ReportsExport;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -47,7 +48,14 @@ class ReportController extends Controller
 
         $clients = \App\Models\Client::orderBy('name')->get();
 
-        return view('reports.index', compact('orders', 'from', 'to', 'month', 'year', 'type', 'activeFilter', 'account', 'clients'));
+        $totalOrders = $query->clone()->count();
+        $totalQtyOrdered = $query->clone()->sum('qty_ordered');
+        $totalQtyDelivered = Delivery::whereIn('order_id', $query->clone()->select('id'))
+            ->where('status', 'FULFILLED')
+            ->sum('qty_out');
+        $totalRemaining = $totalQtyOrdered - $totalQtyDelivered;
+
+        return view('reports.index', compact('orders', 'from', 'to', 'month', 'year', 'type', 'activeFilter', 'account', 'clients', 'totalOrders', 'totalQtyOrdered', 'totalQtyDelivered', 'totalRemaining'));
     }
 
     public function export(Request $request): BinaryFileResponse

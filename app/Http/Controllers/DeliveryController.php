@@ -27,7 +27,7 @@ class DeliveryController extends Controller
     /**
      * Show the form for creating a new delivery.
      */
-    public function create(Order $order): View
+    public function create(Order $order): \Illuminate\View\View|\Illuminate\Http\RedirectResponse
     {
         if (auth()->user()->isViewer() || auth()->user()->isAccounting()) {
             abort(403);

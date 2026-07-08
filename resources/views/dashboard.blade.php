@@ -159,7 +159,19 @@
                                         default => 'bg-secondary-subtle text-secondary border-secondary-subtle',
                                     };
                                 @endphp
+                                @if (auth()->user()->isAdmin() || auth()->user()->isAccounting())
+                                <form method="POST" action="{{ route('order.clearance', $order->id) }}" class="d-inline">
+                                    @csrf
+                                    <select name="clearing_status" class="form-select form-select-sm d-inline-block w-auto" onchange="this.form.submit()">
+                                        <option value="Pending" {{ $cls === 'Pending' ? 'selected' : '' }}>Pending</option>
+                                        <option value="Declined" {{ $cls === 'Declined' ? 'selected' : '' }}>Declined</option>
+                                        <option value="Hold" {{ $cls === 'Hold' ? 'selected' : '' }}>Hold</option>
+                                        <option value="Approved" {{ $cls === 'Approved' ? 'selected' : '' }}>Approved</option>
+                                    </select>
+                                </form>
+                                @else
                                 <span class="badge rounded-pill px-3 py-1 border {{ $badgeClass }}">{{ $cls }}</span>
+                                @endif
                             </td>
                             <td class="text-end pe-4">
                                 <div class="d-flex justify-content-end gap-2">

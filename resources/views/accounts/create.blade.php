@@ -49,6 +49,7 @@
                             <option value="admin" {{ old('role') === 'admin' ? 'selected' : '' }}>Admin</option>
                             <option value="editor" {{ old('role') === 'editor' ? 'selected' : '' }}>Editor</option>
                             <option value="viewer" {{ old('role') === 'viewer' ? 'selected' : '' }}>Viewer</option>
+                            <option value="accounting" {{ old('role') === 'accounting' ? 'selected' : '' }}>Accounting</option>
                         </select>
                         @error('role')
                             <div class="invalid-feedback">{{ $message }}</div>

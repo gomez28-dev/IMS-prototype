@@ -67,6 +67,62 @@
 </div>
 
 @if ($activeFilter)
+<!-- Stats Overview Cards -->
+<div class="row g-4 mb-5">
+    <div class="col-md-3 col-sm-6">
+        <div class="card card-custom p-3 border-0">
+            <div class="d-flex align-items-center">
+                <div class="rounded-3 p-3 bg-primary bg-opacity-10 text-primary me-3">
+                    <i class="bi bi-journal-text fs-4"></i>
+                </div>
+                <div>
+                    <span class="text-muted small d-block">Total Orders</span>
+                    <h4 class="fw-bold mb-0 text-dark">{{ number_format($totalOrders) }}</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+        <div class="card card-custom p-3 border-0">
+            <div class="d-flex align-items-center">
+                <div class="rounded-3 p-3 bg-info bg-opacity-10 text-info me-3" style="background-color: #ecfeff !important; color: #0891b2 !important;">
+                    <i class="bi bi-boxes fs-4"></i>
+                </div>
+                <div>
+                    <span class="text-muted small d-block">Qty Ordered</span>
+                    <h4 class="fw-bold mb-0 text-dark">{{ number_format($totalQtyOrdered) }}</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+        <div class="card card-custom p-3 border-0">
+            <div class="d-flex align-items-center">
+                <div class="rounded-3 p-3 bg-success bg-opacity-10 text-success me-3" style="background-color: #f0fdf4 !important; color: #16a34a !important;">
+                    <i class="bi bi-truck fs-4"></i>
+                </div>
+                <div>
+                    <span class="text-muted small d-block">Qty Delivered</span>
+                    <h4 class="fw-bold mb-0 text-dark">{{ number_format($totalQtyDelivered) }}</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+        <div class="card card-custom p-3 border-0">
+            <div class="d-flex align-items-center">
+                <div class="rounded-3 p-3 bg-warning bg-opacity-10 text-warning me-3" style="background-color: #fffbeb !important; color: #d97706 !important;">
+                    <i class="bi bi-clock-history fs-4"></i>
+                </div>
+                <div>
+                    <span class="text-muted small d-block">Remaining Bal</span>
+                    <h4 class="fw-bold mb-0 text-dark">{{ number_format($totalRemaining) }}</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="d-flex flex-column gap-2 mb-3">
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2">
         <p class="text-muted small mb-0">
