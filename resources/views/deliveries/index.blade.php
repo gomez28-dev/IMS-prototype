@@ -89,7 +89,9 @@
                         <th class="text-end">Qty Out</th>
                         <th class="text-center">Status</th>
                         <th class="text-center">Type</th>
+                        @if (!Auth::user()->isViewer() && !Auth::user()->isAccounting())
                         <th class="text-end pe-4">Action</th>
+                        @endif
                     </tr>
                 </thead>
                 <tbody>
@@ -117,6 +119,7 @@
                                     <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1">DELIVERY</span>
                                 @endif
                             </td>
+                            @if (!Auth::user()->isViewer() && !Auth::user()->isAccounting())
                             <td class="text-end pe-4">
                                 <div class="d-flex justify-content-end gap-2">
                                     @if (!Auth::user()->isViewer())
@@ -134,11 +137,12 @@
                                     @endif
                                 </div>
                             </td>
+                            @endif
                         </tr>
                         @endforeach
                     @else
                         <tr>
-                            <td colspan="6" class="text-center py-5 text-muted">
+                            <td colspan="{{ !Auth::user()->isViewer() && !Auth::user()->isAccounting() ? 6 : 5 }}" class="text-center py-5 text-muted">
                                 <i class="bi bi-box-seam fs-1 d-block mb-3 text-secondary"></i>
                                 No deliveries recorded yet for this order.
                             </td>
@@ -183,6 +187,7 @@
                                 <span class="badge bg-secondary rounded-pill">{{ $delivery->status }}</span>
                             @endif
                         </div>
+                        @if (!Auth::user()->isViewer() && !Auth::user()->isAccounting())
                         <div class="d-flex gap-2">
                             @if (!Auth::user()->isViewer())
                             <a href="{{ route('delivery.edit', $delivery->id) }}" class="btn btn-sm btn-outline-secondary rounded-3 px-3 py-2 flex-fill text-center">
@@ -198,6 +203,7 @@
                             </form>
                             @endif
                         </div>
+                        @endif
                     </div>
                 </div>
                 @endforeach
