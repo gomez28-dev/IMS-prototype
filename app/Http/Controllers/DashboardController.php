@@ -34,7 +34,7 @@ class DashboardController extends Controller
         $totalQtyOrdered = (clone $statsQuery)->sum('qty_ordered');
         $totalQtyDelivered = (clone $statsQuery)->get()->sum(fn($o) => $o->total_qty_out);
         $totalRemaining = (clone $statsQuery)->get()->sum(fn($o) => $o->remaining_balance);
-        $orders = $query->orderBy('date', 'desc')->paginate(10)->withQueryString();
+        $orders = $query->orderBy('so_number', 'desc')->paginate(10)->withQueryString();
 
         return view('dashboard', compact('orders', 'searchQuery', 'totalOrders', 'totalQtyOrdered', 'totalQtyDelivered', 'totalRemaining'));
     }

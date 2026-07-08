@@ -3,6 +3,11 @@
 @section('title', 'Reports')
 
 @section('content')
+<div class="mb-3">
+    <a href="{{ route('dashboard') }}" class="text-decoration-none text-secondary small">
+        <i class="bi bi-arrow-left me-1"></i> Back to Dashboard
+    </a>
+</div>
 <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
     <div>
         <h2 class="fw-bold text-dark mb-1">Reports</h2>
