@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
-use App\Models\Delivery;
 use App\Exports\ReportsExport;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -50,9 +49,10 @@ class ReportController extends Controller
 
         $totalOrders = $query->clone()->count();
         $totalQtyOrdered = $query->clone()->sum('qty_ordered');
-        $totalQtyDelivered = Delivery::whereIn('order_id', $query->clone()->select('id'))
-            ->where('status', 'FULFILLED')
-            ->sum('qty_out');
+        $totalQtyDelivered = $query->clone()
+            ->join('deliveries', 'orders.id', '=', 'deliveries.order_id')
+            ->where('deliveries.status', 'FULFILLED')
+            ->sum('deliveries.qty_out');
         $totalRemaining = $totalQtyOrdered - $totalQtyDelivered;
 
         return view('reports.index', compact('orders', 'from', 'to', 'month', 'year', 'type', 'activeFilter', 'account', 'clients', 'totalOrders', 'totalQtyOrdered', 'totalQtyDelivered', 'totalRemaining'));
