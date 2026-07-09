@@ -132,7 +132,7 @@ class OrderController extends Controller
             'description' => "Updated clearance status for order #{$order->id} ({$order->account}) to {$validated['clearing_status']}",
         ]);
 
-        return redirect()->route('dashboard')
+        return redirect()->back()
             ->with('success', 'Clearance status updated successfully.');
     }
 }
