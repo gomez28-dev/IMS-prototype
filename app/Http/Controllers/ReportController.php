@@ -20,18 +20,25 @@ class ReportController extends Controller
         $month = $request->input('month');
         $year = $request->input('year');
         $type = $request->input('type');
+        $filterMode = $request->input('filter_mode', 'range');
 
         $activeFilter = null;
 
-        if ($from && $to) {
-            $query->whereBetween('date', [$from, $to]);
-            $activeFilter = 'range';
-        } elseif ($month && $year) {
-            $query->whereYear('date', $year)->whereMonth('date', $month);
-            $activeFilter = 'month';
-        } elseif ($year) {
-            $query->whereYear('date', $year);
-            $activeFilter = 'year';
+        if ($filterMode === 'range') {
+            if ($from && $to) {
+                $query->whereBetween('date', [$from, $to]);
+                $activeFilter = 'range';
+            }
+        } elseif ($filterMode === 'month_year') {
+            if ($month && $year) {
+                $query->whereYear('date', $year)->whereMonth('date', $month);
+                $activeFilter = 'month';
+            }
+        } elseif ($filterMode === 'year') {
+            if ($year) {
+                $query->whereYear('date', $year);
+                $activeFilter = 'year';
+            }
         }
 
         if ($type) {
@@ -55,7 +62,7 @@ class ReportController extends Controller
             ->sum('deliveries.qty_out');
         $totalRemaining = $totalQtyOrdered - $totalQtyDelivered;
 
-        return view('reports.index', compact('orders', 'from', 'to', 'month', 'year', 'type', 'activeFilter', 'account', 'clients', 'totalOrders', 'totalQtyOrdered', 'totalQtyDelivered', 'totalRemaining'));
+        return view('reports.index', compact('orders', 'from', 'to', 'month', 'year', 'type', 'activeFilter', 'account', 'clients', 'totalOrders', 'totalQtyOrdered', 'totalQtyDelivered', 'totalRemaining', 'filterMode'));
     }
 
     public function export(Request $request): BinaryFileResponse
@@ -67,13 +74,20 @@ class ReportController extends Controller
         $month = $request->input('month');
         $year = $request->input('year');
         $type = $request->input('type');
+        $filterMode = $request->input('filter_mode', 'range');
 
-        if ($from && $to) {
-            $query->whereBetween('date', [$from, $to]);
-        } elseif ($month && $year) {
-            $query->whereYear('date', $year)->whereMonth('date', $month);
-        } elseif ($year) {
-            $query->whereYear('date', $year);
+        if ($filterMode === 'range') {
+            if ($from && $to) {
+                $query->whereBetween('date', [$from, $to]);
+            }
+        } elseif ($filterMode === 'month_year') {
+            if ($month && $year) {
+                $query->whereYear('date', $year)->whereMonth('date', $month);
+            }
+        } elseif ($filterMode === 'year') {
+            if ($year) {
+                $query->whereYear('date', $year);
+            }
         }
 
         if ($type) {

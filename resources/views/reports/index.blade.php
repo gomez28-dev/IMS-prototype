@@ -16,35 +16,59 @@
 </div>
 
 <div class="card card-custom p-4 mb-4 border-0">
-    <form method="GET" action="{{ route('reports.index') }}" class="row g-3 align-items-end">
-        <div class="col-md-3">
+    <form method="GET" action="{{ route('reports.index') }}" class="row g-3 align-items-end" id="filter-form">
+        <div class="col-12 mb-2">
+            <div class="d-flex flex-wrap gap-2">
+                <button type="button" class="btn btn-mode-tab rounded-3 px-3 py-2 {{ ($filterMode ?? 'range') === 'range' ? 'btn-primary-custom' : 'btn-secondary-custom' }}" data-mode="range">Date range</button>
+                <button type="button" class="btn btn-mode-tab rounded-3 px-3 py-2 {{ ($filterMode ?? 'range') === 'month_year' ? 'btn-primary-custom' : 'btn-secondary-custom' }}" data-mode="month_year">Month/Year</button>
+                <button type="button" class="btn btn-mode-tab rounded-3 px-3 py-2 {{ ($filterMode ?? 'range') === 'year' ? 'btn-primary-custom' : 'btn-secondary-custom' }}" data-mode="year">Year only</button>
+            </div>
+            <input type="hidden" name="filter_mode" id="filter_mode" value="{{ $filterMode ?? 'range' }}">
+        </div>
+
+        <!-- Date Range Fields -->
+        <div class="col-md-3 filter-field" data-mode="range">
             <label for="from" class="form-label fw-medium text-secondary small">From Date</label>
-            <input type="date" name="from" id="from" class="form-control @error('from') is-invalid @enderror" value="{{ old('from', $from ?? '') }}">
+            <input type="date" data-name="from" id="from" class="form-control @error('from') is-invalid @enderror" value="{{ old('from', $from ?? '') }}">
         </div>
-        <div class="col-md-3">
+        <div class="col-md-3 filter-field" data-mode="range">
             <label for="to" class="form-label fw-medium text-secondary small">To Date</label>
-            <input type="date" name="to" id="to" class="form-control @error('to') is-invalid @enderror" value="{{ old('to', $to ?? '') }}">
+            <input type="date" data-name="to" id="to" class="form-control @error('to') is-invalid @enderror" value="{{ old('to', $to ?? '') }}">
         </div>
-        <div class="col-md-2">
+
+        <!-- Month/Year Fields -->
+        <div class="col-md-3 filter-field" data-mode="month_year">
             <label for="month" class="form-label fw-medium text-secondary small">Month</label>
-            <select name="month" id="month" class="form-control form-select">
+            <select data-name="month" id="month" class="form-control form-select">
                 <option value="">All Months</option>
                 @foreach (range(1, 12) as $m)
                     <option value="{{ $m }}" {{ ($month ?? '') == $m ? 'selected' : '' }}>{{ \Carbon\Carbon::create()->month($m)->format('F') }}</option>
                 @endforeach
             </select>
         </div>
-        <div class="col-md-2">
-            <label for="year" class="form-label fw-medium text-secondary small">Year</label>
-            <select name="year" id="year" class="form-control form-select">
+        <div class="col-md-3 filter-field" data-mode="month_year">
+            <label for="year_month_year" class="form-label fw-medium text-secondary small">Year</label>
+            <select data-name="year" id="year_month_year" class="form-control form-select">
                 <option value="">All Years</option>
                 @foreach (range(now()->year, 2020) as $y)
                     <option value="{{ $y }}" {{ ($year ?? '') == $y ? 'selected' : '' }}>{{ $y }}</option>
                 @endforeach
             </select>
         </div>
+
+        <!-- Year Only Field -->
+        <div class="col-md-3 filter-field" data-mode="year">
+            <label for="year_only" class="form-label fw-medium text-secondary small">Year</label>
+            <select data-name="year" id="year_only" class="form-control form-select">
+                <option value="">All Years</option>
+                @foreach (range(now()->year, 2020) as $y)
+                    <option value="{{ $y }}" {{ ($year ?? '') == $y ? 'selected' : '' }}>{{ $y }}</option>
+                @endforeach
+            </select>
+        </div>
+
         <div class="col-md-2">
-            <label for="type" class="form-label fw-medium text-secondary small">Type</label>
+            <label for="reports_type" class="form-label fw-medium text-secondary small">Type</label>
             <select name="type" id="reports_type" class="form-control form-select">
                 <option value="">All Types</option>
                 <option value="PICK-UP" {{ ($type ?? '') === 'PICK-UP' ? 'selected' : '' }}>PICK-UP</option>
@@ -135,16 +159,24 @@
             @if ($activeFilter === 'range')
                 from <strong>{{ $from }}</strong> to <strong>{{ $to }}</strong>
             @elseif ($activeFilter === 'month')
-                for <strong>{{ \Carbon\Carbon::create()->month($month)->format('F') }} {{ $year }}</strong>
+                for <strong>{{ \Carbon\Carbon::create()->month((int) $month)->format('F') }} {{ $year }}</strong>
             @elseif ($activeFilter === 'year')
                 for year <strong>{{ $year }}</strong>
             @endif
         </p>
         <form method="GET" action="{{ route('reports.export') }}">
-            @if ($from) <input type="hidden" name="from" value="{{ $from }}"> @endif
-            @if ($to) <input type="hidden" name="to" value="{{ $to }}"> @endif
-            @if ($month) <input type="hidden" name="month" value="{{ $month }}"> @endif
-            @if ($year) <input type="hidden" name="year" value="{{ $year }}"> @endif
+            @if ($filterMode)
+                <input type="hidden" name="filter_mode" value="{{ $filterMode }}">
+                @if ($filterMode === 'range')
+                    @if ($from) <input type="hidden" name="from" value="{{ $from }}"> @endif
+                    @if ($to) <input type="hidden" name="to" value="{{ $to }}"> @endif
+                @elseif ($filterMode === 'month_year')
+                    @if ($month) <input type="hidden" name="month" value="{{ $month }}"> @endif
+                    @if ($year) <input type="hidden" name="year" value="{{ $year }}"> @endif
+                @elseif ($filterMode === 'year')
+                    @if ($year) <input type="hidden" name="year" value="{{ $year }}"> @endif
+                @endif
+            @endif
             @if ($type) <input type="hidden" name="type" value="{{ $type }}"> @endif
             @if ($account) <input type="hidden" name="account" value="{{ $account }}"> @endif
             <button type="submit" class="btn btn-secondary-custom shadow-sm d-flex align-items-center">
@@ -274,4 +306,52 @@
     </div>
 </div>
 @endif
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const tabs = document.querySelectorAll('.btn-mode-tab');
+    const filterModeInput = document.getElementById('filter_mode');
+
+    function setFilterMode(selectedMode) {
+        // Update hidden input value
+        filterModeInput.value = selectedMode;
+
+        // Toggle tab button active state classes
+        tabs.forEach(tab => {
+            if (tab.getAttribute('data-mode') === selectedMode) {
+                tab.classList.remove('btn-secondary-custom');
+                tab.classList.add('btn-primary-custom');
+            } else {
+                tab.classList.remove('btn-primary-custom');
+                tab.classList.add('btn-secondary-custom');
+            }
+        });
+
+        // Show/hide relevant filter fields and adjust name attribute
+        document.querySelectorAll('.filter-field').forEach(field => {
+            const isVisible = field.getAttribute('data-mode') === selectedMode;
+            if (isVisible) {
+                field.style.setProperty('display', '', 'important');
+                field.querySelectorAll('input, select').forEach(input => {
+                    input.setAttribute('name', input.getAttribute('data-name'));
+                });
+            } else {
+                field.style.setProperty('display', 'none', 'important');
+                field.querySelectorAll('input, select').forEach(input => {
+                    input.removeAttribute('name');
+                });
+            }
+        });
+    }
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', function () {
+            setFilterMode(this.getAttribute('data-mode'));
+        });
+    });
+
+    // Initialize filter mode on page load
+    setFilterMode(filterModeInput.value || 'range');
+});
+</script>
 @endsection

@@ -117,12 +117,10 @@
             <table class="table table-custom table-hover align-middle mb-0">
                 <thead>
                     <tr>
+                        <th style="width: 40px;"></th>
                         <th class="ps-4">Account</th>
-                        <th>Order Date</th>
-                        <th>PO#</th>
                         <th>SO#</th>
-                        <th class="text-end">Qty Ordered</th>
-                        <th class="text-end">Qty Out</th>
+                        <th class="text-center">Qty Ordered</th>
                         <th class="text-center">Remaining Balance</th>
                         <th class="text-center">Clearance</th>
                         <th class="text-end pe-4">Actions</th>
@@ -131,13 +129,13 @@
                 <tbody>
                     @if ($orders->isNotEmpty())
                         @foreach ($orders as $order)
-                        <tr>
+                        <tr class="main-row" style="cursor: pointer;">
+                            <td class="text-center toggle-expand ps-3">
+                                <i class="bi bi-chevron-down text-secondary fs-6 toggle-icon"></i>
+                            </td>
                             <td class="ps-4 fw-semibold text-dark">{{ $order->account }}</td>
-                            <td>{{ $order->date ? $order->date->format('Y-m-d') : '' }}</td>
-                            <td>{{ $order->po_number }}</td>
                             <td><span class="badge bg-light text-dark border">{{ $order->so_number }}</span></td>
-                            <td class="text-end fw-medium">{{ number_format($order->qty_ordered) }}</td>
-                            <td class="text-end fw-medium text-secondary">{{ number_format($order->total_qty_out) }}</td>
+                            <td class="text-center fw-medium">{{ number_format($order->qty_ordered) }}</td>
                             <td class="text-center">
                                 @if ($order->remaining_balance == 0)
                                     <span class="badge badge-balance-zero rounded-pill">
@@ -194,10 +192,30 @@
                                 </div>
                             </td>
                         </tr>
+                        <tr class="expand-row" style="display: none; background-color: #fafafa;">
+                            <td colspan="7" class="p-3 border-top-0">
+                                <div class="px-4 py-2">
+                                    <div class="row g-3">
+                                        <div class="col-sm-4">
+                                            <span class="text-muted small d-block mb-1">Order Date</span>
+                                            <span class="fw-medium text-dark">{{ $order->date ? $order->date->format('Y-m-d') : '—' }}</span>
+                                        </div>
+                                        <div class="col-sm-4">
+                                            <span class="text-muted small d-block mb-1">PO#</span>
+                                            <span class="fw-medium text-dark">{{ $order->po_number ?: '—' }}</span>
+                                        </div>
+                                        <div class="col-sm-4">
+                                            <span class="text-muted small d-block mb-1">Qty Out</span>
+                                            <span class="fw-medium text-dark">{{ number_format($order->total_qty_out) }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
                         @endforeach
                     @else
                         <tr>
-                            <td colspan="9" class="text-center py-5 text-muted">
+                            <td colspan="7" class="text-center py-5 text-muted">
                                 <i class="bi bi-inbox fs-1 d-block mb-3 text-secondary"></i>
                                 No orders found. Click "New Order" to create one.
                             </td>
@@ -304,4 +322,38 @@
 <div class="d-flex justify-content-center mt-4">
     {{ $orders->links() }}
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const mainRows = document.querySelectorAll('tr.main-row');
+    mainRows.forEach(row => {
+        row.addEventListener('click', function (e) {
+            // Do not toggle if the user clicks an interactive element
+            if (e.target.closest('a, button, select, input, form, label')) {
+                return;
+            }
+
+            const nextRow = this.nextElementSibling;
+            if (nextRow && nextRow.classList.contains('expand-row')) {
+                const icon = this.querySelector('.toggle-icon');
+                const isCollapsed = window.getComputedStyle(nextRow).display === 'none';
+
+                if (isCollapsed) {
+                    nextRow.style.display = 'table-row';
+                    if (icon) {
+                        icon.classList.remove('bi-chevron-down');
+                        icon.classList.add('bi-chevron-up');
+                    }
+                } else {
+                    nextRow.style.display = 'none';
+                    if (icon) {
+                        icon.classList.remove('bi-chevron-up');
+                        icon.classList.add('bi-chevron-down');
+                    }
+                }
+            }
+        });
+    });
+});
+</script>
 @endsection
