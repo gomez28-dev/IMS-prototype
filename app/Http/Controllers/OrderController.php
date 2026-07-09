@@ -33,10 +33,7 @@ class OrderController extends Controller
             'date' => ['required', 'date'],
             'qty_ordered' => ['required', 'integer', 'min:0'],
             'so_number' => ['required', 'string', 'max:64', 'unique:orders,so_number'],
-            'po_number' => ['required', 'string', 'max:64', 'unique:orders,po_number'],
-        ]);
-
-        $order = Order::create($validated);
+            'po_number' => ['nullable', 'string', 'max:64', 'unique:orders,po_number'],
 
         AuditLog::create([
             'admin_id' => auth()->id(),
@@ -78,7 +75,7 @@ class OrderController extends Controller
             'date' => ['required', 'date'],
             'qty_ordered' => ['required', 'integer', 'min:0'],
             'so_number' => ['required', 'string', 'max:64', 'unique:orders,so_number,' . $order->id],
-            'po_number' => ['required', 'string', 'max:64', 'unique:orders,po_number,' . $order->id],
+            'po_number' => ['nullable', 'string', 'max:64', 'unique:orders,po_number,' . $order->id],
         ]);
 
         $order->update($validated);

@@ -51,7 +51,7 @@
 
                     <div class="mb-4">
                         <label for="po_number" class="form-label fw-medium text-secondary small">PO Number</label>
-                        <input type="text" name="po_number" id="po_number" class="form-control @error('po_number') is-invalid @enderror" placeholder="e.g. PO-12345" value="{{ old('po_number', $order ? $order->po_number : '') }}" required>
+                        <input type="text" name="po_number" id="po_number" class="form-control @error('po_number') is-invalid @enderror" placeholder="e.g. PO-12345 (optional)" value="{{ old('po_number', $order ? $order->po_number : '') }}">
                         @error('po_number')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
