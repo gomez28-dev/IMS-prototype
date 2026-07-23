@@ -45,7 +45,7 @@ class DeliveryController extends Controller
             abort(403);
         }
 
-        if ($order->clearing_status !== 'Approved') {
+        if (in_array($order->clearing_status, ['Declined', 'Hold'])) {
             return back()->with('warning', 'This order is awaiting Accounting clearance before delivery can be created.');
         }
 
@@ -65,7 +65,7 @@ class DeliveryController extends Controller
             abort(403);
         }
 
-        if ($order->clearing_status !== 'Approved') {
+        if (in_array($order->clearing_status, ['Declined', 'Hold'])) {
             return back()->with('warning', 'This order is awaiting Accounting clearance before delivery can be created.');
         }
 
