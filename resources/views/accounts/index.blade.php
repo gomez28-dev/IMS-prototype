@@ -50,13 +50,15 @@
                             <td>{{ $admin->username }}</td>
                             <td>
                                 @if ($admin->role === 'admin')
-                                    <span class="badge bg-primary rounded-pill px-3 py-1">Admin</span>
+                                    <span class="badge rounded-pill px-3 py-1" style="background-color: #FFEDD5; color: #C2410C;">Admin</span>
                                 @elseif ($admin->role === 'editor')
-                                    <span class="badge bg-info text-dark rounded-pill px-3 py-1">Editor</span>
+                                    <span class="badge rounded-pill px-3 py-1" style="background-color: #E0F2FE; color: #075985;">Editor</span>
                                 @elseif ($admin->role === 'accounting')
-                                    <span class="badge bg-purple rounded-pill px-3 py-1">Accounting</span>
+                                    <span class="badge rounded-pill px-3 py-1" style="background-color: #F3E8FF; color: #6B21A8;">Accounting</span>
+                                @elseif ($admin->role === 'warehouse')
+                                    <span class="badge rounded-pill px-3 py-1" style="background-color: #FEF3C7; color: #92400E;">Warehouse</span>
                                 @else
-                                    <span class="badge bg-secondary rounded-pill px-3 py-1">Viewer</span>
+                                    <span class="badge rounded-pill px-3 py-1" style="background-color: #F1F5F9; color: #475569;">Viewer</span>
                                 @endif
                             </td>
                             <td class="text-center">
@@ -111,13 +113,15 @@
                         <p class="text-muted small mb-2">&#64;{{ $admin->username }}</p>
                         <div class="d-flex flex-wrap gap-2 mb-3">
                             @if ($admin->role === 'admin')
-                                <span class="badge bg-primary rounded-pill px-3 py-1">Admin</span>
+                                <span class="badge rounded-pill px-3 py-1" style="background-color: #FFEDD5; color: #C2410C;">Admin</span>
                             @elseif ($admin->role === 'editor')
-                                <span class="badge bg-info text-dark rounded-pill px-3 py-1">Editor</span>
+                                <span class="badge rounded-pill px-3 py-1" style="background-color: #E0F2FE; color: #075985;">Editor</span>
                             @elseif ($admin->role === 'accounting')
-                                <span class="badge bg-purple rounded-pill px-3 py-1">Accounting</span>
+                                <span class="badge rounded-pill px-3 py-1" style="background-color: #F3E8FF; color: #6B21A8;">Accounting</span>
+                            @elseif ($admin->role === 'warehouse')
+                                <span class="badge rounded-pill px-3 py-1" style="background-color: #FEF3C7; color: #92400E;">Warehouse</span>
                             @else
-                                <span class="badge bg-secondary rounded-pill px-3 py-1">Viewer</span>
+                                <span class="badge rounded-pill px-3 py-1" style="background-color: #F1F5F9; color: #475569;">Viewer</span>
                             @endif
                             @if ($admin->is_active)
                                 <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1">Active</span>

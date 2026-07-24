@@ -69,7 +69,7 @@
 <!-- Deliveries List Header -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h4 class="fw-bold mb-0 text-dark"><i class="bi bi-truck me-2 text-primary"></i>Deliveries</h4>
-        @if (!Auth::user()->isViewer() && !Auth::user()->isAccounting())
+        @if (!Auth::user()->isViewer() && !Auth::user()->isAccounting() && !Auth::user()->isWarehouse())
         <a href="{{ route('delivery.create', $order->id) }}" class="btn btn-primary-custom shadow-sm d-flex align-items-center">
             <i class="bi bi-plus-lg me-2"></i> Add Delivery
         </a>
@@ -89,7 +89,7 @@
                         <th class="text-end">Qty Out</th>
                         <th class="text-center">Status</th>
                         <th class="text-center">Type</th>
-                        @if (!Auth::user()->isViewer() && !Auth::user()->isAccounting())
+                        @if (!Auth::user()->isViewer() && !Auth::user()->isAccounting() && !Auth::user()->isWarehouse())
                         <th class="text-end pe-4">Action</th>
                         @endif
                     </tr>
@@ -119,7 +119,7 @@
                                     <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1">DELIVERY</span>
                                 @endif
                             </td>
-                            @if (!Auth::user()->isViewer() && !Auth::user()->isAccounting())
+                            @if (!Auth::user()->isViewer() && !Auth::user()->isAccounting() && !Auth::user()->isWarehouse())
                             <td class="text-end pe-4">
                                 <div class="d-flex justify-content-end gap-2">
                                     @if (!Auth::user()->isViewer())
@@ -142,7 +142,7 @@
                         @endforeach
                     @else
                         <tr>
-                            <td colspan="{{ !Auth::user()->isViewer() && !Auth::user()->isAccounting() ? 6 : 5 }}" class="text-center py-5 text-muted">
+                            <td colspan="{{ !Auth::user()->isViewer() && !Auth::user()->isAccounting() && !Auth::user()->isWarehouse() ? 6 : 5 }}" class="text-center py-5 text-muted">
                                 <i class="bi bi-box-seam fs-1 d-block mb-3 text-secondary"></i>
                                 No deliveries recorded yet for this order.
                             </td>
@@ -187,7 +187,7 @@
                                 <span class="badge bg-secondary rounded-pill">{{ $delivery->status }}</span>
                             @endif
                         </div>
-                        @if (!Auth::user()->isViewer() && !Auth::user()->isAccounting())
+                        @if (!Auth::user()->isViewer() && !Auth::user()->isAccounting() && !Auth::user()->isWarehouse())
                         <div class="d-flex gap-2">
                             @if (!Auth::user()->isViewer())
                             <a href="{{ route('delivery.edit', $delivery->id) }}" class="btn btn-sm btn-outline-secondary rounded-3 px-3 py-2 flex-fill text-center">

@@ -10,19 +10,19 @@
         <p class="text-muted small mb-0">Manage customer accounts, sales orders, and delivery statuses.</p>
     </div>
     <div class="row g-2">
-        @if (!Auth::user()->isViewer() && !Auth::user()->isAccounting())
+        @if (!Auth::user()->isViewer() && !Auth::user()->isAccounting() && !Auth::user()->isWarehouse())
         <div class="col-6 col-md-auto">
             <a href="{{ route('import.form') }}" class="btn btn-secondary-custom shadow-sm d-flex align-items-center justify-content-center w-100">
                 <i class="bi bi-file-earmark-excel me-2 text-success"></i> Import Excel
             </a>
         </div>
         @endif
-        <div class="{{ (!Auth::user()->isViewer() && !Auth::user()->isAccounting()) ? 'col-6' : 'col-12' }} col-md-auto">
+        <div class="{{ (!Auth::user()->isViewer() && !Auth::user()->isAccounting() && !Auth::user()->isWarehouse()) ? 'col-6' : 'col-12' }} col-md-auto">
             <a href="{{ route('export') }}" class="btn btn-secondary-custom shadow-sm d-flex align-items-center justify-content-center w-100">
                 <i class="bi bi-download me-2 text-primary"></i> Download Excel
             </a>
         </div>
-        @if (!Auth::user()->isViewer() && !Auth::user()->isAccounting())
+        @if (!Auth::user()->isViewer() && !Auth::user()->isAccounting() && !Auth::user()->isWarehouse())
         <div class="col-12 col-md-auto">
             <a href="{{ route('order.create') }}" class="btn btn-primary-custom shadow-sm d-flex align-items-center justify-content-center w-100">
                 <i class="bi bi-plus-lg me-2"></i> New Order
@@ -119,6 +119,7 @@
                     <tr>
                         <th style="width: 40px;"></th>
                         <th class="ps-4">Account</th>
+                        <th>Location</th>
                         <th>SO#</th>
                         <th class="text-center">Qty Ordered</th>
                         <th class="text-center">Remaining Balance</th>
@@ -134,6 +135,13 @@
                                 <i class="bi bi-chevron-down text-secondary fs-6 toggle-icon"></i>
                             </td>
                             <td class="ps-4 fw-semibold text-dark">{{ $order->account }}</td>
+                            <td>
+                                @if ($order->location === 'San Simon')
+                                    <span class="badge" style="background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a;">San Simon</span>
+                                @else
+                                    <span class="badge" style="background-color: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe;">Valenzuela</span>
+                                @endif
+                            </td>
                             <td><span class="badge bg-light text-dark border">{{ $order->so_number }}</span></td>
                             <td class="text-center fw-medium">{{ number_format($order->qty_ordered) }}</td>
                             <td class="text-center">
@@ -176,7 +184,7 @@
                                     <a href="{{ route('order.deliveries', $order->id) }}" class="btn btn-sm btn-outline-primary rounded-3 px-3 py-1" title="View Deliveries">
                                         <i class="bi bi-truck me-1"></i> Deliveries
                                     </a>
-                                    @if (!Auth::user()->isViewer() && !Auth::user()->isAccounting())
+                                    @if (!Auth::user()->isViewer() && !Auth::user()->isAccounting() && !Auth::user()->isWarehouse())
                                     <a href="{{ route('order.edit', $order->id) }}" class="btn btn-sm btn-outline-secondary rounded-3 px-3 py-1" title="Edit Order">
                                         <i class="bi bi-pencil"></i>
                                     </a>
@@ -232,7 +240,14 @@
                 <div class="card border-0 bg-light mb-3 rounded-4 shadow-sm">
                     <div class="card-body p-4">
                         <div class="d-flex justify-content-between align-items-start mb-2">
-                            <h5 class="fw-bold text-dark mb-0">{{ $order->account }}</h5>
+                            <h5 class="fw-bold text-dark mb-0">
+                                {{ $order->account }}
+                                @if ($order->location === 'San Simon')
+                                    <span class="badge ms-1" style="background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a; font-size: 0.6rem;">San Simon</span>
+                                @else
+                                    <span class="badge ms-1" style="background-color: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; font-size: 0.6rem;">Valenzuela</span>
+                                @endif
+                            </h5>
                             <span class="badge bg-light text-dark border">{{ $order->so_number }}</span>
                         </div>
                         <p class="text-muted small mb-1"><span class="fw-medium">PO#:</span> {{ $order->po_number }}</p>
@@ -291,7 +306,7 @@
                             <a href="{{ route('order.deliveries', $order->id) }}" class="btn btn-sm btn-outline-primary rounded-3 px-3 py-2 flex-fill text-center">
                                 <i class="bi bi-truck me-1"></i> Deliveries
                             </a>
-                            @if (!Auth::user()->isViewer() && !Auth::user()->isAccounting())
+                            @if (!Auth::user()->isViewer() && !Auth::user()->isAccounting() && !Auth::user()->isWarehouse())
                             <a href="{{ route('order.edit', $order->id) }}" class="btn btn-sm btn-outline-secondary rounded-3 px-3 py-2 flex-fill text-center">
                                 <i class="bi bi-pencil me-1"></i> Edit
                             </a>

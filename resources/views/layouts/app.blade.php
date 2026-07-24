@@ -186,34 +186,48 @@
         }
 
         .badge-role-admin {
-            background-color: rgba(255, 69, 0, 0.2) !important;
-            color: #FF4500 !important;
-            border: 1px solid rgba(255, 69, 0, 0.4) !important;
+            background-color: #FFEDD5 !important;
+            color: #C2410C !important;
+            border: 1px solid rgba(194, 65, 12, 0.3) !important;
             font-weight: 600;
             font-size: 0.65rem;
             letter-spacing: 0.04em;
         }
 
         .badge-role-editor {
-            background-color: rgba(96, 165, 250, 0.2) !important;
-            color: #60a5fa !important;
-            border: 1px solid rgba(96, 165, 250, 0.4) !important;
+            background-color: #E0F2FE !important;
+            color: #075985 !important;
+            border: 1px solid rgba(7, 89, 133, 0.3) !important;
             font-weight: 600;
             font-size: 0.65rem;
             letter-spacing: 0.04em;
         }
 
         .badge-role-viewer {
-            background-color: rgba(148, 163, 184, 0.25) !important;
-            color: #64748b !important;
-            border: 1px solid rgba(148, 163, 184, 0.4) !important;
+            background-color: #F1F5F9 !important;
+            color: #475569 !important;
+            border: 1px solid rgba(71, 85, 105, 0.3) !important;
             font-weight: 600;
             font-size: 0.65rem;
             letter-spacing: 0.04em;
         }
 
-        .bg-purple {
-            background-color: #7c3aed !important;
+        .badge-role-warehouse {
+            background-color: #FEF3C7 !important;
+            color: #92400E !important;
+            border: 1px solid rgba(146, 64, 14, 0.3) !important;
+            font-weight: 600;
+            font-size: 0.65rem;
+            letter-spacing: 0.04em;
+        }
+
+        .badge-role-accounting {
+            background-color: #F3E8FF !important;
+            color: #6B21A8 !important;
+            border: 1px solid rgba(107, 33, 168, 0.3) !important;
+            font-weight: 600;
+            font-size: 0.65rem;
+            letter-spacing: 0.04em;
         }
 
         /* Consistent action button sizing */
@@ -332,26 +346,44 @@
                 <h5 class="fw-bold mb-0 text-dark">Menu</h5>
             </div>
             <nav class="flex-grow-1">
-                <a class="nav-link d-flex align-items-center" href="{{ route('dashboard') }}">
-                    <i class="bi bi-speedometer2 me-2"></i> Dashboard
-                </a>
-                <a class="nav-link d-flex align-items-center" href="{{ route('reports.index') }}">
-                    <i class="bi bi-bar-chart-line me-2"></i> Reports
-                </a>
-                @if (Auth::user()->isAdmin())
-                <a class="nav-link d-flex align-items-center" href="{{ route('accounts.index') }}">
-                    <i class="bi bi-people me-2"></i> Manage Accounts
-                </a>
+                @if (request()->is('wetstock*'))
+                    <a class="nav-link d-flex align-items-center" href="{{ route('wetstock.dashboard') }}">
+                        <i class="bi bi-speedometer2 me-2"></i> Wet Stock Dashboard
+                    </a>
+                    <a class="nav-link d-flex align-items-center" href="{{ route('wetstock.stock-in.index') }}">
+                        <i class="bi bi-fuel-pump me-2"></i> Stock IN Log
+                    </a>
+                    <a class="nav-link d-flex align-items-center" href="{{ route('wetstock.deliveries.assignment-history') }}">
+                        <i class="bi bi-truck me-2"></i> Assign Deliveries
+                    </a>
+                @elseif (!request()->routeIs('portal'))
+                    <a class="nav-link d-flex align-items-center" href="{{ route('dashboard') }}">
+                        <i class="bi bi-speedometer2 me-2"></i> Dashboard
+                    </a>
+                    <a class="nav-link d-flex align-items-center" href="{{ route('reports.index') }}">
+                        <i class="bi bi-bar-chart-line me-2"></i> Reports
+                    </a>
+                    @if (Auth::user()->isAdmin())
+                    <a class="nav-link d-flex align-items-center" href="{{ route('accounts.index') }}">
+                        <i class="bi bi-people me-2"></i> Manage Accounts
+                    </a>
+                    @endif
+                    @if (Auth::user()->isEditor())
+                    <a class="nav-link d-flex align-items-center" href="{{ route('clients.index') }}">
+                        <i class="bi bi-building me-2"></i> Manage Clients
+                    </a>
+                    @endif
+                    @if (Auth::user()->isAdmin() || Auth::user()->isAccounting())
+                    <a class="nav-link d-flex align-items-center" href="{{ route('audit-logs') }}">
+                        <i class="bi bi-journal-text me-2"></i> Audit Log
+                    </a>
+                    @endif
                 @endif
-                @if (Auth::user()->isEditor())
-                <a class="nav-link d-flex align-items-center" href="{{ route('clients.index') }}">
-                    <i class="bi bi-building me-2"></i> Manage Clients
-                </a>
-                @endif
-                @if (Auth::user()->isAdmin() || Auth::user()->isAccounting())
-                <a class="nav-link d-flex align-items-center" href="{{ route('audit-logs') }}">
-                    <i class="bi bi-journal-text me-2"></i> Audit Log
-                </a>
+
+                @if (!request()->routeIs('portal'))
+                    <a class="nav-link d-flex align-items-center text-primary" href="{{ route('portal') }}">
+                        <i class="bi bi-grid me-2"></i> Switch Portal
+                    </a>
                 @endif
             </nav>
             <div class="mt-auto border-top p-3">
@@ -364,7 +396,9 @@
                         @elseif (Auth::user()->isEditor())
                             <span class="badge badge-role-editor rounded-pill px-2 py-0" style="font-size: 0.6rem;">Editor</span>
                         @elseif (Auth::user()->isAccounting())
-                            <span class="badge bg-purple rounded-pill px-2 py-0" style="font-size: 0.6rem;">Accounting</span>
+                            <span class="badge badge-role-accounting rounded-pill px-2 py-0" style="font-size: 0.6rem;">Accounting</span>
+                        @elseif (Auth::user()->isWarehouse())
+                            <span class="badge badge-role-warehouse rounded-pill px-2 py-0" style="font-size: 0.6rem;">Warehouse</span>
                         @else
                             <span class="badge badge-role-viewer rounded-pill px-2 py-0" style="font-size: 0.6rem;">Viewer</span>
                         @endif
@@ -383,45 +417,88 @@
 
     <nav class="navbar navbar-expand-lg navbar-light navbar-custom py-4">
         <div class="container">
-            <a class="navbar-brand d-flex align-items-center" href="{{ route('dashboard') }}">
+            <a class="navbar-brand d-flex align-items-center" href="{{ route('portal') }}">
                 <img src="{{ asset('images/logo_ims.png') }}" alt="IMS Logo" class="me-2">
-        </a>
+            </a>
+
         @guest
-        <span class="ms-auto text-muted fw-bold d-none d-lg-inline" style="font-size: 1.05rem;">Sales Inventory Portal</span>
+            <span class="ms-auto text-muted fw-bold d-none d-lg-inline" style="font-size: 1.05rem;">IMS Portal</span>
         @endguest
+
         @auth
+            @if (request()->routeIs('portal'))
+                <span class="ms-auto text-muted fw-bold d-none d-lg-inline me-4" style="font-size: 1.05rem;">Portal Selector</span>
+            @elseif (request()->is('wetstock*'))
+                <span class="ms-3 text-muted fw-bold d-none d-lg-inline" style="font-size: 1.05rem;">Wet Stock Portal</span>
+            @else
+                <span class="ms-3 text-muted fw-bold d-none d-lg-inline" style="font-size: 1.05rem;">Sales Inventory Portal</span>
+            @endif
+
             <button class="hamburger-btn d-lg-none ms-2" type="button" onclick="openSidebar()" aria-label="Toggle navigation">
                 <i class="bi bi-list"></i>
             </button>
+
             <div class="collapse navbar-collapse d-none d-lg-flex" id="navbarNav">
-                <ul class="navbar-nav me-auto align-items-center">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ route('reports.index') }}">
-                            <i class="bi bi-bar-chart-line me-1"></i> Reports
-                        </a>
-                    </li>
-                    @if (Auth::user()->isAdmin())
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ route('accounts.index') }}">
-                            <i class="bi bi-people me-1"></i> Manage Accounts
-                        </a>
-                    </li>
+                <ul class="navbar-nav me-auto align-items-center ms-3">
+                    @if (request()->is('wetstock*'))
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ route('wetstock.dashboard') }}">
+                                <i class="bi bi-speedometer2 me-1"></i> Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ route('wetstock.stock-in.index') }}">
+                                <i class="bi bi-fuel-pump me-1"></i> Stock IN Log
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ route('wetstock.deliveries.assignment-history') }}">
+                                <i class="bi bi-truck me-1"></i> Assign Deliveries
+                            </a>
+                        </li>
+                    @elseif (!request()->routeIs('portal'))
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ route('dashboard') }}">
+                                <i class="bi bi-speedometer2 me-1"></i> Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ route('reports.index') }}">
+                                <i class="bi bi-bar-chart-line me-1"></i> Reports
+                            </a>
+                        </li>
+                        @if (Auth::user()->isAdmin())
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ route('accounts.index') }}">
+                                <i class="bi bi-people me-1"></i> Manage Accounts
+                            </a>
+                        </li>
+                        @endif
+                        @if (Auth::user()->isEditor())
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ route('clients.index') }}">
+                                <i class="bi bi-building me-1"></i> Manage Clients
+                            </a>
+                        </li>
+                        @endif
+                        @if (Auth::user()->isAdmin() || Auth::user()->isAccounting())
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ route('audit-logs') }}">
+                                <i class="bi bi-journal-text me-1"></i> Audit Log
+                            </a>
+                        </li>
+                        @endif
                     @endif
-                    @if (Auth::user()->isEditor())
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ route('clients.index') }}">
-                            <i class="bi bi-building me-1"></i> Manage Clients
-                        </a>
-                    </li>
-                    @endif
-                    @if (Auth::user()->isAdmin() || Auth::user()->isAccounting())
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ route('audit-logs') }}">
-                            <i class="bi bi-journal-text me-1"></i> Audit Log
-                        </a>
-                    </li>
+
+                    @if (!request()->routeIs('portal'))
+                        <li class="nav-item ms-2">
+                            <a class="nav-link text-primary fw-semibold" href="{{ route('portal') }}">
+                                <i class="bi bi-grid me-1"></i> Switch Portal
+                            </a>
+                        </li>
                     @endif
                 </ul>
+
                 <ul class="navbar-nav ms-auto align-items-center">
                     <li class="nav-item me-3">
                         <span class="nav-link d-flex align-items-center gap-0">
@@ -431,7 +508,9 @@
                             @elseif (Auth::user()->isEditor())
                                 <span class="badge badge-role-editor rounded-pill ms-2 px-2 py-1">Editor</span>
                             @elseif (Auth::user()->isAccounting())
-                                <span class="badge bg-purple rounded-pill ms-2 px-2 py-1">Accounting</span>
+                                <span class="badge badge-role-accounting rounded-pill ms-2 px-2 py-1">Accounting</span>
+                            @elseif (Auth::user()->isWarehouse())
+                                <span class="badge badge-role-warehouse rounded-pill ms-2 px-2 py-1">Warehouse</span>
                             @else
                                 <span class="badge badge-role-viewer rounded-pill ms-2 px-2 py-1">Viewer</span>
                             @endif

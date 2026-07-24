@@ -28,4 +28,5 @@
 
 # Superpowers agent files
 .superpowers/
+.opencode/
 

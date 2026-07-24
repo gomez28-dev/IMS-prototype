@@ -53,4 +53,9 @@ class Admin extends Authenticatable
     {
         return $this->role === 'accounting';
     }
+
+    public function isWarehouse(): bool
+    {
+        return $this->role === 'warehouse';
+    }
 }

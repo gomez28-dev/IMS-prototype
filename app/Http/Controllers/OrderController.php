@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class OrderController extends Controller
@@ -32,8 +33,11 @@ class OrderController extends Controller
             'account' => ['required', 'string', 'max:128'],
             'date' => ['required', 'date'],
             'qty_ordered' => ['required', 'integer', 'min:0'],
-            'so_number' => ['required', 'string', 'max:64', 'unique:orders,so_number'],
+            'so_number' => ['required', 'string', 'max:64',
+                Rule::unique('orders', 'so_number')->where(fn($q) => $q->where('location', $request->location)),
+            ],
             'po_number' => ['nullable', 'string', 'max:64', 'unique:orders,po_number'],
+            'location' => ['required', 'string', 'in:Valenzuela,San Simon'],
         ]);
 
         $order = Order::create($validated);
@@ -77,8 +81,13 @@ class OrderController extends Controller
             'account' => ['required', 'string', 'max:128'],
             'date' => ['required', 'date'],
             'qty_ordered' => ['required', 'integer', 'min:0'],
-            'so_number' => ['required', 'string', 'max:64', 'unique:orders,so_number,' . $order->id],
+            'so_number' => ['required', 'string', 'max:64',
+                Rule::unique('orders', 'so_number')
+                    ->where(fn($q) => $q->where('location', $request->location))
+                    ->ignore($order->id),
+            ],
             'po_number' => ['nullable', 'string', 'max:64', 'unique:orders,po_number,' . $order->id],
+            'location' => ['required', 'string', 'in:Valenzuela,San Simon'],
         ]);
 
         $order->update($validated);

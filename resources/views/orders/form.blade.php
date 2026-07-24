@@ -32,6 +32,17 @@
                         @enderror
                     </div>
 
+                    <div class="mb-3">
+                        <label for="location" class="form-label fw-medium text-secondary small">Location</label>
+                        <select name="location" id="location" class="form-control form-select @error('location') is-invalid @enderror" required>
+                            <option value="Valenzuela" {{ old('location', $order ? $order->location : 'Valenzuela') === 'Valenzuela' ? 'selected' : '' }}>Valenzuela</option>
+                            <option value="San Simon" {{ old('location', $order ? $order->location : '') === 'San Simon' ? 'selected' : '' }}>San Simon</option>
+                        </select>
+                        @error('location')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label for="so_number" class="form-label fw-medium text-secondary small">SO Number</label>

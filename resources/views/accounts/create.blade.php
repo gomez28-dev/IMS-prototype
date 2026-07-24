@@ -50,6 +50,7 @@
                             <option value="editor" {{ old('role') === 'editor' ? 'selected' : '' }}>Editor</option>
                             <option value="viewer" {{ old('role') === 'viewer' ? 'selected' : '' }}>Viewer</option>
                             <option value="accounting" {{ old('role') === 'accounting' ? 'selected' : '' }}>Accounting</option>
+                            <option value="warehouse" {{ old('role') === 'warehouse' ? 'selected' : '' }}>Warehouse</option>
                         </select>
                         @error('role')
                             <div class="invalid-feedback">{{ $message }}</div>

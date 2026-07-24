@@ -16,11 +16,13 @@ class Order extends Model
         'so_number',
         'po_number',
         'clearing_status',
+        'location',
     ];
 
     protected $casts = [
         'date' => 'datetime',
         'qty_ordered' => 'integer',
+        'location' => 'string',
     ];
 
     /**

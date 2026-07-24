@@ -70,7 +70,7 @@ class DeliveryController extends Controller
         }
 
         $validated = $request->validate([
-            'dr_number' => ['required', 'string', 'max:64'],
+            'dr_number' => ['required', 'string', 'max:64', 'unique:deliveries,dr_number'],
             'delivery_date' => ['required', 'date'],
             'qty_out' => ['required', 'integer', 'min:0'],
             'status' => ['required', 'string', 'in:PENDING,FULFILLED,CANCELLED'],
@@ -123,7 +123,7 @@ class DeliveryController extends Controller
         $order = $delivery->order;
 
         $validated = $request->validate([
-            'dr_number' => ['required', 'string', 'max:64'],
+            'dr_number' => ['required', 'string', 'max:64', 'unique:deliveries,dr_number,' . $delivery->id],
             'delivery_date' => ['required', 'date'],
             'qty_out' => ['required', 'integer', 'min:0'],
             'status' => ['required', 'string', 'in:PENDING,FULFILLED,CANCELLED'],

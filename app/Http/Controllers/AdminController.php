@@ -31,7 +31,7 @@ class AdminController extends Controller
             'username' => ['required', 'string', 'max:64', 'unique:admins,username'],
             'password' => ['required', 'string', 'min:8'],
             'name' => ['required', 'string', 'max:128'],
-            'role' => ['required', 'string', 'in:admin,editor,viewer,accounting'],
+            'role' => ['required', 'string', 'in:admin,editor,viewer,accounting,warehouse'],
         ]);
 
         Admin::create([
@@ -63,7 +63,7 @@ class AdminController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:128'],
-            'role' => ['required', 'string', 'in:admin,editor,viewer,accounting'],
+            'role' => ['required', 'string', 'in:admin,editor,viewer,accounting,warehouse'],
             'password' => ['nullable', 'string', 'min:8'],
         ]);
 
