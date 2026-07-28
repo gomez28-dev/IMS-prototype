@@ -167,25 +167,28 @@
 @push('scripts')
 <script>
 function toggleEdit(id) {
-    var tankCell = document.getElementById('tank-cell-' + id);
     var editForm = document.getElementById('edit-form-' + id);
     var saveRow = document.getElementById('save-row-' + id);
-    if (editForm.style.display === 'none') {
-        editForm.style.display = 'inline';
-        saveRow.style.display = 'table-row';
+    if (editForm && saveRow) {
+        editForm.style.display = editForm.style.display === 'none' ? 'inline' : 'none';
+        saveRow.style.display = saveRow.style.display === 'none' ? 'table-row' : 'none';
     }
 }
 function cancelEdit(id) {
-    document.getElementById('edit-form-' + id).style.display = 'none';
-    document.getElementById('save-row-' + id).style.display = 'none';
+    var editForm = document.getElementById('edit-form-' + id);
+    var saveRow = document.getElementById('save-row-' + id);
+    if (editForm) editForm.style.display = 'none';
+    if (saveRow) saveRow.style.display = 'none';
 }
-function saveReassign(id) {
+function doReassign(id) {
     var select = document.getElementById('tank-select-' + id);
-    var tankId = select.value;
+    var tankId = select ? select.value : null;
     if (!tankId) { alert('Please select a tank.'); return; }
+    var url = '{{ url('/wetstock/deliveries') }}/' + id + '/assign';
     var form = document.createElement('form');
     form.method = 'POST';
-    form.action = '{{ route('wetstock.deliveries.assign', ':delivery') }}'.replace(':delivery', id);
+    form.action = url;
+    form.style.display = 'none';
     var csrf = document.createElement('input');
     csrf.type = 'hidden';
     csrf.name = '_token';
@@ -201,18 +204,21 @@ function saveReassign(id) {
 }
 function toggleEditMobile(id) {
     var el = document.getElementById('edit-form-mobile-' + id);
-    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 function cancelEditMobile(id) {
-    document.getElementById('edit-form-mobile-' + id).style.display = 'none';
+    var el = document.getElementById('edit-form-mobile-' + id);
+    if (el) el.style.display = 'none';
 }
-function saveReassignMobile(id) {
+function doReassignMobile(id) {
     var select = document.getElementById('tank-select-mobile-' + id);
-    var tankId = select.value;
+    var tankId = select ? select.value : null;
     if (!tankId) { alert('Please select a tank.'); return; }
+    var url = '{{ url('/wetstock/deliveries') }}/' + id + '/assign';
     var form = document.createElement('form');
     form.method = 'POST';
-    form.action = '{{ route('wetstock.deliveries.assign', ':delivery') }}'.replace(':delivery', id);
+    form.action = url;
+    form.style.display = 'none';
     var csrf = document.createElement('input');
     csrf.type = 'hidden';
     csrf.name = '_token';

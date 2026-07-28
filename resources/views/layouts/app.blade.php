@@ -13,7 +13,15 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
+
+    {{-- Early script: restore sidebar collapsed state from localStorage before first paint --}}
+    <script>
+        (function() {
+            var c = localStorage.getItem('ims_sidebar_collapsed');
+            if (c === '1') document.documentElement.setAttribute('data-sidebar-collapsed', '1');
+        })();
+    </script>
+
     <style>
         :root {
             --primary-navy: #0f172a;
@@ -29,6 +37,10 @@
             --bs-primary-rgb: 255, 69, 0;
             --bs-link-color: #FF4500;
             --bs-link-hover-color: #CC3700;
+
+            --sidebar-width: 220px;
+            --sidebar-collapsed-width: 68px;
+            --topbar-height: 54px;
         }
 
         body {
@@ -40,38 +52,378 @@
             flex-direction: column;
         }
 
-        .navbar-custom {
-            background: #ffffff;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
-            border-bottom: 3px solid var(--brand-color);
-        }
-
-        .navbar-custom .nav-link {
-            position: relative;
-            color: var(--text-dark);
-            font-weight: 500;
-        }
-
-        .navbar-custom .nav-link:hover {
-            color: var(--brand-color);
-        }
-
-        .navbar-custom .nav-link::after {
-            content: '';
-            position: absolute;
-            bottom: -2px;
+        /* ========================================
+           DESKTOP SIDEBAR (>= 992px only)
+           ======================================== */
+        .app-sidebar {
+            position: fixed;
+            top: 0;
             left: 0;
+            width: var(--sidebar-width);
+            height: 100vh;
+            background: #ffffff;
+            display: flex;
+            flex-direction: column;
+            z-index: 1030;
+            transition: width 0.15s ease;
+            overflow: hidden;
+        }
+
+        .app-sidebar[data-collapsed="1"] {
+            width: var(--sidebar-collapsed-width);
+        }
+
+        /* Sidebar header (brand + collapse toggle) */
+        .sidebar-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid rgba(0,0,0,0.08);
+        }
+
+        .sidebar-header .brand-logo {
+            height: 18px;
+            transition: opacity 0.15s ease;
+        }
+
+        .app-sidebar[data-collapsed="1"] .brand-logo {
+            display: none;
+        }
+
+        .app-sidebar[data-collapsed="1"] .sidebar-header {
+            justify-content: center;
+        }
+
+        .sidebar-collapse-btn {
+            background: none;
+            border: none;
+            color: #64748b;
+            font-size: 1rem;
+            padding: 0.25rem;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: color 0.15s, background 0.15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+        }
+
+        .sidebar-collapse-btn:hover {
+            color: #0f172a;
+            background: #f1f5f9;
+        }
+
+        .app-sidebar[data-collapsed="1"] .sidebar-collapse-btn {
+            margin: 0 auto;
+        }
+
+        /* Portal section label */
+        .sidebar-section-label {
+            padding: 0.75rem 1rem 0.4rem;
+            font-size: 0.6rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #64748b;
+        }
+
+        .app-sidebar[data-collapsed="1"] .sidebar-section-label {
+            display: none;
+        }
+
+        /* Nav list */
+        .sidebar-nav {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0.25rem 0;
+        }
+
+        .sidebar-nav-link {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            padding: 0.6rem 1rem;
+            color: #334155;
+            text-decoration: none;
+            font-size: 0.82rem;
+            font-weight: 500;
+            transition: background 0.12s, color 0.12s;
+            border-left: 3px solid transparent;
+            position: relative;
+        }
+
+        .sidebar-nav-link:hover {
+            background: #f1f5f9;
+            color: #0f172a;
+        }
+
+        .sidebar-nav-link.active {
+            background: rgba(255,69,0,0.1);
+            color: var(--brand-color);
+            border-left-color: var(--brand-color);
+        }
+
+        .sidebar-nav-link i {
+            font-size: 1.1rem;
+            width: 1.25rem;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .sidebar-nav-link .nav-label {
+            white-space: nowrap;
+            overflow: hidden;
+            transition: opacity 0.12s ease;
+        }
+
+        .app-sidebar[data-collapsed="1"] .sidebar-nav-link {
+            justify-content: center;
+            padding: 0.7rem 0;
+            border-left-color: transparent;
+            gap: 0;
+        }
+
+        .app-sidebar[data-collapsed="1"] .sidebar-nav-link.active {
+            background: rgba(255,69,0,0.2);
+            border-radius: 6px;
+            margin: 0 8px;
+        }
+
+        .app-sidebar[data-collapsed="1"] .sidebar-nav-link .nav-label {
+            display: none;
+        }
+
+        /* Switch Portal divider + link */
+        .sidebar-divider {
+            border-top: 1px solid rgba(0,0,0,0.08);
+            margin: 0.5rem 0.75rem;
+        }
+
+        .sidebar-nav-link.switch-portal {
+            font-size: 0.75rem;
+            color: #64748b;
+        }
+
+        .sidebar-nav-link.switch-portal:hover {
+            color: #334155;
+        }
+
+        /* User menu at bottom */
+        .sidebar-user {
+            border-top: 1px solid rgba(0,0,0,0.08);
+            padding: 0.5rem;
+            position: relative;
+        }
+
+        .sidebar-user-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
             width: 100%;
-            height: 2px;
-            background-color: var(--brand-color);
-            transform: scaleX(0);
-            transition: transform 0.2s ease-in-out;
+            background: none;
+            border: none;
+            color: #334155;
+            padding: 0.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: left;
+            transition: background 0.12s;
         }
 
-        .navbar-custom .nav-link:hover::after {
-            transform: scaleX(1);
+        .sidebar-user-btn:hover {
+            background: #f1f5f9;
         }
 
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--brand-color);
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.7rem;
+            flex-shrink: 0;
+        }
+
+        .user-info {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        .user-info .user-name {
+            font-size: 0.78rem;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .user-chevron {
+            font-size: 0.7rem;
+            color: #94a3b8;
+            transition: transform 0.15s;
+        }
+
+        .sidebar-user-btn[aria-expanded="true"] .user-chevron {
+            transform: rotate(180deg);
+        }
+
+        .app-sidebar[data-collapsed="1"] .user-info,
+        .app-sidebar[data-collapsed="1"] .user-chevron {
+            display: none;
+        }
+
+        .app-sidebar[data-collapsed="1"] .sidebar-user-btn {
+            justify-content: center;
+            padding: 0.5rem 0;
+        }
+
+        /* User dropdown */
+        .user-dropdown {
+            display: none;
+            position: absolute;
+            bottom: 100%;
+            left: 0.5rem;
+            right: 0.5rem;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 0.4rem;
+            margin-bottom: 0.25rem;
+            box-shadow: 0 -4px 16px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+
+        .user-dropdown.open {
+            display: block;
+        }
+
+        .app-sidebar[data-collapsed="1"] .user-dropdown {
+            left: calc(var(--sidebar-collapsed-width) + 4px);
+            right: auto;
+            bottom: 0;
+            width: 180px;
+        }
+
+        .user-dropdown .dropdown-item-custom {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            color: #334155;
+            text-decoration: none;
+            font-size: 0.8rem;
+            font-weight: 500;
+            border-radius: 6px;
+            background: none;
+            border: none;
+            width: 100%;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+
+        .user-dropdown .dropdown-item-custom:hover {
+            background: #f1f5f9;
+        }
+
+        /* Role badge styles for sidebar */
+        .sidebar-user .badge-role-admin {
+            background-color: #FFEDD5 !important;
+            color: #C2410C !important;
+            border-color: rgba(194, 65, 12, 0.3) !important;
+        }
+        .sidebar-user .badge-role-editor {
+            background-color: #E0F2FE !important;
+            color: #075985 !important;
+            border-color: rgba(7, 89, 133, 0.3) !important;
+        }
+        .sidebar-user .badge-role-viewer {
+            background-color: #F1F5F9 !important;
+            color: #475569 !important;
+            border-color: rgba(71, 85, 105, 0.3) !important;
+        }
+        .sidebar-user .badge-role-warehouse {
+            background-color: #FEF3C7 !important;
+            color: #92400E !important;
+            border-color: rgba(146, 64, 14, 0.3) !important;
+        }
+        .sidebar-user .badge-role-accounting {
+            background-color: #F3E8FF !important;
+            color: #6B21A8 !important;
+            border-color: rgba(107, 33, 168, 0.3) !important;
+        }
+
+        /* ========================================
+           SLIM TOP BAR
+           ======================================== */
+        .app-topbar {
+            height: var(--topbar-height);
+            background: #ffffff;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 1.5rem;
+            position: sticky;
+            top: 0;
+            z-index: 1020;
+        }
+
+        .app-topbar .topbar-title {
+            font-size: 0.92rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .topbar-portal-label {
+            font-size: 0.65rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            background: var(--light-slate);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 0.15rem 0.5rem;
+        }
+
+        .topbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* ========================================
+           MAIN CONTENT WRAPPER (desktop offset)
+           ======================================== */
+        @media (min-width: 992px) {
+            .app-content-wrapper {
+                margin-left: var(--sidebar-width);
+                transition: margin-left 0.15s ease;
+                display: flex;
+                flex-direction: column;
+                min-height: 100vh;
+            }
+
+            html[data-sidebar-collapsed="1"] .app-content-wrapper,
+            .app-content-wrapper.sidebar-is-collapsed {
+                margin-left: var(--sidebar-collapsed-width);
+            }
+        }
+
+        /* ========================================
+           EXISTING COMPONENT STYLES (preserved)
+           ======================================== */
         .card-custom {
             border: 1px solid var(--border-color);
             border-radius: 16px;
@@ -251,11 +603,13 @@
         }
 
         /* Micro-animations */
-        .btn, .card-custom, .nav-link {
+        .btn, .card-custom {
             transition: all 0.2s ease-in-out;
         }
 
-        /* Mobile sliding drawer sidebar */
+        /* ========================================
+           MOBILE DRAWER (< 992px, unchanged)
+           ======================================== */
         .sidebar-drawer {
             position: fixed;
             top: 0;
@@ -304,19 +658,16 @@
             width: 1.5rem;
         }
 
-        /* Responsive logo sizing */
-        .navbar-brand img {
-            height: 32px;
-            transition: height 0.2s ease;
+        /* Mobile top bar adjustments */
+        .mobile-topbar {
+            background: #ffffff;
+            border-bottom: 1px solid var(--border-color);
+            padding: 0.75rem 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
 
-        @media (max-width: 991.98px) {
-            .navbar-brand img {
-                height: 24px;
-            }
-        }
-
-        /* Mobile hamburger button tweaks */
         .hamburger-btn {
             border: none;
             background: transparent;
@@ -324,22 +675,16 @@
             color: var(--text-dark);
             padding: 0.25rem 0.5rem;
             cursor: pointer;
-            display: none;
-        }
-
-        @media (max-width: 991.98px) {
-            .hamburger-btn {
-                display: block;
-            }
         }
     </style>
 </head>
 <body>
-    <!-- Sidebar overlay -->
+
+    {{-- ============ MOBILE OVERLAY ============ --}}
     <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 
-    <!-- Mobile sidebar drawer -->
     @auth
+    {{-- ============ MOBILE SIDEBAR DRAWER (< 992px, preserved) ============ --}}
     <div class="sidebar-drawer d-lg-none" id="sidebarDrawer">
         <div class="d-flex flex-column h-100">
             <div class="p-3 border-bottom">
@@ -348,7 +693,7 @@
             <nav class="flex-grow-1">
                 @if (request()->is('wetstock*'))
                     <a class="nav-link d-flex align-items-center" href="{{ route('wetstock.dashboard') }}">
-                        <i class="bi bi-speedometer2 me-2"></i> Wet Stock Dashboard
+                        <i class="bi bi-speedometer2 me-2"></i> Dashboard
                     </a>
                     <a class="nav-link d-flex align-items-center" href="{{ route('wetstock.stock-in.index') }}">
                         <i class="bi bi-fuel-pump me-2"></i> Stock IN Log
@@ -413,157 +758,263 @@
             </div>
         </div>
     </div>
-    @endauth
 
-    <nav class="navbar navbar-expand-lg navbar-light navbar-custom py-4">
-        <div class="container">
-            <a class="navbar-brand d-flex align-items-center" href="{{ route('portal') }}">
-                <img src="{{ asset('images/logo_ims.png') }}" alt="IMS Logo" class="me-2">
+    @if (!request()->routeIs('portal'))
+    {{-- ============ DESKTOP SIDEBAR (>= 992px) ============ --}}
+    <aside id="appSidebar" class="app-sidebar d-none d-lg-flex" data-collapsed="0">
+        {{-- Header: brand + collapse toggle --}}
+        <div class="sidebar-header">
+            <a href="{{ route('portal') }}">
+                <img src="{{ asset('images/logo_ims.png') }}" alt="IMS" class="brand-logo">
             </a>
+            <button class="sidebar-collapse-btn" id="sidebarToggle" type="button" aria-label="Collapse sidebar" aria-expanded="true">
+                <i class="bi bi-chevron-left" id="collapseIcon"></i>
+            </button>
+        </div>
 
-        @guest
-            <span class="ms-auto text-muted fw-bold d-none d-lg-inline" style="font-size: 1.05rem;">IMS Portal</span>
-        @endguest
-
-        @auth
-            @if (request()->routeIs('portal'))
-                <span class="ms-auto text-muted fw-bold d-none d-lg-inline me-4" style="font-size: 1.05rem;">Portal Selector</span>
-            @elseif (request()->is('wetstock*'))
-                <span class="ms-3 text-muted fw-bold d-none d-lg-inline" style="font-size: 1.05rem;">Wet Stock Portal</span>
+        {{-- Section label --}}
+        <div class="sidebar-section-label">
+            @if (request()->is('wetstock*'))
+                Wet Stock
             @else
-                <span class="ms-3 text-muted fw-bold d-none d-lg-inline" style="font-size: 1.05rem;">Sales Inventory Portal</span>
+                Sales Inventory
+            @endif
+        </div>
+
+        {{-- Nav links --}}
+        <nav class="sidebar-nav">
+            @if (request()->is('wetstock*'))
+                <a href="{{ route('wetstock.dashboard') }}" class="sidebar-nav-link {{ request()->routeIs('wetstock.dashboard') ? 'active' : '' }}" title="Dashboard">
+                    <i class="bi bi-speedometer2"></i>
+                    <span class="nav-label">Dashboard</span>
+                </a>
+                <a href="{{ route('wetstock.stock-in.index') }}" class="sidebar-nav-link {{ request()->routeIs('wetstock.stock-in.*') ? 'active' : '' }}" title="Stock IN Log">
+                    <i class="bi bi-fuel-pump"></i>
+                    <span class="nav-label">Stock IN Log</span>
+                </a>
+                <a href="{{ route('wetstock.deliveries.assignment-history') }}" class="sidebar-nav-link {{ request()->routeIs('wetstock.deliveries.*') || request()->routeIs('wetstock.deliveries.assignment-history') ? 'active' : '' }}" title="Assign Deliveries">
+                    <i class="bi bi-truck"></i>
+                    <span class="nav-label">Assign Deliveries</span>
+                </a>
+            @else
+                <a href="{{ route('dashboard') }}" class="sidebar-nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}" title="Dashboard">
+                    <i class="bi bi-speedometer2"></i>
+                    <span class="nav-label">Dashboard</span>
+                </a>
+                <a href="{{ route('reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('reports.*') ? 'active' : '' }}" title="Reports">
+                    <i class="bi bi-bar-chart-line"></i>
+                    <span class="nav-label">Reports</span>
+                </a>
+                @if (Auth::user()->isAdmin())
+                <a href="{{ route('accounts.index') }}" class="sidebar-nav-link {{ request()->routeIs('accounts.*') ? 'active' : '' }}" title="Manage Accounts">
+                    <i class="bi bi-people"></i>
+                    <span class="nav-label">Manage Accounts</span>
+                </a>
+                @endif
+                @if (Auth::user()->isEditor())
+                <a href="{{ route('clients.index') }}" class="sidebar-nav-link {{ request()->routeIs('clients.*') ? 'active' : '' }}" title="Manage Clients">
+                    <i class="bi bi-building"></i>
+                    <span class="nav-label">Manage Clients</span>
+                </a>
+                @endif
+                @if (Auth::user()->isAdmin() || Auth::user()->isAccounting())
+                <a href="{{ route('audit-logs') }}" class="sidebar-nav-link {{ request()->routeIs('audit-logs') ? 'active' : '' }}" title="Audit Log">
+                    <i class="bi bi-journal-text"></i>
+                    <span class="nav-label">Audit Log</span>
+                </a>
+                @endif
             @endif
 
-            <button class="hamburger-btn d-lg-none ms-2" type="button" onclick="openSidebar()" aria-label="Toggle navigation">
-                <i class="bi bi-list"></i>
+            <div class="sidebar-divider"></div>
+            <a href="{{ route('portal') }}" class="sidebar-nav-link switch-portal" title="Switch Portal">
+                <i class="bi bi-grid"></i>
+                <span class="nav-label">Switch Portal</span>
+            </a>
+        </nav>
+
+        {{-- User menu (bottom) --}}
+        <div class="sidebar-user">
+            <div class="user-dropdown" id="userDropdown">
+                <form action="{{ route('logout') }}" method="POST">
+                    @csrf
+                    <button type="submit" class="dropdown-item-custom">
+                        <i class="bi bi-box-arrow-right"></i> Logout
+                    </button>
+                </form>
+            </div>
+            @php
+                $nameParts = explode(' ', Auth::user()->name);
+                $initials = strtoupper(substr($nameParts[0], 0, 1) . (isset($nameParts[count($nameParts)-1]) && count($nameParts) > 1 ? substr($nameParts[count($nameParts)-1], 0, 1) : ''));
+            @endphp
+            <button class="sidebar-user-btn" id="userMenuBtn" type="button" aria-haspopup="true" aria-expanded="false">
+                <div class="user-avatar">{{ $initials }}</div>
+                <div class="user-info">
+                    <div class="user-name">{{ Auth::user()->name }}</div>
+                    @if (Auth::user()->isAdmin())
+                        <span class="badge badge-role-admin rounded-pill px-2 py-0" style="font-size: 0.55rem;">Admin</span>
+                    @elseif (Auth::user()->isEditor())
+                        <span class="badge badge-role-editor rounded-pill px-2 py-0" style="font-size: 0.55rem;">Editor</span>
+                    @elseif (Auth::user()->isAccounting())
+                        <span class="badge badge-role-accounting rounded-pill px-2 py-0" style="font-size: 0.55rem;">Accounting</span>
+                    @elseif (Auth::user()->isWarehouse())
+                        <span class="badge badge-role-warehouse rounded-pill px-2 py-0" style="font-size: 0.55rem;">Warehouse</span>
+                    @else
+                        <span class="badge badge-role-viewer rounded-pill px-2 py-0" style="font-size: 0.55rem;">Viewer</span>
+                    @endif
+                </div>
+                <i class="bi bi-chevron-up user-chevron"></i>
             </button>
+        </div>
+    </aside>
+    @endif
+    @endauth
 
-            <div class="collapse navbar-collapse d-none d-lg-flex" id="navbarNav">
-                <ul class="navbar-nav me-auto align-items-center ms-3">
-                    @if (request()->is('wetstock*'))
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ route('wetstock.dashboard') }}">
-                                <i class="bi bi-speedometer2 me-1"></i> Dashboard
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ route('wetstock.stock-in.index') }}">
-                                <i class="bi bi-fuel-pump me-1"></i> Stock IN Log
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ route('wetstock.deliveries.assignment-history') }}">
-                                <i class="bi bi-truck me-1"></i> Assign Deliveries
-                            </a>
-                        </li>
-                    @elseif (!request()->routeIs('portal'))
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ route('dashboard') }}">
-                                <i class="bi bi-speedometer2 me-1"></i> Dashboard
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ route('reports.index') }}">
-                                <i class="bi bi-bar-chart-line me-1"></i> Reports
-                            </a>
-                        </li>
-                        @if (Auth::user()->isAdmin())
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ route('accounts.index') }}">
-                                <i class="bi bi-people me-1"></i> Manage Accounts
-                            </a>
-                        </li>
-                        @endif
-                        @if (Auth::user()->isEditor())
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ route('clients.index') }}">
-                                <i class="bi bi-building me-1"></i> Manage Clients
-                            </a>
-                        </li>
-                        @endif
-                        @if (Auth::user()->isAdmin() || Auth::user()->isAccounting())
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ route('audit-logs') }}">
-                                <i class="bi bi-journal-text me-1"></i> Audit Log
-                            </a>
-                        </li>
-                        @endif
+    {{-- ============ MAIN CONTENT WRAPPER ============ --}}
+    @auth
+        @if (request()->routeIs('portal'))
+            {{-- Portal page: no sidebar, simple centered layout --}}
+            <div class="mobile-topbar d-lg-none">
+                <a href="{{ route('portal') }}">
+                    <img src="{{ asset('images/logo_ims.png') }}" alt="IMS" style="height: 24px;">
+                </a>
+                <form action="{{ route('logout') }}" method="POST" class="d-inline">
+                    @csrf
+                    <button type="submit" class="btn btn-outline-dark btn-sm rounded-pill px-3" style="font-size: 0.75rem;">
+                        <i class="bi bi-box-arrow-right me-1"></i> Logout
+                    </button>
+                </form>
+            </div>
+            {{-- Desktop: simple topbar with logo + logout for portal --}}
+            <div class="app-topbar d-none d-lg-flex">
+                <div class="topbar-title">
+                    <img src="{{ asset('images/logo_ims.png') }}" alt="IMS" style="height: 26px;">
+                    <span>Portal Selector</span>
+                </div>
+                <div class="topbar-actions">
+                    <span class="me-3 text-muted small">
+                        <i class="bi bi-person-circle me-1"></i>{{ Auth::user()->name }}
+                    </span>
+                    <form action="{{ route('logout') }}" method="POST" class="d-inline">
+                        @csrf
+                        <button type="submit" class="btn btn-outline-dark btn-sm rounded-pill px-3" style="font-size: 0.75rem;">
+                            <i class="bi bi-box-arrow-right me-1"></i> Logout
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="flex-grow-1">
+                <div class="container my-5">
+                    @if (session('success'))
+                        <div class="alert alert-success alert-dismissible fade show rounded-4 shadow-sm mb-4 p-3 border-0" role="alert" style="background-color: #dcfce7; color: #15803d;">
+                            <i class="bi bi-check-circle-fill me-2"></i> {{ session('success') }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
                     @endif
-
-                    @if (!request()->routeIs('portal'))
-                        <li class="nav-item ms-2">
-                            <a class="nav-link text-primary fw-semibold" href="{{ route('portal') }}">
-                                <i class="bi bi-grid me-1"></i> Switch Portal
-                            </a>
-                        </li>
+                    @if (session('info'))
+                        <div class="alert alert-info alert-dismissible fade show rounded-4 shadow-sm mb-4 p-3 border-0" role="alert" style="background-color: #e0f2fe; color: #0369a1;">
+                            <i class="bi bi-info-circle-fill me-2"></i> {{ session('info') }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
                     @endif
-                </ul>
+                    @yield('content')
+                </div>
+            </div>
+        @else
+            {{-- Non-portal pages: sidebar + topbar layout --}}
+            <div class="app-content-wrapper" id="appContentWrapper">
+                {{-- Mobile top bar --}}
+                <div class="mobile-topbar d-lg-none">
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="hamburger-btn" type="button" onclick="openSidebar()" aria-label="Open menu">
+                            <i class="bi bi-list"></i>
+                        </button>
+                        <span class="fw-semibold text-dark" style="font-size: 0.85rem;">@yield('title', 'IMS')</span>
+                    </div>
+                    <a href="{{ route('portal') }}">
+                        <img src="{{ asset('images/logo_ims.png') }}" alt="IMS" style="height: 22px;">
+                    </a>
+                </div>
 
-                <ul class="navbar-nav ms-auto align-items-center">
-                    <li class="nav-item me-3">
-                        <span class="nav-link d-flex align-items-center gap-0">
-                            <i class="bi bi-person-circle me-1"></i> {{ Auth::user()->name }}
-                            @if (Auth::user()->isAdmin())
-                                <span class="badge badge-role-admin rounded-pill ms-2 px-2 py-1">Admin</span>
-                            @elseif (Auth::user()->isEditor())
-                                <span class="badge badge-role-editor rounded-pill ms-2 px-2 py-1">Editor</span>
-                            @elseif (Auth::user()->isAccounting())
-                                <span class="badge badge-role-accounting rounded-pill ms-2 px-2 py-1">Accounting</span>
-                            @elseif (Auth::user()->isWarehouse())
-                                <span class="badge badge-role-warehouse rounded-pill ms-2 px-2 py-1">Warehouse</span>
+                {{-- Desktop slim top bar --}}
+                <div class="app-topbar d-none d-lg-flex">
+                    <div class="topbar-title">
+                        <span>@yield('title', 'IMS')</span>
+                        <span class="topbar-portal-label">
+                            @if (request()->is('wetstock*'))
+                                Wet Stock
                             @else
-                                <span class="badge badge-role-viewer rounded-pill ms-2 px-2 py-1">Viewer</span>
+                                Sales Inventory
                             @endif
                         </span>
-                    </li>
-                    <li class="nav-item">
-                        <form action="{{ route('logout') }}" method="POST" class="d-inline">
-                            @csrf
-                            <button type="submit" class="btn btn-outline-dark btn-sm rounded-pill px-3">
-                                <i class="bi bi-box-arrow-right me-1"></i> Logout
-                            </button>
-                        </form>
-                    </li>
-                </ul>
+                    </div>
+                    <div class="topbar-actions">
+                        @stack('page-actions')
+                    </div>
+                </div>
+
+                {{-- Main content area --}}
+                <div class="container-fluid px-4 py-4 flex-grow-1">
+                    @if (session('success'))
+                        <div class="alert alert-success alert-dismissible fade show rounded-4 shadow-sm mb-4 p-3 border-0" role="alert" style="background-color: #dcfce7; color: #15803d;">
+                            <i class="bi bi-check-circle-fill me-2"></i> {{ session('success') }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    @endif
+
+                    @if (session('danger'))
+                        <div class="alert alert-danger alert-dismissible fade show rounded-4 shadow-sm mb-4 p-3 border-0" role="alert" style="background-color: #fee2e2; color: #b91c1c;">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i> {{ session('danger') }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    @endif
+
+                    @if (session('warning'))
+                        <div class="alert alert-warning alert-dismissible fade show rounded-4 shadow-sm mb-4 p-3 border-0" role="alert" style="background-color: #fef9c3; color: #854d0e;">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i> {{ session('warning') }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    @endif
+
+                    @if (session('info'))
+                        <div class="alert alert-info alert-dismissible fade show rounded-4 shadow-sm mb-4 p-3 border-0" role="alert" style="background-color: #e0f2fe; color: #0369a1;">
+                            <i class="bi bi-info-circle-fill me-2"></i> {{ session('info') }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    @endif
+
+                    @yield('content')
+                </div>
+
+                <footer class="footer mt-auto py-4 bg-white border-top text-center text-muted small">
+                    <div class="container">
+                        &copy; 2026 Doyen Group of Companies. All rights reserved.
+                    </div>
+                </footer>
             </div>
-            @endauth
+        @endif
+    @else
+        {{-- Guest (login page) --}}
+        <div class="container my-5 flex-grow-1">
+            @if (session('info'))
+                <div class="alert alert-info alert-dismissible fade show rounded-4 shadow-sm mb-4 p-3 border-0" role="alert" style="background-color: #e0f2fe; color: #0369a1;">
+                    <i class="bi bi-info-circle-fill me-2"></i> {{ session('info') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            @endif
+            @yield('content')
         </div>
-    </nav>
-
-    <div class="container my-5 flex-grow-1">
-        @if (session('success'))
-            <div class="alert alert-success alert-dismissible fade show rounded-4 shadow-sm mb-4 p-3 border-0" role="alert" style="background-color: #dcfce7; color: #15803d;">
-                <i class="bi bi-check-circle-fill me-2"></i> {{ session('success') }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        <footer class="footer mt-auto py-4 bg-white border-top text-center text-muted small">
+            <div class="container">
+                &copy; 2026 Doyen Group of Companies. All rights reserved.
             </div>
-        @endif
-
-        @if (session('danger'))
-            <div class="alert alert-danger alert-dismissible fade show rounded-4 shadow-sm mb-4 p-3 border-0" role="alert" style="background-color: #fee2e2; color: #b91c1c;">
-                <i class="bi bi-exclamation-triangle-fill me-2"></i> {{ session('danger') }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        @endif
-
-        @if (session('info'))
-            <div class="alert alert-info alert-dismissible fade show rounded-4 shadow-sm mb-4 p-3 border-0" role="alert" style="background-color: #e0f2fe; color: #0369a1;">
-                <i class="bi bi-info-circle-fill me-2"></i> {{ session('info') }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        @endif
-
-        @yield('content')
-    </div>
-
-    <footer class="footer mt-auto py-4 bg-white border-top text-center text-muted small">
-        <div class="container">
-            &copy; 2026 Doyen Group of Companies. All rights reserved.
-        </div>
-    </footer>
+        </footer>
+    @endauth
 
     <!-- Bootstrap 5 JS Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // ===== Mobile drawer (preserved) =====
         function openSidebar() {
             document.getElementById('sidebarDrawer').classList.add('open');
             document.getElementById('sidebarOverlay').classList.add('open');
@@ -574,6 +1025,95 @@
             document.getElementById('sidebarOverlay').classList.remove('open');
             document.body.style.overflow = '';
         }
+
+        // ===== Desktop sidebar collapse/expand =====
+        (function() {
+            var sidebar = document.getElementById('appSidebar');
+            var toggle = document.getElementById('sidebarToggle');
+            var icon = document.getElementById('collapseIcon');
+            var wrapper = document.getElementById('appContentWrapper');
+
+            if (!sidebar || !toggle) return;
+
+            // Restore state from localStorage
+            var stored = localStorage.getItem('ims_sidebar_collapsed');
+            if (stored === '1') {
+                sidebar.setAttribute('data-collapsed', '1');
+                icon.className = 'bi bi-chevron-right';
+                toggle.setAttribute('aria-label', 'Expand sidebar');
+                toggle.setAttribute('aria-expanded', 'false');
+                if (wrapper) wrapper.classList.add('sidebar-is-collapsed');
+            } else {
+                sidebar.setAttribute('data-collapsed', '0');
+                icon.className = 'bi bi-chevron-left';
+                toggle.setAttribute('aria-label', 'Collapse sidebar');
+                toggle.setAttribute('aria-expanded', 'true');
+                if (wrapper) wrapper.classList.remove('sidebar-is-collapsed');
+            }
+
+            toggle.addEventListener('click', function() {
+                var isCollapsed = sidebar.getAttribute('data-collapsed') === '1';
+                if (isCollapsed) {
+                    // Expand
+                    sidebar.setAttribute('data-collapsed', '0');
+                    icon.className = 'bi bi-chevron-left';
+                    toggle.setAttribute('aria-label', 'Collapse sidebar');
+                    toggle.setAttribute('aria-expanded', 'true');
+                    localStorage.setItem('ims_sidebar_collapsed', '0');
+                    if (wrapper) wrapper.classList.remove('sidebar-is-collapsed');
+                    document.documentElement.removeAttribute('data-sidebar-collapsed');
+                } else {
+                    // Collapse
+                    sidebar.setAttribute('data-collapsed', '1');
+                    icon.className = 'bi bi-chevron-right';
+                    toggle.setAttribute('aria-label', 'Expand sidebar');
+                    toggle.setAttribute('aria-expanded', 'false');
+                    localStorage.setItem('ims_sidebar_collapsed', '1');
+                    if (wrapper) wrapper.classList.add('sidebar-is-collapsed');
+                    document.documentElement.setAttribute('data-sidebar-collapsed', '1');
+                }
+            });
+
+            // Handle keyboard (Enter/Space)
+            toggle.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    toggle.click();
+                }
+            });
+        })();
+
+        // ===== User menu dropdown =====
+        (function() {
+            var btn = document.getElementById('userMenuBtn');
+            var dropdown = document.getElementById('userDropdown');
+            if (!btn || !dropdown) return;
+
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                var isOpen = dropdown.classList.contains('open');
+                dropdown.classList.toggle('open');
+                btn.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+            });
+
+            // Close on outside click
+            document.addEventListener('click', function(e) {
+                if (!dropdown.contains(e.target) && !btn.contains(e.target)) {
+                    dropdown.classList.remove('open');
+                    btn.setAttribute('aria-expanded', 'false');
+                }
+            });
+
+            // Keyboard support
+            btn.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    btn.click();
+                }
+            });
+        })();
     </script>
+
+    @stack('scripts')
 </body>
 </html>
