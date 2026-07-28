@@ -183,7 +183,7 @@ function saveReassign(id) {
     if (!tankId) { alert('Please select a tank.'); return; }
     var form = document.createElement('form');
     form.method = 'POST';
-    form.action = '{{ route('wetstock.deliveries.assign', ':delivery') }}'.replace(':delivery', id);
+    form.action = '{{ route('wetstock.deliveries.assign', '__DELIVERY_ID__') }}'.replace('__DELIVERY_ID__', id);
     var csrf = document.createElement('input');
     csrf.type = 'hidden';
     csrf.name = '_token';
@@ -210,7 +210,7 @@ function saveReassignMobile(id) {
     if (!tankId) { alert('Please select a tank.'); return; }
     var form = document.createElement('form');
     form.method = 'POST';
-    form.action = '{{ route('wetstock.deliveries.assign', ':delivery') }}'.replace(':delivery', id);
+    form.action = '{{ route('wetstock.deliveries.assign', '__DELIVERY_ID__') }}'.replace('__DELIVERY_ID__', id);
     var csrf = document.createElement('input');
     csrf.type = 'hidden';
     csrf.name = '_token';
