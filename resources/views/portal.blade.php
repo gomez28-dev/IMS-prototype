@@ -16,11 +16,11 @@
                     <div class="rounded-circle bg-light d-inline-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px; color: var(--brand-color);">
                         <i class="bi bi-box-seam fs-1"></i>
                     </div>
-                    <h4 class="fw-bold text-dark mb-2">Sales Inventory</h4>
+                    <h4 class="fw-bold text-dark mb-2">Sales Documentation</h4>
                     <p class="text-muted small">Manage client orders, deliveries, clearances, and generate sales reports.</p>
                 </div>
                 <a href="{{ route('dashboard') }}" class="btn btn-primary-custom w-100 py-2 fs-6">
-                    Enter Sales Inventory <i class="bi bi-arrow-right ms-1"></i>
+                    Enter Sales Documentation <i class="bi bi-arrow-right ms-1"></i>
                 </a>
             </div>
         </div>

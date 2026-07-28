@@ -778,7 +778,7 @@
             @if (request()->is('wetstock*'))
                 Wet Stock
             @else
-                Sales Inventory
+                Sales Documentation
             @endif
         </div>
 
@@ -945,7 +945,7 @@
                             @if (request()->is('wetstock*'))
                                 Wet Stock
                             @else
-                                Sales Inventory
+                                Sales Documentation
                             @endif
                         </span>
                     </div>
