@@ -40,6 +40,7 @@
 
             --sidebar-width: 220px;
             --sidebar-collapsed-width: 68px;
+            --sidebar-current-width: var(--sidebar-width);
             --topbar-height: 54px;
         }
 
@@ -55,11 +56,15 @@
         /* ========================================
            DESKTOP SIDEBAR (>= 992px only)
            ======================================== */
+        html[data-sidebar-collapsed] {
+            --sidebar-current-width: var(--sidebar-collapsed-width);
+        }
+
         .app-sidebar {
             position: fixed;
             top: 0;
             left: 0;
-            width: var(--sidebar-width);
+            width: var(--sidebar-current-width);
             height: 100vh;
             background: #ffffff;
             display: flex;
@@ -67,10 +72,6 @@
             z-index: 1030;
             transition: width 0.15s ease;
             overflow: hidden;
-        }
-
-        .app-sidebar[data-collapsed="1"] {
-            width: var(--sidebar-collapsed-width);
         }
 
         /* Sidebar header (brand + collapse toggle) */
@@ -1113,7 +1114,5 @@
             });
         })();
     </script>
-
-    @stack('scripts')
 </body>
 </html>
