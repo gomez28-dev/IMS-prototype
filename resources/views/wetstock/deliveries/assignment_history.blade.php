@@ -48,32 +48,18 @@
                                 <tr>
                                     <td class="fw-bold text-dark">{{ $a->dr_number }}</td>
                                     <td>{{ $a->order->account ?? '-' }}</td>
-                                    <td id="tank-cell-{{ $a->id }}">
+                                    <td>
                                         <span class="badge bg-light text-dark border">
                                             <i class="bi bi-box-seam me-1 text-primary"></i>{{ $a->storageTank->name ?? '—' }}
                                         </span>
-                                        <span id="edit-form-{{ $a->id }}" style="display:none;">
-                                            <select name="storage_tank_id" id="tank-select-{{ $a->id }}" class="form-select form-select-sm" style="min-width: 200px;">
-                                                <option value="">-- Select Tank --</option>
-                                                @foreach ($warehouses as $wh)
-                                                    <optgroup label="{{ $wh->name }}">
-                                                        @foreach ($wh->tanks as $t)
-                                                            <option value="{{ $t->id }}" {{ $a->storage_tank_id == $t->id ? 'selected' : '' }}>
-                                                                {{ $wh->name }} - {{ $t->name }} ({{ number_format($t->effective_available) }}L available)
-                                                            </option>
-                                                        @endforeach
-                                                    </optgroup>
-                                                @endforeach
-                                            </select>
-                                        </span>
                                     </td>
-                                    <td id="wh-cell-{{ $a->id }}">{{ $a->storageTank->warehouse->name ?? '—' }}</td>
+                                    <td>{{ $a->storageTank->warehouse->name ?? '—' }}</td>
                                     <td class="text-center fw-semibold">{{ number_format($a->qty_out) }} L</td>
                                     <td>{{ $a->assignedBy->name ?? '—' }}</td>
                                     <td class="text-muted small">{{ $a->updated_at ? $a->updated_at->timezone('Asia/Manila')->format('M d, Y h:i A') : '—' }}</td>
                                     <td class="text-center">
                                         <div class="btn-group btn-group-sm">
-                                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="toggleEdit({{ $a->id }})" title="Edit assignment">
+                                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="openReassignModal({{ $a->id }}, 'DR #{{ $a->dr_number }}', '{{ number_format($a->qty_out) }} L', {{ $a->storage_tank_id ?? 'null' }})" title="Edit assignment">
                                                 <i class="bi bi-pencil"></i>
                                             </button>
                                             <form method="POST" action="{{ route('wetstock.deliveries.unassign', $a->id) }}" class="d-inline" onsubmit="return confirm('Unassign DR #{{ $a->dr_number }} from this tank?');">
@@ -82,15 +68,6 @@
                                                     <i class="bi bi-arrow-return-left"></i>
                                                 </button>
                                             </form>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr id="save-row-{{ $a->id }}" style="display:none;">
-                                    <td colspan="8" class="bg-light p-2">
-                                        <div class="d-flex gap-2 align-items-center">
-                                            <button type="button" class="btn btn-sm btn-primary-custom" onclick="saveReassign({{ $a->id }})">Save</button>
-                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="cancelEdit({{ $a->id }})">Cancel</button>
-                                            <span class="text-muted small">Changing the tank will reassign this delivery.</span>
                                         </div>
                                     </td>
                                 </tr>
@@ -111,7 +88,7 @@
                                         </span>
                                     </div>
                                     <p class="mb-1"><span class="fw-medium text-muted">Account:</span> {{ $a->order->account ?? '-' }}</p>
-                                    <p class="mb-1" id="tank-cell-mobile-{{ $a->id }}">
+                                    <p class="mb-1">
                                         <span class="fw-medium text-muted">Tank:</span>
                                         <span class="badge bg-light text-dark border">
                                             <i class="bi bi-box-seam me-1 text-primary"></i>{{ $a->storageTank->name ?? '—' }}
@@ -121,7 +98,7 @@
                                     <p class="mb-1"><span class="fw-medium text-muted">Assigned By:</span> {{ $a->assignedBy->name ?? '—' }}</p>
                                     <p class="mb-0 text-muted small"><span class="fw-medium">Date:</span> {{ $a->updated_at ? $a->updated_at->timezone('Asia/Manila')->format('M d, Y h:i A') : '—' }}</p>
                                     <div class="d-flex gap-1 mt-2">
-                                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="toggleEditMobile({{ $a->id }})">
+                                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="openReassignModal({{ $a->id }}, 'DR #{{ $a->dr_number }}', '{{ number_format($a->qty_out) }} L', {{ $a->storage_tank_id ?? 'null' }})">
                                             <i class="bi bi-pencil me-1"></i> Edit
                                         </button>
                                         <form method="POST" action="{{ route('wetstock.deliveries.unassign', $a->id) }}" class="d-inline" onsubmit="return confirm('Unassign DR #{{ $a->dr_number }} from this tank?');">
@@ -130,24 +107,6 @@
                                                 <i class="bi bi-arrow-return-left me-1"></i> Unassign
                                             </button>
                                         </form>
-                                    </div>
-                                    <div id="edit-form-mobile-{{ $a->id }}" style="display:none;" class="mt-2">
-                                        <select name="storage_tank_id" id="tank-select-mobile-{{ $a->id }}" class="form-select form-select-sm mb-1">
-                                            <option value="">-- Select Tank --</option>
-                                            @foreach ($warehouses as $wh)
-                                                <optgroup label="{{ $wh->name }}">
-                                                    @foreach ($wh->tanks as $t)
-                                                        <option value="{{ $t->id }}" {{ $a->storage_tank_id == $t->id ? 'selected' : '' }}>
-                                                            {{ $wh->name }} - {{ $t->name }} ({{ number_format($t->effective_available) }}L)
-                                                        </option>
-                                                    @endforeach
-                                                </optgroup>
-                                            @endforeach
-                                        </select>
-                                        <div class="d-flex gap-1">
-                                            <button type="button" class="btn btn-sm btn-primary-custom" onclick="saveReassignMobile({{ $a->id }})">Save</button>
-                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="cancelEditMobile({{ $a->id }})">Cancel</button>
-                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -164,21 +123,55 @@
     </div>
 </div>
 
+<!-- Reassign Delivery Modal -->
+<div class="modal fade" id="reassignModal" tabindex="-1" aria-labelledby="reassignModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="reassignModalLabel">Reassign delivery</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex gap-2 mb-3">
+                    <span class="badge bg-dark" id="modal-dr-badge">DR #0000</span>
+                    <span class="badge bg-dark" id="modal-qty-badge">0 L</span>
+                </div>
+                <label for="modal-tank-select" class="form-label fw-medium">Storage tank</label>
+                <select class="form-select" id="modal-tank-select">
+                    <option value="">-- Select Tank --</option>
+                    @foreach ($warehouses as $wh)
+                        <optgroup label="{{ $wh->name }}">
+                            @foreach ($wh->tanks as $t)
+                                <option value="{{ $t->id }}">
+                                    {{ $wh->name }} — {{ $t->name }} ({{ number_format($t->effective_available) }}L available)
+                                </option>
+                            @endforeach
+                        </optgroup>
+                    @endforeach
+                </select>
+                <small class="text-muted"><i class="bi bi-info-circle me-1"></i>Changing the tank will reassign this delivery.</small>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary-custom" id="modal-save-btn">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
-function toggleEdit(id) {
-    var editForm = document.getElementById('edit-form-' + id);
-    var saveRow = document.getElementById('save-row-' + id);
-    if (editForm.style.display === 'none') {
-        editForm.style.display = 'inline';
-        saveRow.style.display = 'table-row';
-    }
+function openReassignModal(id, drNumber, qty, currentTankId) {
+    document.getElementById('modal-dr-badge').textContent = drNumber;
+    document.getElementById('modal-qty-badge').textContent = qty;
+    var select = document.getElementById('modal-tank-select');
+    select.value = currentTankId || '';
+    document.getElementById('modal-save-btn').setAttribute('data-delivery-id', id);
+    var modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('reassignModal'));
+    modal.show();
 }
-function cancelEdit(id) {
-    document.getElementById('edit-form-' + id).style.display = 'none';
-    document.getElementById('save-row-' + id).style.display = 'none';
-}
-function saveReassign(id) {
-    var select = document.getElementById('tank-select-' + id);
+document.getElementById('modal-save-btn').addEventListener('click', function() {
+    var id = this.getAttribute('data-delivery-id');
+    var select = document.getElementById('modal-tank-select');
     var tankId = select.value;
     if (!tankId) { alert('Please select a tank.'); return; }
     var form = document.createElement('form');
@@ -196,33 +189,6 @@ function saveReassign(id) {
     form.appendChild(tankInput);
     document.body.appendChild(form);
     form.submit();
-}
-function toggleEditMobile(id) {
-    var el = document.getElementById('edit-form-mobile-' + id);
-    el.style.display = el.style.display === 'none' ? 'block' : 'none';
-}
-function cancelEditMobile(id) {
-    document.getElementById('edit-form-mobile-' + id).style.display = 'none';
-}
-function saveReassignMobile(id) {
-    var select = document.getElementById('tank-select-mobile-' + id);
-    var tankId = select.value;
-    if (!tankId) { alert('Please select a tank.'); return; }
-    var form = document.createElement('form');
-    form.method = 'POST';
-    form.action = '{{ route('wetstock.deliveries.assign', '__DELIVERY_ID__') }}'.replace('__DELIVERY_ID__', id);
-    var csrf = document.createElement('input');
-    csrf.type = 'hidden';
-    csrf.name = '_token';
-    csrf.value = '{{ csrf_token() }}';
-    var tankInput = document.createElement('input');
-    tankInput.type = 'hidden';
-    tankInput.name = 'storage_tank_id';
-    tankInput.value = tankId;
-    form.appendChild(csrf);
-    form.appendChild(tankInput);
-    document.body.appendChild(form);
-    form.submit();
-}
+});
 </script>
 @endsection
