@@ -79,6 +79,35 @@ class DeliveryAssignmentController extends Controller
             ->orderBy('updated_at', 'desc')
             ->paginate(20);
 
-        return view('wetstock.deliveries.assignment_history', compact('assignments'));
+        $warehouses = Warehouse::with(['tanks' => function ($q) {
+            $q->where('is_active', true)->orderBy('name', 'asc');
+        }])->orderBy('name', 'asc')->get();
+
+        return view('wetstock.deliveries.assignment_history', compact('assignments', 'warehouses'));
+    }
+
+    /**
+     * Unassign a delivery from its storage tank.
+     */
+    public function unassign(Delivery $delivery): RedirectResponse
+    {
+        if (auth()->user()->isViewer() || auth()->user()->isAccounting()) {
+            abort(403);
+        }
+
+        $tankName = $delivery->storageTank->name;
+
+        $delivery->update([
+            'storage_tank_id' => null,
+            'assigned_by' => null,
+        ]);
+
+        AuditLog::create([
+            'admin_id' => auth()->id(),
+            'action' => 'updated',
+            'description' => "Unassigned DR #{$delivery->dr_number} ({$delivery->qty_out}L) from tank {$tankName}",
+        ]);
+
+        return back()->with('success', "DR #{$delivery->dr_number} has been unassigned.");
     }
 }

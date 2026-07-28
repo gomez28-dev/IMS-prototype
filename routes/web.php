@@ -106,6 +106,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/deliveries/assignment-history', [WetStock\DeliveryAssignmentController::class, 'history'])->name('deliveries.assignment-history');
         Route::middleware('role:admin,editor,warehouse')->group(function () {
             Route::post('/deliveries/{delivery}/assign', [WetStock\DeliveryAssignmentController::class, 'assign'])->name('deliveries.assign');
+            Route::post('/deliveries/{delivery}/unassign', [WetStock\DeliveryAssignmentController::class, 'unassign'])->name('deliveries.unassign');
         });
     });
 });
