@@ -55,7 +55,7 @@ class ReportController extends Controller
         $clients = \App\Models\Client::orderBy('name')->get();
 
         $totalOrders = $query->clone()->count();
-        $totalQtyOrdered = $query->clone()->sum('qty_ordered');
+        $totalQtyOrdered = $query->clone()->get()->sum(fn($o) => $o->effective_qty_ordered);
         $totalQtyDelivered = $query->clone()
             ->join('deliveries', 'orders.id', '=', 'deliveries.order_id')
             ->where('deliveries.status', 'FULFILLED')

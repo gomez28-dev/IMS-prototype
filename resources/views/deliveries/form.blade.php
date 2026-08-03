@@ -15,6 +15,14 @@
                 <div class="mb-3">
                     <span class="badge bg-light text-dark border">SO# {{ $order->so_number }}</span>
                     <span class="text-muted small ms-2">{{ $order->account }}</span>
+                    @php
+                        $available = $order->effective_qty_ordered - $order->committed_qty_out;
+                        if ($delivery && $delivery->status !== 'CANCELLED') {
+                            $available += $delivery->qty_out;
+                        }
+                        $available = max($available, 0);
+                    @endphp
+                    <span class="badge bg-success-subtle text-success border ms-2" id="available-badge">Available: {{ number_format($available) }} L</span>
                 </div>
                 <h4 class="fw-bold mb-4 text-dark">
                     <i class="bi bi-truck text-primary me-2"></i>{{ $title }}
@@ -43,7 +51,7 @@
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label for="qty_out" class="form-label fw-medium text-secondary small">Qty Out</label>
-                            <input type="number" name="qty_out" id="qty_out" class="form-control @error('qty_out') is-invalid @enderror" placeholder="e.g. 50" value="{{ old('qty_out', $delivery ? $delivery->qty_out : '') }}" required>
+                            <input type="number" name="qty_out" id="qty_out" class="form-control @error('qty_out') is-invalid @enderror" placeholder="e.g. 50" value="{{ old('qty_out', $delivery ? $delivery->qty_out : '') }}" min="0" max="{{ $available }}" required>
                             @error('qty_out')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
@@ -59,6 +67,11 @@
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
+                    </div>
+
+                    <div class="alert alert-warning d-none" id="cancel-warning" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        <strong>Warning:</strong> Cancelling this DR will reduce the SO's remaining ordered quantity and may close the order. Reassigning it to PENDING/FULFILLED later will restore the original quantity.
                     </div>
 
                     <div class="row mb-3">
@@ -92,4 +105,34 @@
         </div>
     </div>
 </div>
+
+<script>
+    (function() {
+        var statusSelect = document.getElementById('status');
+        var warning = document.getElementById('cancel-warning');
+        var form = statusSelect ? statusSelect.closest('form') : null;
+
+        function updateWarning() {
+            if (statusSelect && warning) {
+                warning.classList.toggle('d-none', statusSelect.value !== 'CANCELLED');
+            }
+        }
+
+        if (statusSelect) {
+            statusSelect.addEventListener('change', updateWarning);
+            updateWarning();
+        }
+
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                if (statusSelect.value === 'CANCELLED') {
+                    var msg = 'Warning: Cancelling this DR will reduce the SO\'s remaining ordered quantity and may close the order. Continue?';
+                    if (!confirm(msg)) {
+                        e.preventDefault();
+                    }
+                }
+            });
+        }
+    })();
+</script>
 @endsection

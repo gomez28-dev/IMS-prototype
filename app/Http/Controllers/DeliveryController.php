@@ -78,10 +78,18 @@ class DeliveryController extends Controller
             'remarks' => ['nullable', 'string'],
         ]);
 
-        if ($validated['status'] === 'FULFILLED') {
-            if ($validated['qty_out'] > $order->remaining_balance) {
-                return back()->withInput()->with('danger', 'Error: Delivery quantity exceeds the remaining order balance!');
-            }
+        $committed = $order->committed_qty_out;
+        $cancelled = $order->total_cancelled_qty;
+
+        if ($validated['status'] !== 'CANCELLED') {
+            $committed += $validated['qty_out'];
+        } else {
+            $cancelled += $validated['qty_out'];
+        }
+
+        if ($committed > $order->qty_ordered - $cancelled) {
+            $available = max($order->effective_qty_ordered - $order->committed_qty_out, 0);
+            return back()->withInput()->with('danger', 'Error: Delivery quantity would exceed the SO remaining quantity (Available: ' . $available . 'L).');
         }
 
         $delivery = $order->deliveries()->create($validated);
@@ -131,14 +139,27 @@ class DeliveryController extends Controller
             'remarks' => ['nullable', 'string'],
         ]);
 
-        if ($validated['status'] === 'FULFILLED') {
-            $adjustedBalance = $order->remaining_balance;
-            if ($delivery->status === 'FULFILLED') {
-                $adjustedBalance += $delivery->qty_out;
+        $committed = $order->committed_qty_out;
+        $cancelled = $order->total_cancelled_qty;
+
+        if ($delivery->status !== 'CANCELLED') {
+            $committed -= $delivery->qty_out;
+        } else {
+            $cancelled -= $delivery->qty_out;
+        }
+
+        if ($validated['status'] !== 'CANCELLED') {
+            $committed += $validated['qty_out'];
+        } else {
+            $cancelled += $validated['qty_out'];
+        }
+
+        if ($committed > $order->qty_ordered - $cancelled) {
+            $available = $order->effective_qty_ordered - $order->committed_qty_out;
+            if ($delivery->status !== 'CANCELLED') {
+                $available += $delivery->qty_out;
             }
-            if ($validated['qty_out'] > $adjustedBalance) {
-                return back()->withInput()->with('danger', 'Error: Delivery quantity exceeds the remaining order balance!');
-            }
+            return back()->withInput()->with('danger', 'Error: Delivery quantity would exceed the SO remaining quantity (Available: ' . max($available, 0) . 'L).');
         }
 
         $delivery->update($validated);

@@ -16,9 +16,25 @@ class DashboardController extends Controller
     /**
      * Display the dashboard with orders list and optional search.
      */
-    public function index(Request $request): View
+    public function index(Request $request): View|RedirectResponse
     {
-        $searchQuery = trim($request->input('search', ''));
+        // Clear persisted dashboard state and reset to page 1
+        if ($request->has('clear')) {
+            session()->forget(['dashboard_page', 'dashboard_search']);
+            return redirect()->route('dashboard');
+        }
+
+        // Capture pagination + search state whenever they appear in the request
+        if ($request->has('page') || $request->has('search')) {
+            session([
+                'dashboard_page' => (int) $request->input('page', 1),
+                'dashboard_search' => trim($request->input('search', '')),
+            ]);
+        }
+
+        // Restore from session when navigating back without params
+        $searchQuery = $request->input('search', session('dashboard_search', ''));
+        $page = (int) $request->input('page', session('dashboard_page', 1));
 
         $query = Order::query();
 
@@ -29,12 +45,18 @@ class DashboardController extends Controller
             });
         }
 
+        // Summary cards are scoped to the current month (monthly reset)
+        $now = now('Asia/Manila');
         $statsQuery = clone $query;
+        $statsQuery->whereYear('date', $now->year)->whereMonth('date', $now->month);
+
         $totalOrders = (clone $statsQuery)->count();
-        $totalQtyOrdered = (clone $statsQuery)->sum('qty_ordered');
+        $totalQtyOrdered = (clone $statsQuery)->get()->sum(fn($o) => $o->effective_qty_ordered);
         $totalQtyDelivered = (clone $statsQuery)->get()->sum(fn($o) => $o->total_qty_out);
         $totalRemaining = (clone $statsQuery)->get()->sum(fn($o) => $o->remaining_balance);
-        $orders = $query->orderBy('so_number', 'desc')->paginate(10)->withQueryString();
+        $orders = $query->orderBy('so_number', 'desc')
+            ->paginate(10, ['*'], 'page', $page)
+            ->appends(['search' => $searchQuery]);
 
         return view('dashboard', compact('orders', 'searchQuery', 'totalOrders', 'totalQtyOrdered', 'totalQtyDelivered', 'totalRemaining'));
     }

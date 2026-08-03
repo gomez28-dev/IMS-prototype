@@ -34,7 +34,7 @@
                     <div class="col-4">
                         <div class="p-3 bg-light rounded border border-light-subtle">
                             <div class="text-muted extra-small uppercase fw-semibold mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">QTY ORDERED</div>
-                            <div class="fs-5 fw-bold text-dark">{{ number_format($order->qty_ordered) }}</div>
+                            <div class="fs-5 fw-bold text-dark">{{ number_format($order->effective_qty_ordered) }}</div>
                         </div>
                     </div>
                     <div class="col-4">
