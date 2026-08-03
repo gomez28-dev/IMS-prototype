@@ -33,6 +33,11 @@
 </div>
 
 <!-- Stats Overview Cards -->
+<div class="d-flex align-items-center gap-2 mb-3">
+    <span class="badge rounded-pill px-3 py-2" style="background-color: #eef2ff !important; color: #4338ca !important;">
+        <i class="bi bi-calendar3 me-1"></i> Monthly Summary &mdash; {{ $now->format('F Y') }}
+    </span>
+</div>
 <div class="row g-4 mb-5">
 
     <div class="col-md-3 col-sm-6">

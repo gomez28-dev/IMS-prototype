@@ -58,7 +58,7 @@ class DashboardController extends Controller
             ->paginate(10, ['*'], 'page', $page)
             ->appends(['search' => $searchQuery]);
 
-        return view('dashboard', compact('orders', 'searchQuery', 'totalOrders', 'totalQtyOrdered', 'totalQtyDelivered', 'totalRemaining'));
+        return view('dashboard', compact('orders', 'searchQuery', 'totalOrders', 'totalQtyOrdered', 'totalQtyDelivered', 'totalRemaining', 'now'));
     }
 
     /**
