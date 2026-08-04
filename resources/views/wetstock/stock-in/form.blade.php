@@ -90,7 +90,7 @@
                     <div class="row mb-4">
                         <div class="col-md-6">
                             <label for="quantity" class="form-label fw-medium text-secondary small">Quantity Added (Liters)</label>
-                            <input type="number" name="quantity" id="quantity" class="form-control @error('quantity') is-invalid @enderror" placeholder="e.g. 20000" value="{{ old('quantity', isset($stockIn) ? $stockIn->quantity : '') }}" min="1" required>
+                            <input type="number" name="quantity" id="quantity" class="form-control @error('quantity') is-invalid @enderror" placeholder="e.g. 20000" value="{{ old('quantity', isset($stockIn) ? $stockIn->quantity : '') }}" min="{{ isset($stockIn) ? 0 : 1 }}" required>
                             @error('quantity')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror

@@ -114,6 +114,27 @@
     </form>
 </div>
 
+<!-- Bulk Clearance Toolbar -->
+@if (auth()->user()->isAdmin() || auth()->user()->isAccounting())
+<div id="bulkClearanceToolbar" class="card card-custom border-0 d-none mb-3 p-3">
+    <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center gap-2">
+        <span class="fw-semibold text-dark me-2">
+            <i class="bi bi-check2-square me-1 text-primary"></i><span id="selectedCount">0</span> selected
+        </span>
+        <select id="bulkStatusSelect" class="form-select form-select-sm w-auto">
+            <option value="">-- Set clearance to --</option>
+            <option value="Pending">Pending</option>
+            <option value="Declined">Declined</option>
+            <option value="Hold">Hold</option>
+            <option value="Approved">Approved</option>
+        </select>
+        <button type="button" id="bulkApplyBtn" class="btn btn-primary-custom btn-sm" disabled>
+            <i class="bi bi-check2-all me-1"></i> Apply to selected
+        </button>
+    </div>
+</div>
+@endif
+
 <!-- Orders Table -->
 <div class="card card-custom border-0 overflow-hidden">
     <div class="card-body p-0">
@@ -123,6 +144,11 @@
                 <thead>
                     <tr>
                         <th style="width: 40px;"></th>
+                        @if (auth()->user()->isAdmin() || auth()->user()->isAccounting())
+                        <th style="width: 40px;" class="text-center">
+                            <input type="checkbox" id="checkAllDesktop" class="form-check-input order-check-all" title="Select all on this page">
+                        </th>
+                        @endif
                         <th class="ps-4">Account</th>
                         <th>Location</th>
                         <th>SO#</th>
@@ -139,6 +165,11 @@
                             <td class="text-center toggle-expand ps-3">
                                 <i class="bi bi-chevron-down text-secondary fs-6 toggle-icon"></i>
                             </td>
+                            @if (auth()->user()->isAdmin() || auth()->user()->isAccounting())
+                            <td class="text-center">
+                                <input type="checkbox" class="form-check-input order-check" value="{{ $order->id }}">
+                            </td>
+                            @endif
                             <td class="ps-4 fw-semibold text-dark">{{ $order->account }}</td>
                             <td>
                                 @if ($order->location === 'San Simon')
@@ -206,7 +237,7 @@
                             </td>
                         </tr>
                         <tr class="expand-row" style="display: none; background-color: #fafafa;">
-                            <td colspan="7" class="p-3 border-top-0">
+                            <td colspan="{{ auth()->user()->isAdmin() || auth()->user()->isAccounting() ? 9 : 8 }}" class="p-3 border-top-0">
                                 <div class="px-4 py-2">
                                     <div class="row g-3">
                                         <div class="col-sm-4">
@@ -228,7 +259,7 @@
                         @endforeach
                     @else
                         <tr>
-                            <td colspan="7" class="text-center py-5 text-muted">
+                            <td colspan="{{ auth()->user()->isAdmin() || auth()->user()->isAccounting() ? 9 : 8 }}" class="text-center py-5 text-muted">
                                 <i class="bi bi-inbox fs-1 d-block mb-3 text-secondary"></i>
                                 No orders found. Click "New Order" to create one.
                             </td>
@@ -245,14 +276,28 @@
                 <div class="card border-0 bg-light mb-3 rounded-4 shadow-sm">
                     <div class="card-body p-4">
                         <div class="d-flex justify-content-between align-items-start mb-2">
-                            <h5 class="fw-bold text-dark mb-0">
+                            @if (auth()->user()->isAdmin() || auth()->user()->isAccounting())
+                            <div class="d-flex align-items-center gap-2">
+                                <input type="checkbox" class="form-check-input order-check" value="{{ $order->id }}">
+                                <h5 class="fw-bold text-dark mb-0">
                                 {{ $order->account }}
                                 @if ($order->location === 'San Simon')
                                     <span class="badge ms-1" style="background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a; font-size: 0.6rem;">San Simon</span>
                                 @else
                                     <span class="badge ms-1" style="background-color: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; font-size: 0.6rem;">Valenzuela</span>
                                 @endif
+                                </h5>
+                            </div>
+                            @else
+                            <h5 class="fw-bold text-dark mb-0">
+                            {{ $order->account }}
+                            @if ($order->location === 'San Simon')
+                                <span class="badge ms-1" style="background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a; font-size: 0.6rem;">San Simon</span>
+                            @else
+                                <span class="badge ms-1" style="background-color: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; font-size: 0.6rem;">Valenzuela</span>
+                            @endif
                             </h5>
+                            @endif
                             <span class="badge bg-light text-dark border">{{ $order->so_number }}</span>
                         </div>
                         <p class="text-muted small mb-1"><span class="fw-medium">PO#:</span> {{ $order->po_number }}</p>
@@ -374,6 +419,82 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     });
+
+    // Bulk clearance selection handling
+    const toolbar = document.getElementById('bulkClearanceToolbar');
+    const checkAllDesktop = document.getElementById('checkAllDesktop');
+    const selectedCount = document.getElementById('selectedCount');
+    const bulkStatusSelect = document.getElementById('bulkStatusSelect');
+    const bulkApplyBtn = document.getElementById('bulkApplyBtn');
+
+    if (toolbar) {
+        const orderChecks = () => Array.from(document.querySelectorAll('.order-check'));
+
+        function updateSelectionUI() {
+            const checks = orderChecks();
+            const checked = checks.filter(c => c.checked);
+            selectedCount.textContent = checked.length;
+            bulkApplyBtn.disabled = checked.length === 0;
+
+            if (checkAllDesktop) {
+                checkAllDesktop.checked = checked.length > 0 && checked.length === checks.length;
+                checkAllDesktop.indeterminate = checked.length > 0 && checked.length < checks.length;
+            }
+
+            toolbar.classList.toggle('d-none', checked.length === 0);
+        }
+
+        if (checkAllDesktop) {
+            checkAllDesktop.addEventListener('change', function () {
+                orderChecks().forEach(c => { c.checked = this.checked; });
+                updateSelectionUI();
+            });
+        }
+
+        orderChecks().forEach(c => c.addEventListener('change', updateSelectionUI));
+
+        bulkApplyBtn.addEventListener('click', function () {
+            const status = bulkStatusSelect.value;
+            if (!status) {
+                alert('Please select a clearance status first.');
+                return;
+            }
+
+            const ids = orderChecks().filter(c => c.checked).map(c => c.value);
+            if (ids.length === 0) return;
+
+            if (!confirm('Set clearance status to "' + status + '" for ' + ids.length + ' selected order(s)?')) {
+                return;
+            }
+
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '{{ route('orders.bulk-clearance') }}';
+
+            const csrf = document.createElement('input');
+            csrf.type = 'hidden';
+            csrf.name = '_token';
+            csrf.value = '{{ csrf_token() }}';
+            form.appendChild(csrf);
+
+            ids.forEach(id => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'order_ids[]';
+                input.value = id;
+                form.appendChild(input);
+            });
+
+            const statusInput = document.createElement('input');
+            statusInput.type = 'hidden';
+            statusInput.name = 'clearing_status';
+            statusInput.value = status;
+            form.appendChild(statusInput);
+
+            document.body.appendChild(form);
+            form.submit();
+        });
+    }
 });
 </script>
 @endsection

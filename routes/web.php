@@ -78,6 +78,7 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('role:admin,accounting')->group(function () {
         Route::post('/order/{order}/clearance', [OrderController::class, 'updateClearance'])->name('order.clearance');
+        Route::post('/orders/bulk-clearance', [OrderController::class, 'bulkUpdateClearance'])->name('orders.bulk-clearance');
     });
 
     // Wet Stock Module Routes

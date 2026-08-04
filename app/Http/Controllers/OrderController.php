@@ -144,4 +144,36 @@ class OrderController extends Controller
         return redirect()->back()
             ->with('success', 'Clearance status updated successfully.');
     }
+
+    /**
+     * Bulk update clearance status for multiple selected orders.
+     */
+    public function bulkUpdateClearance(Request $request): RedirectResponse
+    {
+        if (!auth()->user()->isAdmin() && !auth()->user()->isAccounting()) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'order_ids' => ['required', 'array', 'min:1'],
+            'order_ids.*' => ['integer', 'exists:orders,id'],
+            'clearing_status' => ['required', 'string', 'in:Pending,Declined,Hold,Approved'],
+        ]);
+
+        $count = Order::whereIn('id', $validated['order_ids'])
+            ->update(['clearing_status' => $validated['clearing_status']]);
+
+        if ($count === 0) {
+            return redirect()->back()->with('danger', 'No matching orders were found to update.');
+        }
+
+        AuditLog::create([
+            'admin_id' => auth()->id(),
+            'action' => 'updated',
+            'description' => "Bulk updated clearance status to {$validated['clearing_status']} for {$count} order(s): #" . implode(', #', $validated['order_ids']),
+        ]);
+
+        return redirect()->back()
+            ->with('success', "Clearance status set to {$validated['clearing_status']} for {$count} order(s).");
+    }
 }

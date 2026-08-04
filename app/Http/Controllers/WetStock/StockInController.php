@@ -121,7 +121,7 @@ class StockInController extends Controller
         $stockIn->load('tank.warehouse');
 
         $validated = $request->validate([
-            'quantity' => ['required', 'integer', 'min:1'],
+            'quantity' => ['required', 'integer', 'min:0'],
         ]);
 
         $newQuantity = (int) $validated['quantity'];
