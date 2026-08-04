@@ -10,7 +10,7 @@
                 <h3 class="fw-bold text-dark mb-1">
                     <i class="bi bi-fuel-pump text-primary me-2"></i>Stock IN Log History
                 </h3>
-                <p class="text-muted small mb-0">Immutable audit log of all fuel added to storage tanks</p>
+                <p class="text-muted small mb-0">Audit log of all fuel added to storage tanks — corrections are recorded</p>
             </div>
             @if (Auth::user()->isAdmin() || Auth::user()->isEditor() || Auth::user()->isWarehouse())
                 <div>
@@ -44,6 +44,9 @@
                                     <th>Quantity Added</th>
                                     <th>Logged By</th>
                                     <th>Logged Timestamp</th>
+                                    @if (Auth::user()->isAdmin() || Auth::user()->isEditor() || Auth::user()->isWarehouse())
+                                        <th class="text-end">Action</th>
+                                    @endif
                                 </tr>
                             </thead>
                             <tbody>
@@ -69,6 +72,13 @@
                                         <td class="text-muted small">
                                             {{ $stockIn->created_at ? $stockIn->created_at->format('Y-m-d H:i') : '-' }}
                                         </td>
+                                        @if (Auth::user()->isAdmin() || Auth::user()->isEditor() || Auth::user()->isWarehouse())
+                                            <td class="text-end">
+                                                <a href="{{ route('wetstock.stock-in.edit', $stockIn->id) }}" class="btn btn-sm btn-outline-primary" title="Correct quantity">
+                                                    <i class="bi bi-pencil"></i>
+                                                </a>
+                                            </td>
+                                        @endif
                                     </tr>
                                 @endforeach
                             </tbody>

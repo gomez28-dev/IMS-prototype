@@ -100,6 +100,8 @@ Route::middleware('auth')->group(function () {
         Route::middleware('role:admin,editor,warehouse')->group(function () {
             Route::get('/stock-in/create', [WetStock\StockInController::class, 'create'])->name('stock-in.create');
             Route::post('/stock-in', [WetStock\StockInController::class, 'store'])->name('stock-in.store');
+            Route::get('/stock-in/{stockIn}/edit', [WetStock\StockInController::class, 'edit'])->name('stock-in.edit');
+            Route::post('/stock-in/{stockIn}/edit', [WetStock\StockInController::class, 'update'])->name('stock-in.update');
         });
 
         // Delivery Assignment

@@ -90,4 +90,71 @@ class StockInController extends Controller
         return redirect()->route('wetstock.stock-in.index')
             ->with('success', "Logged {$stockIn->quantity}L into {$tank->name} ({$tank->warehouse->name}) successfully.");
     }
+
+    /**
+     * Show form to correct a Stock IN entry's quantity (typo fix).
+     */
+    public function edit(StockIn $stockIn): View
+    {
+        if (auth()->user()->isViewer() || auth()->user()->isAccounting()) {
+            abort(403);
+        }
+
+        $stockIn->load(['tank.warehouse', 'admin']);
+
+        return view('wetstock.stock-in.form', [
+            'stockIn' => $stockIn,
+            'warehouses' => collect(),
+            'selectedTankId' => null,
+        ]);
+    }
+
+    /**
+     * Update a Stock IN entry's quantity (typo correction).
+     */
+    public function update(Request $request, StockIn $stockIn): RedirectResponse
+    {
+        if (auth()->user()->isViewer() || auth()->user()->isAccounting()) {
+            abort(403);
+        }
+
+        $stockIn->load('tank.warehouse');
+
+        $validated = $request->validate([
+            'quantity' => ['required', 'integer', 'min:1'],
+        ]);
+
+        $newQuantity = (int) $validated['quantity'];
+        $oldQuantity = $stockIn->quantity;
+        $tank = $stockIn->tank;
+
+        if ($newQuantity === $oldQuantity) {
+            return back()->with('info', 'No changes were made to this entry.');
+        }
+
+        if (!$tank->is_active) {
+            return back()->withInput()->with('danger', 'Error: Cannot correct a Stock IN entry for a deactivated tank!');
+        }
+
+        // Effective remaining capacity accounts for the entry's own old quantity
+        // still being part of stock_available (max_capacity - (stock_available - old_qty)).
+        $effectiveRemaining = $tank->remaining_capacity + $oldQuantity;
+
+        if ($newQuantity > $effectiveRemaining) {
+            return back()->withInput()->with('danger', "Error: {$newQuantity}L exceeds the corrected capacity of {$effectiveRemaining}L for {$tank->name} (Max capacity: {$tank->max_capacity}L, Current stock: {$tank->stock_available}L)!");
+        }
+
+        $stockIn->update([
+            'quantity' => $newQuantity,
+        ]);
+
+        AuditLog::create([
+            'admin_id' => auth()->id(),
+            'action' => 'updated',
+            'description' => "Stock IN: Corrected quantity for {$tank->name} ({$tank->warehouse->name}) from " . number_format($oldQuantity) . "L to " . number_format($newQuantity) . "L",
+        ]);
+
+        return redirect()->route('wetstock.stock-in.index')
+            ->with('success', "Corrected {$tank->name} Stock IN quantity from " . number_format($oldQuantity) . "L to " . number_format($newQuantity) . "L.");
+    }
 }
