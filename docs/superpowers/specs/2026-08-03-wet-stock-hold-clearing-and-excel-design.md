@@ -30,21 +30,21 @@ The Wet Stock Report module (new, uncommitted work by the project owner) compute
 - New per-block value: `pending_clearance_orders_total` = SUM of `qty_ordered` from `orders` where:
   - `clearing_status = 'Pending'` (strictly Pending — not Approved, not Declined, not Hold), AND
   - `location` matches the warehouse name case-insensitively (trimmed), mirroring the existing delivery→warehouse matching approach.
-- `total_hold_for_clearing` = `client_pickup_total` + `client_pending_delivery_total` + `pending_clearance_orders_total` (user chose: keep delivery-based hold AND add sales-doc hold).
+- The **HOLD FOR CLEARING** row shows `pending_clearance_orders_total` (the sales-docs sum) as its value.
+- `total_hold_for_clearing` (the **TOTAL** row under HOLD FOR CLEARING) = **HOLD FOR CLEARING + CLIENT UNLIFTED PICK UP + CLIENT PENDING DELIVERY**, i.e. `pending_clearance_orders_total` + `client_pickup_total` + `client_pending_delivery_total`.
 - `total_available_for_sale` = `total_commitments_in` + `total_hold_for_clearing` (formula unchanged; value grows).
 - `total_available_on_hand_for_selling` unchanged.
 
 ### UI changes
 
-Top summary gains a row between CLIENT PENDING DELIVERY and TOTAL, in every surface:
+Top summary in every surface (live portal `index.blade.php`, snapshot view `show_snapshot.blade.php`, Excel export `excel.blade.php`) keeps the template row structure and changes the values:
 
-- Live portal: `resources/views/wetstock/reports/index.blade.php`
-- Snapshot view: `resources/views/wetstock/reports/show_snapshot.blade.php`
-- Excel export: `resources/views/wetstock/reports/excel.blade.php`
+- **HOLD FOR CLEARING** | value = `pending_clearance_orders_total` (was note text "FROM SALES DOCS SUM - ACCOUNTING CLEARANCE"; the note may remain as a small caption below the label).
+- **CLIENT UNLIFTED PICK UP** | value = `client_pickup_total` (unchanged).
+- **CLIENT PENDING DELIVERY** | value = `client_pending_delivery_total` (unchanged).
+- **TOTAL** | value = `total_hold_for_clearing` (new sum of the three rows above).
 
-New row label: **SALES DOCS PENDING CLEARANCE** (value = `pending_clearance_orders_total`, with a small note: "SUM of qty_ordered where clearance = Pending").
-
-Detail tables (UNLIFTED STOCK PICK UP, PENDING STOCK DELIVERY, BIG/SMALL TANKER UNDELIVERED, CLIENT PICK UP) are unchanged.
+No extra row is added to the top summary. Detail tables (UNLIFTED STOCK PICK UP, PENDING STOCK DELIVERY, BIG/SMALL TANKER UNDELIVERED, CLIENT PICK UP) are unchanged.
 
 ### Snapshot compatibility
 
@@ -74,7 +74,7 @@ Replicate the visual system of `WET STOCK REPORT.xlsx` (verified from its `style
 - `WetStockReportExport`: remove `ShouldAutoSize` (it overrides fixed widths); remove or keep `styles()` only if harmless — fixed column widths set in an `AfterSheet` event (register via `WithEvents`): B 37.63, E 37.88, I 37.63, L 37.88, A 1.75, H 1.25.
 - Rendering stays in `excel.blade.php` using inline styles (`background-color`, `font-weight`, `color`, `border`, `align`) — already supported by the Html reader.
 - `colspan` on empty cells is not needed; empty `<td>` cells are skipped by the reader, and row-internal alignment is preserved because non-empty cells are placed at fixed columns (existing pattern already verified).
-- HOLD FOR CLEARING value cell shows the numeric hold total; the template's note text "FROM SALES DOCS SUM - ACCOUNTING CLEARANCE" is retained as a sub-line under the HOLD FOR CLEARING label row (small/plain text).
+- HOLD FOR CLEARING value cell shows the numeric sales-docs total; the template's note text "FROM SALES DOCS SUM - ACCOUNTING CLEARANCE" is retained as a sub-line under the HOLD FOR CLEARING label row (small/plain text).
 
 ## Verification (local, before any push)
 

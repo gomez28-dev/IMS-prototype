@@ -1,0 +1,31 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('wet_stock_report_snapshots', function (Blueprint $table) {
+            $table->id();
+            $table->string('title');
+            $table->dateTime('snapshot_date');
+            $table->longText('report_data');
+            $table->foreignId('created_by')->nullable()->constrained('admins')->nullOnDelete();
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('wet_stock_report_snapshots');
+    }
+};

@@ -85,13 +85,14 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [WetStock\DashboardController::class, 'index'])->name('dashboard');
         Route::get('/warehouses/{warehouse}', [WetStock\WarehouseController::class, 'show'])->name('warehouses.show');
 
-        // Tank CRUD
+        // Tank CRUD & Contamination
         Route::middleware('role:admin,editor,warehouse')->group(function () {
             Route::get('/warehouses/{warehouse}/tanks/create', [WetStock\StorageTankController::class, 'create'])->name('tanks.create');
             Route::post('/warehouses/{warehouse}/tanks', [WetStock\StorageTankController::class, 'store'])->name('tanks.store');
             Route::get('/tanks/{tank}/edit', [WetStock\StorageTankController::class, 'edit'])->name('tanks.edit');
             Route::post('/tanks/{tank}/edit', [WetStock\StorageTankController::class, 'update'])->name('tanks.update');
             Route::post('/tanks/{tank}/toggle-active', [WetStock\StorageTankController::class, 'toggleActive'])->name('tanks.toggle-active');
+            Route::post('/tanks/{tank}/toggle-contamination', [WetStock\StorageTankController::class, 'toggleContamination'])->name('tanks.toggle-contamination');
         });
 
         // Stock IN
@@ -102,11 +103,36 @@ Route::middleware('auth')->group(function () {
         });
 
         // Delivery Assignment
-        Route::get('/deliveries/unassigned', [WetStock\DeliveryAssignmentController::class, 'index'])->name('deliveries.unassigned');
-        Route::get('/deliveries/assignment-history', [WetStock\DeliveryAssignmentController::class, 'history'])->name('deliveries.assignment-history');
+        Route::get('/deliveries', [WetStock\DeliveryAssignmentController::class, 'index'])->name('deliveries.index');
+        Route::get('/deliveries/unassigned', function () {
+            return redirect()->route('wetstock.deliveries.index', ['tab' => 'unassigned']);
+        })->name('deliveries.unassigned');
+        Route::get('/deliveries/assignment-history', function () {
+            return redirect()->route('wetstock.deliveries.index', ['tab' => 'history']);
+        })->name('deliveries.assignment-history');
         Route::middleware('role:admin,editor,warehouse')->group(function () {
             Route::post('/deliveries/{delivery}/assign', [WetStock\DeliveryAssignmentController::class, 'assign'])->name('deliveries.assign');
             Route::post('/deliveries/{delivery}/unassign', [WetStock\DeliveryAssignmentController::class, 'unassign'])->name('deliveries.unassign');
         });
+
+        // Incoming Supplier Stock
+        Route::get('/supplier-orders', [WetStock\SupplierOrderController::class, 'index'])->name('supplier-orders.index');
+        Route::middleware('role:admin,editor,warehouse')->group(function () {
+            Route::get('/supplier-orders/create', [WetStock\SupplierOrderController::class, 'create'])->name('supplier-orders.create');
+            Route::post('/supplier-orders', [WetStock\SupplierOrderController::class, 'store'])->name('supplier-orders.store');
+            Route::get('/supplier-orders/{supplierOrder}/edit', [WetStock\SupplierOrderController::class, 'edit'])->name('supplier-orders.edit');
+            Route::post('/supplier-orders/{supplierOrder}/edit', [WetStock\SupplierOrderController::class, 'update'])->name('supplier-orders.update');
+            Route::post('/supplier-orders/{supplierOrder}/complete', [WetStock\SupplierOrderController::class, 'complete'])->name('supplier-orders.complete');
+        });
+
+        // Wet Stock Reports & Snapshots
+        Route::get('/reports', [WetStock\ReportController::class, 'index'])->name('reports.index');
+        Route::get('/reports/export/live', [WetStock\ReportController::class, 'exportLive'])->name('reports.export-live');
+        Route::get('/reports/snapshot/{snapshot}', [WetStock\ReportController::class, 'showSnapshot'])->name('reports.show-snapshot');
+        Route::get('/reports/export/snapshot/{snapshot}', [WetStock\ReportController::class, 'exportSnapshot'])->name('reports.export-snapshot');
+        Route::middleware('role:admin,editor,warehouse')->group(function () {
+            Route::post('/reports/snapshot', [WetStock\ReportController::class, 'storeSnapshot'])->name('reports.snapshot');
+        });
     });
+
 });

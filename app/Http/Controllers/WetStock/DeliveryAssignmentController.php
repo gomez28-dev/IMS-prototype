@@ -14,22 +14,33 @@ use Illuminate\View\View;
 class DeliveryAssignmentController extends Controller
 {
     /**
-     * Display list of deliveries that haven't been assigned to a storage tank yet.
+     * Display delivery assignments — Unassigned & History in a single tabbed page.
      */
-    public function index(): View
+    public function index(Request $request): View
     {
         $unassignedDeliveries = Delivery::with(['order', 'storageTank.warehouse'])
             ->whereNull('storage_tank_id')
+            ->where('status', '!=', 'CANCELLED')
             ->orderBy('delivery_date', 'desc')
             ->paginate(15);
+
+        $assignments = Delivery::with(['order', 'storageTank.warehouse', 'assignedBy'])
+            ->whereNotNull('storage_tank_id')
+            ->orderBy('updated_at', 'desc')
+            ->paginate(20);
 
         $warehouses = Warehouse::with(['tanks' => function ($q) {
             $q->where('is_active', true)->orderBy('name', 'asc');
         }])->orderBy('name', 'asc')->get();
 
-        return view('wetstock.deliveries.unassigned', [
+        $unassignedCount = Delivery::whereNull('storage_tank_id')->where('status', '!=', 'CANCELLED')->count();
+
+        return view('wetstock.deliveries.index', [
             'deliveries' => $unassignedDeliveries,
+            'assignments' => $assignments,
             'warehouses' => $warehouses,
+            'unassignedCount' => $unassignedCount,
+            'activeTab' => $request->get('tab', 'unassigned'),
         ]);
     }
 
@@ -67,23 +78,6 @@ class DeliveryAssignmentController extends Controller
         ]);
 
         return back()->with('success', "Delivery DR #{$delivery->dr_number} assigned to tank {$delivery->storageTank->name} successfully.");
-    }
-
-    /**
-     * Display assignment history — deliveries that have been assigned to a tank.
-     */
-    public function history(): View
-    {
-        $assignments = Delivery::with(['order', 'storageTank.warehouse', 'assignedBy'])
-            ->whereNotNull('storage_tank_id')
-            ->orderBy('updated_at', 'desc')
-            ->paginate(20);
-
-        $warehouses = Warehouse::with(['tanks' => function ($q) {
-            $q->where('is_active', true)->orderBy('name', 'asc');
-        }])->orderBy('name', 'asc')->get();
-
-        return view('wetstock.deliveries.assignment_history', compact('assignments', 'warehouses'));
     }
 
     /**

@@ -13,18 +13,32 @@ class StorageTank extends Model
     protected $fillable = [
         'warehouse_id',
         'name',
+        'category', // 'depot' or 'tanker'
         'max_capacity',
         'is_active',
+        'is_contaminated',
+        'contaminated_liters',
+        'contaminated_date',
+        'contaminated_by',
+        'remarks',
     ];
 
     protected $casts = [
         'max_capacity' => 'integer',
         'is_active' => 'boolean',
+        'is_contaminated' => 'boolean',
+        'contaminated_liters' => 'integer',
+        'contaminated_date' => 'datetime',
     ];
 
     public function warehouse(): BelongsTo
     {
         return $this->belongsTo(Warehouse::class, 'warehouse_id');
+    }
+
+    public function contaminatedBy(): BelongsTo
+    {
+        return $this->belongsTo(Admin::class, 'contaminated_by');
     }
 
     public function stockIns(): HasMany
@@ -35,6 +49,16 @@ class StorageTank extends Model
     public function deliveries(): HasMany
     {
         return $this->hasMany(Delivery::class, 'storage_tank_id');
+    }
+
+    public function isDepot(): bool
+    {
+        return $this->category === 'depot';
+    }
+
+    public function isTanker(): bool
+    {
+        return $this->category === 'tanker';
     }
 
     /**
@@ -66,7 +90,7 @@ class StorageTank extends Model
     }
 
     /**
-     * Stock currently available in tank (never below 0).
+     * Stock currently physically in tank (never below 0).
      */
     public function getStockAvailableAttribute(): int
     {
@@ -74,12 +98,20 @@ class StorageTank extends Model
     }
 
     /**
+     * Stock available for selling (physical volume minus contaminated liters).
+     */
+    public function getSellableAvailableAttribute(): int
+    {
+        $contaminated = $this->is_contaminated ? $this->contaminated_liters : 0;
+        return max(0, $this->stock_available - $contaminated);
+    }
+
+    /**
      * Effective available stock after accounting for pending (PENDING) deliveries.
-     * This is how much more can be assigned/fulfilled without going negative.
      */
     public function getEffectiveAvailableAttribute(): int
     {
-        return max(0, $this->stock_available - $this->stock_for_delivery);
+        return max(0, $this->sellable_available - $this->stock_for_delivery);
     }
 
     /**

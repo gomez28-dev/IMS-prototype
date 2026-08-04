@@ -11,8 +11,17 @@
         <p class="text-muted small mb-0">Real-time fuel storage tracking & capacity management</p>
     </div>
     <div class="d-flex gap-2 flex-wrap">
-        <a href="{{ route('wetstock.deliveries.unassigned') }}" class="btn btn-outline-warning btn-sm">
+        <a href="{{ route('wetstock.reports.index') }}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-file-earmark-bar-graph me-1"></i> View Wet Stock Report
+        </a>
+        <a href="{{ route('wetstock.supplier-orders.index') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-box-arrow-in-down me-1"></i> Incoming Supplier Stock
+        </a>
+        <a href="{{ route('wetstock.deliveries.index') }}" class="btn btn-outline-warning btn-sm position-relative">
             <i class="bi bi-truck me-1"></i> Unassigned Deliveries
+            @if (!empty($unassignedCount) && $unassignedCount > 0)
+                <span class="badge bg-warning text-dark rounded-pill ms-1">{{ $unassignedCount }}</span>
+            @endif
         </a>
         @if (Auth::user()->isAdmin() || Auth::user()->isEditor() || Auth::user()->isWarehouse())
             <a href="{{ route('wetstock.stock-in.create') }}" class="btn btn-primary-custom btn-sm">
@@ -35,12 +44,12 @@
                         <i class="bi bi-building text-primary me-2"></i>{{ $warehouse->name }} Warehouse
                     </h4>
                     <span class="badge bg-light text-dark border rounded-pill px-3 py-1">
-                        {{ $warehouse->activeTanks->count() }} Active Tanks
+                        {{ $warehouse->activeTanks->count() }} Active Units
                     </span>
                 </div>
                 <div>
                     <a href="{{ route('wetstock.warehouses.show', $warehouse->id) }}" class="btn btn-sm btn-outline-dark rounded-pill px-3">
-                        <i class="bi bi-gear me-1"></i> Manage Tanks
+                        <i class="bi bi-gear me-1"></i> Manage Tanks & Tankers
                     </a>
                 </div>
             </div>
@@ -75,7 +84,7 @@
 
             <!-- Tanks Grid -->
             @if ($warehouse->activeTanks->isEmpty())
-                <p class="text-muted text-center py-3">No active storage tanks in {{ $warehouse->name }}. <a href="{{ route('wetstock.tanks.create', $warehouse->id) }}">Add a tank</a> to start tracking fuel.</p>
+                <p class="text-muted text-center py-3">No active storage tanks or tankers in {{ $warehouse->name }}. <a href="{{ route('wetstock.tanks.create', $warehouse->id) }}">Add a unit</a> to start tracking fuel.</p>
             @else
                 <div class="row g-3">
                     @foreach ($warehouse->activeTanks as $tank)
@@ -84,12 +93,22 @@
                             $barColor = $percentageUsed > 85 ? 'bg-danger' : ($percentageUsed > 60 ? 'bg-warning' : 'bg-success');
                         @endphp
                         <div class="col-md-6 col-lg-4">
-                            <div class="card h-100 border shadow-sm rounded-3">
+                            <div class="card h-100 border shadow-sm rounded-3 {{ $tank->is_contaminated ? 'border-danger' : '' }}">
                                 <div class="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom-0">
                                     <h6 class="fw-bold mb-0 text-dark">
-                                        <i class="bi bi-box-seam me-1 text-primary"></i>{{ $tank->name }}
+                                        @if ($tank->isTanker())
+                                            <i class="bi bi-truck me-1 text-info"></i>
+                                        @else
+                                            <i class="bi bi-box-seam me-1 text-primary"></i>
+                                        @endif
+                                        {{ $tank->name }}
                                     </h6>
-                                    <span class="badge bg-light text-muted border small">{{ number_format($tank->max_capacity) }}L max</span>
+                                    <div>
+                                        @if ($tank->is_contaminated)
+                                            <span class="badge bg-danger text-white me-1">CONTAMINATED</span>
+                                        @endif
+                                        <span class="badge bg-light text-muted border small">{{ number_format($tank->max_capacity) }}L max</span>
+                                    </div>
                                 </div>
                                 <div class="card-body pt-0">
                                     <!-- Capacity Bar -->
@@ -125,7 +144,7 @@
                                     </div>
                                 </div>
                                 <div class="card-footer bg-light border-top-0 d-flex justify-content-between align-items-center py-2">
-                                    <span class="text-muted" style="font-size: 0.75rem;">Rem: {{ number_format($tank->remaining_capacity) }}L</span>
+                                    <span class="text-muted" style="font-size: 0.75rem;">Sellable: {{ number_format($tank->sellable_available) }}L</span>
                                     @if (Auth::user()->isAdmin() || Auth::user()->isEditor() || Auth::user()->isWarehouse())
                                         <a href="{{ route('wetstock.stock-in.create', ['tank_id' => $tank->id]) }}" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size: 0.75rem;">
                                             + Stock IN

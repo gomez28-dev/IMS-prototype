@@ -583,6 +583,24 @@
             letter-spacing: 0.04em;
         }
 
+        .badge-type-big-tanker {
+            background-color: #ffedd5 !important;
+            color: #c2410c !important;
+            border: 1px solid #fed7aa !important;
+            font-weight: 600;
+            padding: 0.5em 1em;
+            font-size: 0.75rem;
+        }
+
+        .badge-type-small-tanker {
+            background-color: #e0e7ff !important;
+            color: #3730a3 !important;
+            border: 1px solid #c7d2fe !important;
+            font-weight: 600;
+            padding: 0.5em 1em;
+            font-size: 0.75rem;
+        }
+
         /* Consistent action button sizing */
         .table-custom .btn-sm {
             padding: 0.35rem 0.7rem;
@@ -685,6 +703,11 @@
     <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 
     @auth
+    @php
+        $__unassignedDeliveriesCount = request()->is('wetstock*')
+            ? \App\Models\Delivery::whereNull('storage_tank_id')->where('status', '!=', 'CANCELLED')->count()
+            : 0;
+    @endphp
     {{-- ============ MOBILE SIDEBAR DRAWER (< 992px, preserved) ============ --}}
     <div class="sidebar-drawer d-lg-none" id="sidebarDrawer">
         <div class="d-flex flex-column h-100">
@@ -699,8 +722,17 @@
                     <a class="nav-link d-flex align-items-center" href="{{ route('wetstock.stock-in.index') }}">
                         <i class="bi bi-fuel-pump me-2"></i> Stock IN Log
                     </a>
-                    <a class="nav-link d-flex align-items-center" href="{{ route('wetstock.deliveries.assignment-history') }}">
+                    <a class="nav-link d-flex align-items-center" href="{{ route('wetstock.supplier-orders.index') }}">
+                        <i class="bi bi-box-arrow-in-down me-2"></i> Incoming Stock
+                    </a>
+                    <a class="nav-link d-flex align-items-center" href="{{ route('wetstock.deliveries.index') }}">
                         <i class="bi bi-truck me-2"></i> Assign Deliveries
+                        @if ($__unassignedDeliveriesCount > 0)
+                            <span class="badge bg-warning text-dark rounded-pill ms-1">{{ $__unassignedDeliveriesCount }}</span>
+                        @endif
+                    </a>
+                    <a class="nav-link d-flex align-items-center" href="{{ route('wetstock.reports.index') }}">
+                        <i class="bi bi-file-earmark-bar-graph me-2"></i> Wet Stock Report
                     </a>
                 @elseif (!request()->routeIs('portal'))
                     <a class="nav-link d-flex align-items-center" href="{{ route('dashboard') }}">
@@ -793,9 +825,20 @@
                     <i class="bi bi-fuel-pump"></i>
                     <span class="nav-label">Stock IN Log</span>
                 </a>
-                <a href="{{ route('wetstock.deliveries.assignment-history') }}" class="sidebar-nav-link {{ request()->routeIs('wetstock.deliveries.*') || request()->routeIs('wetstock.deliveries.assignment-history') ? 'active' : '' }}" title="Assign Deliveries">
+                <a href="{{ route('wetstock.supplier-orders.index') }}" class="sidebar-nav-link {{ request()->routeIs('wetstock.supplier-orders.*') ? 'active' : '' }}" title="Incoming Stock">
+                    <i class="bi bi-box-arrow-in-down"></i>
+                    <span class="nav-label">Incoming Stock</span>
+                </a>
+                <a href="{{ route('wetstock.deliveries.index') }}" class="sidebar-nav-link {{ request()->routeIs('wetstock.deliveries.*') ? 'active' : '' }}" title="Assign Deliveries">
                     <i class="bi bi-truck"></i>
                     <span class="nav-label">Assign Deliveries</span>
+                    @if ($__unassignedDeliveriesCount > 0)
+                        <span class="badge bg-warning text-dark rounded-pill ms-auto">{{ $__unassignedDeliveriesCount }}</span>
+                    @endif
+                </a>
+                <a href="{{ route('wetstock.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('wetstock.reports.*') ? 'active' : '' }}" title="Wet Stock Report">
+                    <i class="bi bi-file-earmark-bar-graph"></i>
+                    <span class="nav-label">Wet Stock Report</span>
                 </a>
             @else
                 <a href="{{ route('dashboard') }}" class="sidebar-nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}" title="Dashboard">

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\WetStock;
 
 use App\Http\Controllers\Controller;
+use App\Models\Delivery;
 use App\Models\Warehouse;
 use Illuminate\View\View;
 
@@ -19,6 +20,7 @@ class DashboardController extends Controller
 
         return view('wetstock.dashboard', [
             'warehouses' => $warehouses,
+            'unassignedCount' => Delivery::whereNull('storage_tank_id')->where('status', '!=', 'CANCELLED')->count(),
         ]);
     }
 }

@@ -30,3 +30,6 @@
 .superpowers/
 .opencode/
 
+
+# Stray SQLite database from old Python prototype (local only)
+ims_db

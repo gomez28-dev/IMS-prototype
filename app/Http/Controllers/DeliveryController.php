@@ -74,7 +74,7 @@ class DeliveryController extends Controller
             'delivery_date' => ['required', 'date'],
             'qty_out' => ['required', 'integer', 'min:0'],
             'status' => ['required', 'string', 'in:PENDING,FULFILLED,CANCELLED'],
-            'type' => ['required', 'string', 'in:PICK-UP,DELIVERY'],
+            'type' => ['required', 'string', 'in:PICK-UP,BIG TANKER,SMALL TANKER,DELIVERY'],
             'remarks' => ['nullable', 'string'],
         ]);
 
@@ -135,7 +135,7 @@ class DeliveryController extends Controller
             'delivery_date' => ['required', 'date'],
             'qty_out' => ['required', 'integer', 'min:0'],
             'status' => ['required', 'string', 'in:PENDING,FULFILLED,CANCELLED'],
-            'type' => ['required', 'string', 'in:PICK-UP,DELIVERY'],
+            'type' => ['required', 'string', 'in:PICK-UP,BIG TANKER,SMALL TANKER,DELIVERY'],
             'remarks' => ['nullable', 'string'],
         ]);
 

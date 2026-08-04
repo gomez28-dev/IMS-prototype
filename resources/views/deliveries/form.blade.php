@@ -78,7 +78,8 @@
                         <div class="col-md-6">
                             <label for="type" class="form-label fw-medium text-secondary small">Type</label>
                             <select name="type" id="type" class="form-control form-select @error('type') is-invalid @enderror" required>
-                                <option value="DELIVERY" {{ old('type', $delivery ? $delivery->type : 'DELIVERY') === 'DELIVERY' ? 'selected' : '' }}>DELIVERY</option>
+                                <option value="BIG TANKER" {{ old('type', $delivery ? $delivery->type : 'BIG TANKER') === 'BIG TANKER' || (isset($delivery) && $delivery->type === 'DELIVERY') ? 'selected' : '' }}>BIG TANKER</option>
+                                <option value="SMALL TANKER" {{ old('type', $delivery ? $delivery->type : '') === 'SMALL TANKER' ? 'selected' : '' }}>SMALL TANKER</option>
                                 <option value="PICK-UP" {{ old('type', $delivery ? $delivery->type : '') === 'PICK-UP' ? 'selected' : '' }}>PICK-UP</option>
                             </select>
                             @error('type')

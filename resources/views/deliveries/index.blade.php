@@ -115,8 +115,10 @@
                             <td class="text-center">
                                 @if ($delivery->type === 'PICK-UP')
                                     <span class="badge badge-type-pickup rounded-pill px-3 py-1">PICK-UP</span>
+                                @elseif ($delivery->type === 'SMALL TANKER')
+                                    <span class="badge badge-type-small-tanker rounded-pill px-3 py-1">SMALL TANKER</span>
                                 @else
-                                    <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1">DELIVERY</span>
+                                    <span class="badge badge-type-big-tanker rounded-pill px-3 py-1">BIG TANKER</span>
                                 @endif
                             </td>
                             @if (!Auth::user()->isViewer() && !Auth::user()->isAccounting() && !Auth::user()->isWarehouse())
@@ -163,8 +165,10 @@
                             <div class="d-flex gap-1">
                                 @if ($delivery->type === 'PICK-UP')
                                     <span class="badge badge-type-pickup rounded-pill px-3 py-1">PICK-UP</span>
+                                @elseif ($delivery->type === 'SMALL TANKER')
+                                    <span class="badge badge-type-small-tanker rounded-pill px-3 py-1">SMALL TANKER</span>
                                 @else
-                                    <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1">DELIVERY</span>
+                                    <span class="badge badge-type-big-tanker rounded-pill px-3 py-1">BIG TANKER</span>
                                 @endif
                             </div>
                         </div>
