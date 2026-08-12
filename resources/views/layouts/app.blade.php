@@ -705,7 +705,13 @@
     @auth
     @php
         $__unassignedDeliveriesCount = request()->is('wetstock*')
-            ? \App\Models\Delivery::whereNull('storage_tank_id')->where('status', '!=', 'CANCELLED')->count()
+            ? \App\Models\Delivery::where('status', '!=', 'CANCELLED')
+                ->whereHas('order', fn($q) => $q->where('status', '!=', 'Cancelled'))
+                ->where(function ($q) {
+                    $q->whereDoesntHave('allocations')
+                        ->orWhereRaw('(SELECT COALESCE(SUM(quantity), 0) FROM delivery_allocations WHERE delivery_id = deliveries.id) < qty_out');
+                })
+                ->count()
             : 0;
     @endphp
     {{-- ============ MOBILE SIDEBAR DRAWER (< 992px, preserved) ============ --}}
@@ -728,7 +734,7 @@
                     <a class="nav-link d-flex align-items-center" href="{{ route('wetstock.deliveries.index') }}">
                         <i class="bi bi-truck me-2"></i> Assign Deliveries
                         @if ($__unassignedDeliveriesCount > 0)
-                            <span class="badge bg-warning text-dark rounded-pill ms-1">{{ $__unassignedDeliveriesCount }}</span>
+                            <span class="badge rounded-pill ms-1 text-white" style="background-color: var(--brand-color);">{{ $__unassignedDeliveriesCount }}</span>
                         @endif
                     </a>
                     <a class="nav-link d-flex align-items-center" href="{{ route('wetstock.reports.index') }}">
@@ -833,7 +839,7 @@
                     <i class="bi bi-truck"></i>
                     <span class="nav-label">Assign Deliveries</span>
                     @if ($__unassignedDeliveriesCount > 0)
-                        <span class="badge bg-warning text-dark rounded-pill ms-auto">{{ $__unassignedDeliveriesCount }}</span>
+                        <span class="badge rounded-pill ms-auto text-white" style="background-color: var(--brand-color);">{{ $__unassignedDeliveriesCount }}</span>
                     @endif
                 </a>
                 <a href="{{ route('wetstock.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('wetstock.reports.*') ? 'active' : '' }}" title="Wet Stock Report">

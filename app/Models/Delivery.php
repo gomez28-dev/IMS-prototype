@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Delivery extends Model
 {
@@ -41,6 +42,38 @@ class Delivery extends Model
     public function storageTank(): BelongsTo
     {
         return $this->belongsTo(StorageTank::class, 'storage_tank_id');
+    }
+
+    /**
+     * The per-tank allocation rows for this delivery (supports split assignment).
+     */
+    public function allocations(): HasMany
+    {
+        return $this->hasMany(DeliveryAllocation::class, 'delivery_id');
+    }
+
+    /**
+     * Total quantity already allocated across tanks.
+     */
+    public function getAllocatedQuantityAttribute(): int
+    {
+        return (int) $this->allocations()->sum('quantity');
+    }
+
+    /**
+     * Quantity not yet allocated to any tank.
+     */
+    public function getRemainingToAllocateAttribute(): int
+    {
+        return max(0, (int) $this->qty_out - $this->allocated_quantity);
+    }
+
+    /**
+     * Whether this delivery has been fully allocated across tanks.
+     */
+    public function getFullyAllocatedAttribute(): bool
+    {
+        return $this->allocated_quantity >= (int) $this->qty_out;
     }
 
     /**

@@ -26,7 +26,6 @@ Route::middleware('auth')->group(function () {
 
     // Sales Inventory Portal Routes
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-    Route::get('/export/excel', [DashboardController::class, 'export'])->name('export');
 
     // Delivery index — accessible to all authenticated users
     Route::get('/order/{order}/deliveries', [DeliveryController::class, 'index'])->name('order.deliveries');
@@ -39,9 +38,6 @@ Route::middleware('auth')->group(function () {
     Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('audit-logs');
 
     Route::middleware('role:admin,editor')->group(function () {
-        Route::get('/import/excel', [DashboardController::class, 'showImportForm'])->name('import.form');
-        Route::post('/import/excel', [DashboardController::class, 'import'])->name('import');
-
         Route::get('/order/new', [OrderController::class, 'create'])->name('order.create');
         Route::post('/order/new', [OrderController::class, 'store'])->name('order.store');
         Route::get('/order/{order}/edit', [OrderController::class, 'edit'])->name('order.edit');
@@ -114,8 +110,8 @@ Route::middleware('auth')->group(function () {
             return redirect()->route('wetstock.deliveries.index', ['tab' => 'history']);
         })->name('deliveries.assignment-history');
         Route::middleware('role:admin,editor,warehouse')->group(function () {
-            Route::post('/deliveries/{delivery}/assign', [WetStock\DeliveryAssignmentController::class, 'assign'])->name('deliveries.assign');
-            Route::post('/deliveries/{delivery}/unassign', [WetStock\DeliveryAssignmentController::class, 'unassign'])->name('deliveries.unassign');
+            Route::post('/deliveries/{delivery}/allocate', [WetStock\DeliveryAssignmentController::class, 'allocate'])->name('deliveries.allocate');
+            Route::post('/deliveries/allocations/{allocation}/unassign', [WetStock\DeliveryAssignmentController::class, 'unassign'])->name('deliveries.unassign');
         });
 
         // Incoming Supplier Stock

@@ -51,6 +51,11 @@ class StorageTank extends Model
         return $this->hasMany(Delivery::class, 'storage_tank_id');
     }
 
+    public function allocations(): HasMany
+    {
+        return $this->hasMany(DeliveryAllocation::class, 'storage_tank_id');
+    }
+
     public function isDepot(): bool
     {
         return $this->category === 'depot';
@@ -70,23 +75,23 @@ class StorageTank extends Model
     }
 
     /**
-     * Stock out (FULFILLED deliveries).
+     * Stock out (FULFILLED deliveries) — allocated quantities for fulfilled DRs.
      */
     public function getStockOutAttribute(): int
     {
-        return (int) $this->deliveries()
-            ->where('status', 'FULFILLED')
-            ->sum('qty_out');
+        return (int) $this->allocations()
+            ->whereHas('delivery', fn ($q) => $q->where('status', 'FULFILLED'))
+            ->sum('quantity');
     }
 
     /**
-     * Stock earmarked for pending deliveries.
+     * Stock earmarked for pending deliveries — allocated quantities for pending DRs.
      */
     public function getStockForDeliveryAttribute(): int
     {
-        return (int) $this->deliveries()
-            ->where('status', 'PENDING')
-            ->sum('qty_out');
+        return (int) $this->allocations()
+            ->whereHas('delivery', fn ($q) => $q->where('status', 'PENDING'))
+            ->sum('quantity');
     }
 
     /**

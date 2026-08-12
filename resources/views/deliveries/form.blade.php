@@ -86,7 +86,18 @@
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
-                        <div class="col-md-6"></div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-medium text-secondary small d-block">Order Status</label>
+                            @if ($order && $order->status === 'Cancelled')
+                                <span class="badge bg-danger-subtle text-danger border fw-semibold">
+                                    <i class="bi bi-x-circle me-1"></i>{{ $order->status }}
+                                </span>
+                            @else
+                                <span class="badge bg-success-subtle text-success border fw-semibold">
+                                    <i class="bi bi-check-circle me-1"></i>{{ $order ? $order->status : 'Active' }}
+                                </span>
+                            @endif
+                        </div>
                     </div>
 
                     <div class="mb-4">

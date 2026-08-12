@@ -16,6 +16,8 @@ class Order extends Model
         'so_number',
         'po_number',
         'clearing_status',
+        'status',
+        'terms',
         'location',
     ];
 

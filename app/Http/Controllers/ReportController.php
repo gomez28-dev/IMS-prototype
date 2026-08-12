@@ -13,7 +13,7 @@ class ReportController extends Controller
 {
     public function index(Request $request): View
     {
-        $query = Order::query()->with('deliveries');
+        $query = Order::query()->with('deliveries')->where('orders.status', '!=', 'Cancelled');
 
         $from = $request->input('from');
         $to = $request->input('to');
@@ -58,6 +58,7 @@ class ReportController extends Controller
         $totalQtyOrdered = $query->clone()->get()->sum(fn($o) => $o->effective_qty_ordered);
         $totalQtyDelivered = $query->clone()
             ->join('deliveries', 'orders.id', '=', 'deliveries.order_id')
+            ->where('orders.status', '!=', 'Cancelled')
             ->where('deliveries.status', 'FULFILLED')
             ->sum('deliveries.qty_out');
         $totalRemaining = $totalQtyOrdered - $totalQtyDelivered;
@@ -67,7 +68,7 @@ class ReportController extends Controller
 
     public function export(Request $request): BinaryFileResponse
     {
-        $query = Order::query()->with('deliveries');
+        $query = Order::query()->with('deliveries')->where('orders.status', '!=', 'Cancelled');
 
         $from = $request->input('from');
         $to = $request->input('to');

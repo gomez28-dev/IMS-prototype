@@ -71,8 +71,9 @@
             <label for="reports_type" class="form-label fw-medium text-secondary small">Type</label>
             <select name="type" id="reports_type" class="form-control form-select">
                 <option value="">All Types</option>
+                <option value="BIG TANKER" {{ ($type ?? '') === 'BIG TANKER' ? 'selected' : '' }}>BIG TANKER</option>
+                <option value="SMALL TANKER" {{ ($type ?? '') === 'SMALL TANKER' ? 'selected' : '' }}>SMALL TANKER</option>
                 <option value="PICK-UP" {{ ($type ?? '') === 'PICK-UP' ? 'selected' : '' }}>PICK-UP</option>
-                <option value="DELIVERY" {{ ($type ?? '') === 'DELIVERY' ? 'selected' : '' }}>DELIVERY</option>
             </select>
         </div>
         <div class="col-md-2">

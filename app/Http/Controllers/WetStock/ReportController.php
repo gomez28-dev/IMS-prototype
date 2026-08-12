@@ -140,8 +140,8 @@ class ReportController extends Controller
 
             // Helper closure to check if a pending delivery matches this warehouse
             $matchDeliveryToWarehouse = function (Delivery $delivery) use ($warehouse) {
-                if ($delivery->storage_tank_id && $delivery->storageTank) {
-                    return $delivery->storageTank->warehouse_id == $warehouse->id;
+                if ($delivery->allocations->isNotEmpty()) {
+                    return $delivery->allocations->contains(fn ($a) => $a->tank && $a->tank->warehouse_id == $warehouse->id);
                 }
                 if ($delivery->order && $delivery->order->location) {
                     return strtolower(trim($delivery->order->location)) === strtolower(trim($warehouse->name));
@@ -149,31 +149,44 @@ class ReportController extends Controller
                 return false;
             };
 
+            // Quantity of a pending delivery attributable to this warehouse.
+            // Split deliveries only count their allocated portion per warehouse.
+            $qtyForWarehouse = function (Delivery $delivery) use ($warehouse) {
+                if ($delivery->allocations->isNotEmpty()) {
+                    return (int) $delivery->allocations
+                        ->filter(fn ($a) => $a->tank && $a->tank->warehouse_id == $warehouse->id)
+                        ->sum('quantity');
+                }
+                return (int) $delivery->qty_out;
+            };
+
             // Pending deliveries query
-            $allPendingDeliveries = Delivery::with(['order', 'storageTank'])
+            $allPendingDeliveries = Delivery::with(['order', 'allocations.tank'])
                 ->where('status', 'PENDING')
+                ->whereHas('order', fn($q) => $q->where('status', '!=', 'Cancelled'))
                 ->get();
 
             // 2.5 Big Tanker Undelivered
             $bigTankerDeliveries = $allPendingDeliveries->filter(function ($d) use ($matchDeliveryToWarehouse) {
                 return ($d->type === 'BIG TANKER' || $d->type === 'DELIVERY') && $matchDeliveryToWarehouse($d);
             });
-            $bigTankerTotal = $bigTankerDeliveries->sum('qty_out');
+            $bigTankerTotal = $bigTankerDeliveries->sum(fn ($d) => $qtyForWarehouse($d));
 
             // 2.6 Small Tanker Undelivered
             $smallTankerDeliveries = $allPendingDeliveries->filter(function ($d) use ($matchDeliveryToWarehouse) {
                 return $d->type === 'SMALL TANKER' && $matchDeliveryToWarehouse($d);
             });
-            $smallTankerTotal = $smallTankerDeliveries->sum('qty_out');
+            $smallTankerTotal = $smallTankerDeliveries->sum(fn ($d) => $qtyForWarehouse($d));
 
             // 2.7 Client Pick Up
             $clientPickupDeliveries = $allPendingDeliveries->filter(function ($d) use ($matchDeliveryToWarehouse) {
                 return $d->type === 'PICK-UP' && $matchDeliveryToWarehouse($d);
             });
-            $clientPickupTotal = $clientPickupDeliveries->sum('qty_out');
+            $clientPickupTotal = $clientPickupDeliveries->sum(fn ($d) => $qtyForWarehouse($d));
 
             // 2.8 Sales Docs Pending Clearance (Hold for Clearing)
             $pendingClearanceOrders = \App\Models\Order::where('clearing_status', 'Pending')
+                ->where('status', '!=', 'Cancelled')
                 ->get()
                 ->filter(fn ($order) => strtolower(trim($order->location)) === strtolower(trim($warehouse->name)));
             $pendingClearanceOrdersTotal = $pendingClearanceOrders->sum('qty_ordered');

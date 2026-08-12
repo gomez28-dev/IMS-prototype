@@ -57,12 +57,12 @@
                         </thead>
                         <tbody>
                             <tr>
-                                <td>Depot Physical Volume</td>
+                                <td>Depot</td>
                                 <td class="text-end fw-semibold">{{ number_format($b['depot_total']) }}</td>
                                 <td class="small text-muted">Sum of active Depot Tanks at snapshot time</td>
                             </tr>
                             <tr>
-                                <td>Tankers Physical Volume</td>
+                                <td>Tankers</td>
                                 <td class="text-end fw-semibold">{{ number_format($b['tankers_total']) }}</td>
                                 <td class="small text-muted">Sum of active Tankers at snapshot time</td>
                             </tr>
@@ -72,22 +72,23 @@
                                 <td class="small text-muted">Flagged contaminated volume at snapshot time</td>
                             </tr>
                             <tr>
-                                <td>Unlifted Supplier Stock Pick Up</td>
+                                <td>Unlifted Stock Pick Up</td>
                                 <td class="text-end fw-semibold">{{ number_format($b['unlifted_supplier_total']) }}</td>
                                 <td class="small text-muted">Purchased vendor POs awaiting pickup</td>
                             </tr>
                             <tr>
-                                <td>Pending Supplier Stock Delivery</td>
+                                <td>Pending Stock Delivery</td>
                                 <td class="text-end fw-semibold">{{ number_format($b['pending_supplier_total']) }}</td>
                                 <td class="small text-muted">Vendor POs in transit to depot</td>
                             </tr>
                             <tr class="table-light fw-bold">
-                                <td>TOTAL COMMITMENTS / PHYSICAL IN</td>
+                                <td>TOTAL STOCK</td>
                                 <td class="text-end text-primary fs-6">{{ number_format($b['total_commitments_in']) }}</td>
-                                <td class="small">Depot + Tankers + Contaminated + Unlifted + Pending Supplier</td>
+                                <td class="small">Depot + Tankers + Contaminated + Unlifted Stock Pick Up + Pending Stock Delivery</td>
                             </tr>
+                            <tr><td colspan="3" class="py-1"><div class="border-top border-2"></div></td></tr>
                             <tr class="table-warning">
-                                <td class="fw-bold text-dark">HOLD FOR CLEARING (Sales Documentation)</td>
+                                <td class="fw-bold text-dark">HOLD FOR ACCOUNTING CLEARANCE</td>
                                 <td class="text-end fw-bold">{{ number_format($b['pending_clearance_orders_total'] ?? 0) }}</td>
                                 <td class="small text-muted">SUM of qty_ordered where clearance = Pending</td>
                             </tr>
@@ -97,19 +98,20 @@
                                 <td class="small text-muted">Pending sales orders (Type: PICK-UP)</td>
                             </tr>
                             <tr>
-                                <td class="ps-4">Client Pending Delivery (Big + Small Tanker)</td>
+                                <td class="ps-4">Client Pending Delivery</td>
                                 <td class="text-end fw-semibold">{{ number_format($b['client_pending_delivery_total']) }}</td>
                                 <td class="small text-muted">Big Tanker ({{ number_format($b['big_tanker_total']) }}L) + Small Tanker ({{ number_format($b['small_tanker_total']) }}L)</td>
                             </tr>
                             <tr class="table-light fw-bold">
-                                <td>TOTAL (Hold for Clearing)</td>
+                                <td>TOTAL</td>
                                 <td class="text-end text-warning-emphasis fs-6">{{ number_format($b['total_hold_for_clearing']) }}</td>
-                                <td class="small">Hold for Clearing + Client Unlifted Pick Up + Client Pending Delivery</td>
+                                <td class="small">HOLD FOR ACCOUNTING CLEARANCE + Client Unlifted Pick Up + Client Pending Delivery</td>
                             </tr>
+                            <tr><td colspan="3" class="py-1"><div class="border-top border-2"></div></td></tr>
                             <tr class="table-secondary fw-bold">
                                 <td>TOTAL AVAILABLE FOR SALE</td>
                                 <td class="text-end fs-6 text-dark">{{ number_format($b['total_available_for_sale']) }}</td>
-                                <td class="small">TOTAL + TOTAL (Hold for Clearing)</td>
+                                <td class="small">TOTAL STOCK + TOTAL (Hold for Accounting Clearance & Client Commitments)</td>
                             </tr>
                             <tr class="{{ $b['total_available_on_hand_for_selling'] < 0 ? 'table-danger' : 'table-success' }} fw-bold">
                                 <td class="fs-6">TOTAL AVAILABLE ON HAND FOR SELLING</td>

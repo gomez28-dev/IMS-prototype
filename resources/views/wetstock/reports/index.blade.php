@@ -10,10 +10,10 @@
     </div>
     <div class="d-flex gap-2">
         <a href="{{ route('wetstock.reports.export-live') }}" class="btn btn-success shadow-sm d-flex align-items-center">
-            <i class="bi bi-file-earmark-excel me-2"></i> Download Real-Time Excel
+            <i class="bi bi-file-earmark-excel me-2"></i> Download Excel
         </a>
         @if (!Auth::user()->isViewer() && !Auth::user()->isAccounting())
-        <button type="button" class="btn btn-warning shadow-sm d-flex align-items-center" data-bs-toggle="modal" data-bs-target="#saveSnapshotModal">
+        <button type="button" class="btn btn-primary-custom shadow-sm d-flex align-items-center" data-bs-toggle="modal" data-bs-target="#saveSnapshotModal">
             <i class="bi bi-lock-fill me-2"></i> Lock & Save Snapshot
         </button>
         @endif
@@ -108,12 +108,12 @@
                                 </thead>
                                 <tbody>
                                     <tr>
-                                        <td>Depot Physical Volume</td>
+                                        <td>Depot</td>
                                         <td class="text-end fw-semibold">{{ number_format($b['depot_total']) }}</td>
                                         <td class="small text-muted">Sum of active Depot Tanks</td>
                                     </tr>
                                     <tr>
-                                        <td>Tankers Physical Volume</td>
+                                        <td>Tankers</td>
                                         <td class="text-end fw-semibold">{{ number_format($b['tankers_total']) }}</td>
                                         <td class="small text-muted">Sum of active Tankers</td>
                                     </tr>
@@ -123,22 +123,23 @@
                                         <td class="small text-muted">Flagged contaminated tanks/tankers (Deducted from sellable volume)</td>
                                     </tr>
                                     <tr>
-                                        <td>Unlifted Supplier Stock Pick Up</td>
+                                        <td>Unlifted Stock Pick Up</td>
                                         <td class="text-end fw-semibold">{{ number_format($b['unlifted_supplier_total']) }}</td>
                                         <td class="small text-muted">Purchased vendor POs awaiting pickup</td>
                                     </tr>
                                     <tr>
-                                        <td>Pending Supplier Stock Delivery</td>
+                                        <td>Pending Stock Delivery</td>
                                         <td class="text-end fw-semibold">{{ number_format($b['pending_supplier_total']) }}</td>
                                         <td class="small text-muted">Vendor POs in transit to depot</td>
                                     </tr>
                                     <tr class="table-light fw-bold">
-                                        <td>TOTAL COMMITMENTS / PHYSICAL IN</td>
+                                        <td>TOTAL STOCK</td>
                                         <td class="text-end text-primary fs-6">{{ number_format($b['total_commitments_in']) }}</td>
-                                        <td class="small">Depot + Tankers + Contaminated + Unlifted + Pending Supplier</td>
+                                        <td class="small">Depot + Tankers + Contaminated + Unlifted Stock Pick Up + Pending Stock Delivery</td>
                                     </tr>
+                                    <tr><td colspan="3" class="py-1"><div class="border-top border-2"></div></td></tr>
                                     <tr class="table-warning">
-                                        <td class="fw-bold text-dark">HOLD FOR CLEARING (Sales Documentation)</td>
+                                        <td class="fw-bold text-dark">HOLD FOR ACCOUNTING CLEARANCE</td>
                                         <td class="text-end fw-bold">{{ number_format($b['pending_clearance_orders_total'] ?? 0) }}</td>
                                         <td class="small text-muted">SUM of qty_ordered where clearance = Pending</td>
                                     </tr>
@@ -148,19 +149,20 @@
                                         <td class="small text-muted">Pending sales orders (Type: PICK-UP)</td>
                                     </tr>
                                     <tr>
-                                        <td class="ps-4">Client Pending Delivery (Big + Small Tanker)</td>
+                                        <td class="ps-4">Client Pending Delivery</td>
                                         <td class="text-end fw-semibold">{{ number_format($b['client_pending_delivery_total']) }}</td>
                                         <td class="small text-muted">Big Tanker ({{ number_format($b['big_tanker_total']) }}L) + Small Tanker ({{ number_format($b['small_tanker_total']) }}L)</td>
                                     </tr>
                                     <tr class="table-light fw-bold">
-                                        <td>TOTAL (Hold for Clearing)</td>
+                                        <td>TOTAL</td>
                                         <td class="text-end text-warning-emphasis fs-6">{{ number_format($b['total_hold_for_clearing']) }}</td>
-                                        <td class="small">Hold for Clearing + Client Unlifted Pick Up + Client Pending Delivery</td>
+                                        <td class="small">HOLD FOR ACCOUNTING CLEARANCE + Client Unlifted Pick Up + Client Pending Delivery</td>
                                     </tr>
+                                    <tr><td colspan="3" class="py-1"><div class="border-top border-2"></div></td></tr>
                                     <tr class="table-secondary fw-bold">
                                         <td>TOTAL AVAILABLE FOR SALE</td>
                                         <td class="text-end fs-6 text-dark">{{ number_format($b['total_available_for_sale']) }}</td>
-                                        <td class="small">TOTAL + TOTAL (Hold for Clearing)</td>
+                                        <td class="small">TOTAL STOCK + TOTAL (Hold for Accounting Clearance & Client Commitments)</td>
                                     </tr>
                                     <tr class="{{ $b['total_available_on_hand_for_selling'] < 0 ? 'table-danger' : 'table-success' }} fw-bold">
                                         <td class="fs-6">TOTAL AVAILABLE ON HAND FOR SELLING</td>
@@ -242,10 +244,10 @@
                             </div>
                         </div>
 
-                        <!-- Unlifted Supplier Pick Up -->
+                        <!-- Unlifted Stock Pick Up -->
                         <div class="col-md-6">
                             <div class="border rounded p-3 bg-white h-100">
-                                <h6 class="fw-bold text-dark mb-3"><i class="bi bi-box-arrow-in-down me-2 text-warning"></i>Unlifted Supplier Pick Up</h6>
+                                <h6 class="fw-bold text-dark mb-3"><i class="bi bi-box-arrow-in-down me-2 text-warning"></i>Unlifted Stock Pick Up</h6>
                                 <table class="table table-sm table-striped small mb-0">
                                     <thead>
                                         <tr>
@@ -272,7 +274,7 @@
                         <!-- Pending Supplier Delivery -->
                         <div class="col-md-6">
                             <div class="border rounded p-3 bg-white h-100">
-                                <h6 class="fw-bold text-dark mb-3"><i class="bi bi-truck-flatbed me-2 text-success"></i>Pending Supplier Stock Delivery</h6>
+                                <h6 class="fw-bold text-dark mb-3"><i class="bi bi-truck-flatbed me-2 text-success"></i>Pending Stock Delivery</h6>
                                 <table class="table table-sm table-striped small mb-0">
                                     <thead>
                                         <tr>
@@ -353,7 +355,7 @@
                         <!-- Client Pick Up -->
                         <div class="col-md-4">
                             <div class="border rounded p-3 bg-white h-100">
-                                <h6 class="fw-bold text-dark mb-3"><i class="bi bi-person-badge me-2 text-primary"></i>Client Pick Up</h6>
+                                <h6 class="fw-bold text-dark mb-3"><i class="bi bi-person-badge me-2 text-primary"></i>Client Pick Up Unlifted</h6>
                                 <table class="table table-sm table-striped small mb-0">
                                     <thead>
                                         <tr>
@@ -438,7 +440,7 @@
         <div class="modal-content border-0 shadow">
             <form action="{{ route('wetstock.reports.snapshot') }}" method="POST">
                 @csrf
-                <div class="modal-header bg-warning text-dark">
+                <div class="modal-header text-white" style="background-color: var(--brand-color);">
                     <h5 class="modal-title fw-bold" id="saveSnapshotModalLabel"><i class="bi bi-lock-fill me-2"></i>Lock & Save Month-End Snapshot</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -451,7 +453,7 @@
                 </div>
                 <div class="modal-footer bg-light">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-warning fw-semibold"><i class="bi bi-check-circle me-1"></i>Lock & Save Snapshot</button>
+                    <button type="submit" class="btn btn-primary-custom fw-semibold"><i class="bi bi-check-circle me-1"></i>Lock & Save Snapshot</button>
                 </div>
             </form>
         </div>

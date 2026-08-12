@@ -38,6 +38,8 @@ class OrderController extends Controller
             ],
             'po_number' => ['nullable', 'string', 'max:64', 'unique:orders,po_number'],
             'location' => ['required', 'string', 'in:Valenzuela,San Simon'],
+            'status' => ['required', 'string', 'in:Active,Cancelled'],
+            'terms' => ['nullable', 'string', 'max:64'],
         ]);
 
         $order = Order::create($validated);
@@ -88,6 +90,8 @@ class OrderController extends Controller
             ],
             'po_number' => ['nullable', 'string', 'max:64', 'unique:orders,po_number,' . $order->id],
             'location' => ['required', 'string', 'in:Valenzuela,San Simon'],
+            'status' => ['required', 'string', 'in:Active,Cancelled'],
+            'terms' => ['nullable', 'string', 'max:64'],
         ]);
 
         $order->update($validated);

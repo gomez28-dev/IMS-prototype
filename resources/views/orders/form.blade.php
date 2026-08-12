@@ -76,6 +76,26 @@
                         @enderror
                     </div>
 
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <label for="status" class="form-label fw-medium text-secondary small">Status</label>
+                            <select name="status" id="status" class="form-control form-select @error('status') is-invalid @enderror" required>
+                                <option value="Active" {{ old('status', $order ? $order->status : 'Active') === 'Active' ? 'selected' : '' }}>Active</option>
+                                <option value="Cancelled" {{ old('status', $order ? $order->status : '') === 'Cancelled' ? 'selected' : '' }}>Cancelled</option>
+                            </select>
+                            @error('status')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="col-md-6">
+                            <label for="terms" class="form-label fw-medium text-secondary small">Terms</label>
+                            <input type="text" name="terms" id="terms" class="form-control @error('terms') is-invalid @enderror" placeholder="e.g. COD, 30 days (optional)" value="{{ old('terms', $order ? $order->terms : '') }}">
+                            @error('terms')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
+
                     <div class="d-flex justify-content-end gap-2">
                         <a href="{{ route('dashboard') }}" class="btn btn-light border">Cancel</a>
                         <button type="submit" class="btn btn-primary-custom">Save Order</button>
