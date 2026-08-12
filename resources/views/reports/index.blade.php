@@ -205,10 +205,15 @@
                     <tbody>
                         @if ($orders->isNotEmpty())
                             @foreach ($orders as $order)
-                            <tr>
+                            <tr class="{{ $order->status === 'Cancelled' ? 'order-cancelled' : '' }}">
                                 <td class="ps-4 fw-semibold text-dark">{{ $order->account }}</td>
                                 <td>{{ $order->date ? $order->date->format('Y-m-d') : '' }}</td>
-                                <td><span class="badge bg-light text-dark border">{{ $order->so_number }}</span></td>
+                                <td>
+                                    @if ($order->status === 'Cancelled')
+                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill me-1"><i class="bi bi-x-circle me-1"></i>CANCELLED</span>
+                                    @endif
+                                    <span class="badge {{ $order->status === 'Cancelled' ? 'bg-danger text-white' : 'bg-light text-dark border' }}">{{ $order->so_number }}</span>
+                                </td>
                                 <td class="text-end fw-medium">{{ number_format($order->effective_qty_ordered) }}</td>
                                 <td class="text-end fw-medium text-secondary">{{ number_format($order->total_qty_out) }}</td>
                                 <td class="text-center">
@@ -245,11 +250,16 @@
             <div class="d-md-none p-3">
                 @if ($orders->isNotEmpty())
                     @foreach ($orders as $order)
-                    <div class="card border-0 bg-light mb-3 rounded-4 shadow-sm">
+                    <div class="card border-0 bg-light mb-3 rounded-4 shadow-sm {{ $order->status === 'Cancelled' ? 'order-cancelled' : '' }}">
                         <div class="card-body p-4">
                             <div class="d-flex justify-content-between align-items-start mb-2">
                                 <h5 class="fw-bold text-dark mb-0">{{ $order->account }}</h5>
-                                <span class="badge bg-light text-dark border">{{ $order->so_number }}</span>
+                                <span>
+                                    @if ($order->status === 'Cancelled')
+                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill me-1"><i class="bi bi-x-circle me-1"></i>CANCELLED</span>
+                                    @endif
+                                    <span class="badge {{ $order->status === 'Cancelled' ? 'bg-danger text-white' : 'bg-light text-dark border' }}">{{ $order->so_number }}</span>
+                                </span>
                             </div>
                             <div class="row mb-3 small text-muted">
                                 <div class="col-6">

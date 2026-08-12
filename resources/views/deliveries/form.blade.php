@@ -12,8 +12,11 @@
         </div>
         <div class="card card-custom p-4 border-0">
             <div class="card-body">
-                <div class="mb-3">
-                    <span class="badge bg-light text-dark border">SO# {{ $order->so_number }}</span>
+                <div class="mb-3 d-flex flex-wrap align-items-center gap-2">
+                    @if ($order && $order->status === 'Cancelled')
+                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill"><i class="bi bi-x-circle me-1"></i>CANCELLED ORDER</span>
+                    @endif
+                    <span class="badge {{ $order && $order->status === 'Cancelled' ? 'bg-danger text-white' : 'bg-light text-dark border' }}">SO# {{ $order->so_number }}</span>
                     <span class="text-muted small ms-2">{{ $order->account }}</span>
                     @php
                         $available = $order->effective_qty_ordered - $order->committed_qty_out;

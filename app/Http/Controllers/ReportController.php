@@ -13,7 +13,7 @@ class ReportController extends Controller
 {
     public function index(Request $request): View
     {
-        $query = Order::query()->with('deliveries')->where('orders.status', '!=', 'Cancelled');
+        $query = Order::query()->with('deliveries');
 
         $from = $request->input('from');
         $to = $request->input('to');
@@ -54,11 +54,12 @@ class ReportController extends Controller
 
         $clients = \App\Models\Client::orderBy('name')->get();
 
-        $totalOrders = $query->clone()->count();
-        $totalQtyOrdered = $query->clone()->get()->sum(fn($o) => $o->effective_qty_ordered);
-        $totalQtyDelivered = $query->clone()
+        $statsQuery = (clone $query)->where('orders.status', '!=', 'Cancelled');
+
+        $totalOrders = $statsQuery->clone()->count();
+        $totalQtyOrdered = $statsQuery->clone()->get()->sum(fn($o) => $o->effective_qty_ordered);
+        $totalQtyDelivered = $statsQuery->clone()
             ->join('deliveries', 'orders.id', '=', 'deliveries.order_id')
-            ->where('orders.status', '!=', 'Cancelled')
             ->where('deliveries.status', 'FULFILLED')
             ->sum('deliveries.qty_out');
         $totalRemaining = $totalQtyOrdered - $totalQtyDelivered;
@@ -68,7 +69,7 @@ class ReportController extends Controller
 
     public function export(Request $request): BinaryFileResponse
     {
-        $query = Order::query()->with('deliveries')->where('orders.status', '!=', 'Cancelled');
+        $query = Order::query()->with('deliveries');
 
         $from = $request->input('from');
         $to = $request->input('to');

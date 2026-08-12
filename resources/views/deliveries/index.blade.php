@@ -21,9 +21,14 @@
     <div class="card-body p-4">
         <div class="row align-items-center">
             <div class="col-md-6 mb-3 mb-md-0">
-                    <span class="badge bg-primary bg-opacity-10 text-primary mb-2 fw-semibold px-3 py-2">
-                    SO# {{ $order->so_number }}
-                </span>
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                    @if ($order->status === 'Cancelled')
+                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill fw-semibold px-3 py-2"><i class="bi bi-x-circle me-1"></i>CANCELLED ORDER</span>
+                    @endif
+                    <span class="badge {{ $order->status === 'Cancelled' ? 'bg-danger text-white' : 'bg-primary bg-opacity-10 text-primary' }} fw-semibold px-3 py-2">
+                        SO# {{ $order->so_number }}
+                    </span>
+                </div>
                 <h3 class="fw-bold mb-1 text-dark">{{ $order->account }}</h3>
                 <p class="text-muted small mb-0">
                     <i class="bi bi-calendar3 me-1"></i> Order Date: {{ $order->date ? $order->date->format('F d, Y') : '' }}

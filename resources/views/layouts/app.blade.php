@@ -479,6 +479,19 @@
             font-size: 0.75rem;
         }
 
+        .order-cancelled {
+            opacity: 0.6;
+        }
+        .order-cancelled td,
+        .order-cancelled h5,
+        .order-cancelled .fw-semibold,
+        .order-cancelled .text-dark {
+            color: #b91c1c !important;
+        }
+        .order-cancelled .badge:not(.bg-danger):not(.bg-danger-subtle) {
+            filter: grayscale(1);
+        }
+
         .badge-type-pickup {
             background-color: #e8f0fe !important;
             color: #1967d2 !important;

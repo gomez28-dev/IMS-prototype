@@ -32,7 +32,7 @@ class DashboardController extends Controller
         $searchQuery = $request->input('search', session('dashboard_search', ''));
         $page = (int) $request->input('page', session('dashboard_page', 1));
 
-        $query = Order::query()->where('status', '!=', 'Cancelled');
+        $query = Order::query();
 
         if ($searchQuery !== '') {
             $query->where(function ($q) use ($searchQuery) {
@@ -41,9 +41,9 @@ class DashboardController extends Controller
             });
         }
 
-        // Summary cards are scoped to the current month (monthly reset)
+        // Summary cards are scoped to the current month (monthly reset) and exclude cancelled orders
         $now = now('Asia/Manila');
-        $statsQuery = clone $query;
+        $statsQuery = (clone $query)->where('status', '!=', 'Cancelled');
         $statsQuery->whereYear('date', $now->year)->whereMonth('date', $now->month);
 
         $totalOrders = (clone $statsQuery)->count();
