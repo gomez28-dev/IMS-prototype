@@ -16,6 +16,11 @@ class ReportsExport implements FromArray, WithHeadings, WithColumnWidths, WithEv
 {
     protected Collection $orders;
 
+    /**
+     * Excel row numbers belonging to cancelled orders (for red highlighting).
+     */
+    protected array $cancelledRows = [];
+
     public function __construct(Collection $orders)
     {
         $this->orders = $orders;
@@ -26,6 +31,7 @@ class ReportsExport implements FromArray, WithHeadings, WithColumnWidths, WithEv
         $rows = [];
 
         foreach ($this->orders as $order) {
+            $orderCancelled = $order->status === 'Cancelled';
             $deliveries = $order->deliveries()->orderBy('delivery_date', 'asc')->get();
             $runningBalance = $order->qty_ordered;
 
@@ -45,6 +51,10 @@ class ReportsExport implements FromArray, WithHeadings, WithColumnWidths, WithEv
                     'TYPE' => '',
                     'REMARKS' => '',
                 ];
+
+                if ($orderCancelled) {
+                    $this->cancelledRows[] = count($rows) + 1;
+                }
             } else {
                 foreach ($deliveries as $idx => $delivery) {
                     if ($delivery->status !== 'CANCELLED') {
@@ -71,6 +81,10 @@ class ReportsExport implements FromArray, WithHeadings, WithColumnWidths, WithEv
                         'REMARKS' => $delivery->remarks ?? '',
                     ];
                     $rows[] = $row;
+
+                    if ($orderCancelled) {
+                        $this->cancelledRows[] = count($rows) + 1;
+                    }
                 }
             }
         }
@@ -124,6 +138,7 @@ class ReportsExport implements FromArray, WithHeadings, WithColumnWidths, WithEv
                 $this->applyNumberFormats($sheet, $lastRow);
                 $this->applyMergeRanges($sheet, $lastRow);
                 $this->fillZeroBalances($sheet, $lastRow);
+                $this->highlightCancelledOrders($sheet, $lastRow);
                 $sheet->freezePane('A2');
             },
         ];
@@ -229,6 +244,32 @@ class ReportsExport implements FromArray, WithHeadings, WithColumnWidths, WithEv
             if ($cell->getValue() === null) {
                 $cell->setValueExplicit(0, 'n');
             }
+        }
+    }
+
+    /**
+     * Light red row highlight for orders whose SO status is Cancelled.
+     */
+    protected function highlightCancelledOrders($sheet, int $lastRow): void
+    {
+        if (empty($this->cancelledRows)) {
+            return;
+        }
+
+        foreach ($this->cancelledRows as $row) {
+            if ($row < 2 || $row > $lastRow) {
+                continue;
+            }
+
+            $sheet->getStyle("A{$row}:K{$row}")->applyFromArray([
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'FFEBEE'],
+                ],
+                'font' => [
+                    'color' => ['rgb' => 'B71C1C'],
+                ],
+            ]);
         }
     }
 }

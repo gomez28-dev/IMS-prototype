@@ -73,6 +73,10 @@ class DeliveryAssignmentController extends Controller
         $tank = StorageTank::findOrFail($validated['storage_tank_id']);
         $quantity = (int) $validated['quantity'];
 
+        if ($delivery->order && $delivery->order->status === 'Cancelled') {
+            return back()->with('danger', "Cannot allocate: the parent order of DR #{$delivery->dr_number} is cancelled.");
+        }
+
         if ($delivery->remaining_to_allocate <= 0) {
             return back()->with('danger', "Cannot allocate: DR #{$delivery->dr_number} is already fully allocated.");
         }

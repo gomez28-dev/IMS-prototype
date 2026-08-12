@@ -102,6 +102,27 @@ class OrderController extends Controller
             'description' => "Updated order #{$order->id} - {$order->account}",
         ]);
 
+        // Cancelling the SO also cancels all of its outstanding delivery records.
+        $autoCancelled = 0;
+        if (($validated['status'] ?? null) === 'Cancelled') {
+            $autoCancelled = $order->deliveries()
+                ->where('status', '!=', 'CANCELLED')
+                ->update(['status' => 'CANCELLED']);
+
+            if ($autoCancelled > 0) {
+                AuditLog::create([
+                    'admin_id' => auth()->id(),
+                    'action' => 'updated',
+                    'description' => "Cancelled order #{$order->id} - {$order->account}: {$autoCancelled} delivery record(s) auto-cancelled.",
+                ]);
+            }
+        }
+
+        if ($autoCancelled > 0) {
+            return redirect()->route('dashboard')
+                ->with('success', "Order updated and cancelled. {$autoCancelled} delivery record(s) were auto-cancelled.");
+        }
+
         return redirect()->route('dashboard')
             ->with('success', 'Order updated successfully.');
     }

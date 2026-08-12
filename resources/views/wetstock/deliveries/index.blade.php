@@ -183,6 +183,8 @@
                                             {{ $alloc->delivery->dr_number }}
                                             @if ($alloc->delivery->status === 'FULFILLED')
                                                 <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1 ms-1">FULFILLED</span>
+                                            @elseif ($alloc->delivery->status === 'CANCELLED')
+                                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2 py-1 ms-1">CANCELLED</span>
                                             @else
                                                 <span class="badge bg-warning-subtle text-warning border border-warning-subtle rounded-pill px-2 py-1 ms-1" style="color: #a16207 !important;">PENDING</span>
                                             @endif
@@ -224,6 +226,8 @@
                                                 {{ $alloc->delivery->dr_number }}
                                                 @if ($alloc->delivery->status === 'FULFILLED')
                                                     <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1">FULFILLED</span>
+                                                @elseif ($alloc->delivery->status === 'CANCELLED')
+                                                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2 py-1">CANCELLED</span>
                                                 @else
                                                     <span class="badge bg-warning-subtle text-warning border border-warning-subtle rounded-pill px-2 py-1" style="color: #a16207 !important;">PENDING</span>
                                                 @endif
