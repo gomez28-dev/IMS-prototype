@@ -32,7 +32,7 @@ class StockInController extends Controller
      */
     public function create(Request $request): View
     {
-        if (auth()->user()->isViewer() || auth()->user()->isAccounting()) {
+        if (!auth()->user()->canEditModule2()) {
             abort(403);
         }
 
@@ -53,7 +53,7 @@ class StockInController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
-        if (auth()->user()->isViewer() || auth()->user()->isAccounting()) {
+        if (!auth()->user()->canEditModule2()) {
             abort(403);
         }
 
@@ -96,7 +96,7 @@ class StockInController extends Controller
      */
     public function edit(StockIn $stockIn): View
     {
-        if (auth()->user()->isViewer() || auth()->user()->isAccounting()) {
+        if (!auth()->user()->canEditModule2()) {
             abort(403);
         }
 
@@ -114,7 +114,7 @@ class StockInController extends Controller
      */
     public function update(Request $request, StockIn $stockIn): RedirectResponse
     {
-        if (auth()->user()->isViewer() || auth()->user()->isAccounting()) {
+        if (!auth()->user()->canEditModule2()) {
             abort(403);
         }
 

@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -33,6 +35,41 @@ class Order extends Model
     public function deliveries(): HasMany
     {
         return $this->hasMany(Delivery::class, 'order_id');
+    }
+
+    /**
+     * Scope query to orders placed in the current month OR unfulfilled carry-over orders from previous months.
+     */
+    public function scopeActiveOrCurrentMonth(Builder $query, ?Carbon $now = null): Builder
+    {
+        $now = $now ?: now('Asia/Manila');
+        $startOfCurrentMonth = $now->copy()->startOfMonth();
+
+        return $query->where(function (Builder $q) use ($now, $startOfCurrentMonth) {
+            // 1. Orders placed in current month
+            $q->where(function (Builder $inner) use ($now) {
+                $inner->whereYear('date', $now->year)
+                      ->whereMonth('date', $now->month);
+            })
+            // 2. OR unfulfilled carry-over orders from past months
+            ->orWhere(function (Builder $inner) use ($startOfCurrentMonth) {
+                $inner->where('date', '<', $startOfCurrentMonth)
+                      ->where('status', '!=', 'Cancelled')
+                      ->whereRaw('(qty_ordered - (SELECT COALESCE(SUM(qty_out), 0) FROM deliveries WHERE deliveries.order_id = orders.id AND deliveries.status = "FULFILLED") - (SELECT COALESCE(SUM(qty_out), 0) FROM deliveries WHERE deliveries.order_id = orders.id AND deliveries.status = "CANCELLED")) > 0');
+            });
+        });
+    }
+
+    /**
+     * Check if this order originated prior to current month.
+     */
+    public function isCarryOver(?Carbon $now = null): bool
+    {
+        if (!$this->date) {
+            return false;
+        }
+        $now = $now ?: now('Asia/Manila');
+        return $this->date->lt($now->copy()->startOfMonth());
     }
 
     /**

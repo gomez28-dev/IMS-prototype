@@ -340,26 +340,17 @@
             color: #C2410C !important;
             border-color: rgba(194, 65, 12, 0.3) !important;
         }
-        .sidebar-user .badge-role-editor {
-            background-color: #E0F2FE !important;
-            color: #075985 !important;
-            border-color: rgba(7, 89, 133, 0.3) !important;
-        }
-        .sidebar-user .badge-role-viewer {
-            background-color: #F1F5F9 !important;
-            color: #475569 !important;
-            border-color: rgba(71, 85, 105, 0.3) !important;
-        }
-        .sidebar-user .badge-role-warehouse {
-            background-color: #FEF3C7 !important;
-            color: #92400E !important;
-            border-color: rgba(146, 64, 14, 0.3) !important;
-        }
-        .sidebar-user .badge-role-accounting {
-            background-color: #F3E8FF !important;
-            color: #6B21A8 !important;
-            border-color: rgba(107, 33, 168, 0.3) !important;
-        }
+        .sidebar-user .badge-role-admin { background-color: #FFEDD5 !important; color: #C2410C !important; border-color: rgba(194, 65, 12, 0.3) !important; }
+        .sidebar-user .badge-role-viewer { background-color: #F1F5F9 !important; color: #475569 !important; border-color: rgba(71, 85, 105, 0.3) !important; }
+        .sidebar-user .badge-role-audit { background-color: #CCFBF1 !important; color: #0F766E !important; border-color: rgba(15, 118, 110, 0.3) !important; }
+        .sidebar-user .badge-role-sales { background-color: #E0F2FE !important; color: #075985 !important; border-color: rgba(7, 89, 133, 0.3) !important; }
+        .sidebar-user .badge-role-ops-admin { background-color: #EDE9FE !important; color: #5B21B6 !important; border-color: rgba(91, 33, 182, 0.3) !important; }
+        .sidebar-user .badge-role-ops-mgr { background-color: #E0E7FF !important; color: #3730A3 !important; border-color: rgba(55, 48, 163, 0.3) !important; }
+        .sidebar-user .badge-role-ops-wh { background-color: #FEF3C7 !important; color: #92400E !important; border-color: rgba(146, 64, 14, 0.3) !important; }
+        .sidebar-user .badge-role-ops-log { background-color: #DBEAFE !important; color: #1E40AF !important; border-color: rgba(30, 64, 175, 0.3) !important; }
+        .sidebar-user .badge-role-accounting { background-color: #D1FAE5 !important; color: #065F46 !important; border-color: rgba(6, 95, 70, 0.3) !important; }
+        .sidebar-user .badge-role-hod { background-color: #FFE4E6 !important; color: #9F1239 !important; border-color: rgba(159, 18, 57, 0.3) !important; }
+        .sidebar-user .badge-role-vp { background-color: #FAE8FF !important; color: #86198F !important; border-color: rgba(134, 25, 143, 0.3) !important; }
 
         /* ========================================
            SLIM TOP BAR
@@ -551,50 +542,17 @@
             color: var(--text-dark);
         }
 
-        .badge-role-admin {
-            background-color: #FFEDD5 !important;
-            color: #C2410C !important;
-            border: 1px solid rgba(194, 65, 12, 0.3) !important;
-            font-weight: 600;
-            font-size: 0.65rem;
-            letter-spacing: 0.04em;
-        }
-
-        .badge-role-editor {
-            background-color: #E0F2FE !important;
-            color: #075985 !important;
-            border: 1px solid rgba(7, 89, 133, 0.3) !important;
-            font-weight: 600;
-            font-size: 0.65rem;
-            letter-spacing: 0.04em;
-        }
-
-        .badge-role-viewer {
-            background-color: #F1F5F9 !important;
-            color: #475569 !important;
-            border: 1px solid rgba(71, 85, 105, 0.3) !important;
-            font-weight: 600;
-            font-size: 0.65rem;
-            letter-spacing: 0.04em;
-        }
-
-        .badge-role-warehouse {
-            background-color: #FEF3C7 !important;
-            color: #92400E !important;
-            border: 1px solid rgba(146, 64, 14, 0.3) !important;
-            font-weight: 600;
-            font-size: 0.65rem;
-            letter-spacing: 0.04em;
-        }
-
-        .badge-role-accounting {
-            background-color: #F3E8FF !important;
-            color: #6B21A8 !important;
-            border: 1px solid rgba(107, 33, 168, 0.3) !important;
-            font-weight: 600;
-            font-size: 0.65rem;
-            letter-spacing: 0.04em;
-        }
+        .badge-role-admin { background-color: #FFEDD5 !important; color: #C2410C !important; border: 1px solid rgba(194, 65, 12, 0.3) !important; font-weight: 600; font-size: 0.65rem; letter-spacing: 0.04em; }
+        .badge-role-viewer { background-color: #F1F5F9 !important; color: #475569 !important; border: 1px solid rgba(71, 85, 105, 0.3) !important; font-weight: 600; font-size: 0.65rem; letter-spacing: 0.04em; }
+        .badge-role-audit { background-color: #CCFBF1 !important; color: #0F766E !important; border: 1px solid rgba(15, 118, 110, 0.3) !important; font-weight: 600; font-size: 0.65rem; letter-spacing: 0.04em; }
+        .badge-role-sales { background-color: #E0F2FE !important; color: #075985 !important; border: 1px solid rgba(7, 89, 133, 0.3) !important; font-weight: 600; font-size: 0.65rem; letter-spacing: 0.04em; }
+        .badge-role-ops-admin { background-color: #EDE9FE !important; color: #5B21B6 !important; border: 1px solid rgba(91, 33, 182, 0.3) !important; font-weight: 600; font-size: 0.65rem; letter-spacing: 0.04em; }
+        .badge-role-ops-mgr { background-color: #E0E7FF !important; color: #3730A3 !important; border: 1px solid rgba(55, 48, 163, 0.3) !important; font-weight: 600; font-size: 0.65rem; letter-spacing: 0.04em; }
+        .badge-role-ops-wh { background-color: #FEF3C7 !important; color: #92400E !important; border: 1px solid rgba(146, 64, 14, 0.3) !important; font-weight: 600; font-size: 0.65rem; letter-spacing: 0.04em; }
+        .badge-role-ops-log { background-color: #DBEAFE !important; color: #1E40AF !important; border: 1px solid rgba(30, 64, 175, 0.3) !important; font-weight: 600; font-size: 0.65rem; letter-spacing: 0.04em; }
+        .badge-role-accounting { background-color: #D1FAE5 !important; color: #065F46 !important; border: 1px solid rgba(6, 95, 70, 0.3) !important; font-weight: 600; font-size: 0.65rem; letter-spacing: 0.04em; }
+        .badge-role-hod { background-color: #FFE4E6 !important; color: #9F1239 !important; border: 1px solid rgba(159, 18, 57, 0.3) !important; font-weight: 600; font-size: 0.65rem; letter-spacing: 0.04em; }
+        .badge-role-vp { background-color: #FAE8FF !important; color: #86198F !important; border: 1px solid rgba(134, 25, 143, 0.3) !important; font-weight: 600; font-size: 0.65rem; letter-spacing: 0.04em; }
 
         .badge-type-big-tanker {
             background-color: #ffedd5 !important;
@@ -741,6 +699,9 @@
                     <a class="nav-link d-flex align-items-center" href="{{ route('wetstock.stock-in.index') }}">
                         <i class="bi bi-fuel-pump me-2"></i> Stock IN Log
                     </a>
+                    <a class="nav-link d-flex align-items-center" href="{{ route('wetstock.transfers.index') }}">
+                        <i class="bi bi-arrow-left-right me-2"></i> Stock Transfers
+                    </a>
                     <a class="nav-link d-flex align-items-center" href="{{ route('wetstock.supplier-orders.index') }}">
                         <i class="bi bi-box-arrow-in-down me-2"></i> Incoming Stock
                     </a>
@@ -760,17 +721,17 @@
                     <a class="nav-link d-flex align-items-center" href="{{ route('reports.index') }}">
                         <i class="bi bi-bar-chart-line me-2"></i> Reports
                     </a>
-                    @if (Auth::user()->isAdmin())
+                    @if (Auth::user()->canManageAccounts())
                     <a class="nav-link d-flex align-items-center" href="{{ route('accounts.index') }}">
                         <i class="bi bi-people me-2"></i> Manage Accounts
                     </a>
                     @endif
-                    @if (Auth::user()->isEditor())
+                    @if (Auth::user()->canEditModule1())
                     <a class="nav-link d-flex align-items-center" href="{{ route('clients.index') }}">
                         <i class="bi bi-building me-2"></i> Manage Clients
                     </a>
                     @endif
-                    @if (Auth::user()->isAdmin() || Auth::user()->isAccounting())
+                    @if (Auth::user()->canViewAuditLog())
                     <a class="nav-link d-flex align-items-center" href="{{ route('audit-logs') }}">
                         <i class="bi bi-journal-text me-2"></i> Audit Log
                     </a>
@@ -788,17 +749,7 @@
                     <i class="bi bi-person-circle fs-5 me-2 text-muted"></i>
                     <div>
                         <div class="fw-semibold small text-dark">{{ Auth::user()->name }}</div>
-                        @if (Auth::user()->isAdmin())
-                            <span class="badge badge-role-admin rounded-pill px-2 py-0" style="font-size: 0.6rem;">Admin</span>
-                        @elseif (Auth::user()->isEditor())
-                            <span class="badge badge-role-editor rounded-pill px-2 py-0" style="font-size: 0.6rem;">Editor</span>
-                        @elseif (Auth::user()->isAccounting())
-                            <span class="badge badge-role-accounting rounded-pill px-2 py-0" style="font-size: 0.6rem;">Accounting</span>
-                        @elseif (Auth::user()->isWarehouse())
-                            <span class="badge badge-role-warehouse rounded-pill px-2 py-0" style="font-size: 0.6rem;">Warehouse</span>
-                        @else
-                            <span class="badge badge-role-viewer rounded-pill px-2 py-0" style="font-size: 0.6rem;">Viewer</span>
-                        @endif
+                        <span class="badge {{ Auth::user()->role_badge_class }} rounded-pill px-2 py-0" style="font-size: 0.6rem;">{{ Auth::user()->role_label }}</span>
                     </div>
                 </div>
                 <form action="{{ route('logout') }}" method="POST" class="w-100">
@@ -844,6 +795,10 @@
                     <i class="bi bi-fuel-pump"></i>
                     <span class="nav-label">Stock IN Log</span>
                 </a>
+                <a href="{{ route('wetstock.transfers.index') }}" class="sidebar-nav-link {{ request()->routeIs('wetstock.transfers.*') ? 'active' : '' }}" title="Stock Transfers">
+                    <i class="bi bi-arrow-left-right"></i>
+                    <span class="nav-label">Stock Transfers</span>
+                </a>
                 <a href="{{ route('wetstock.supplier-orders.index') }}" class="sidebar-nav-link {{ request()->routeIs('wetstock.supplier-orders.*') ? 'active' : '' }}" title="Incoming Stock">
                     <i class="bi bi-box-arrow-in-down"></i>
                     <span class="nav-label">Incoming Stock</span>
@@ -868,24 +823,24 @@
                     <i class="bi bi-bar-chart-line"></i>
                     <span class="nav-label">Reports</span>
                 </a>
-                @if (Auth::user()->isAdmin())
+                @if (Auth::user()->canManageAccounts())
                 <a href="{{ route('accounts.index') }}" class="sidebar-nav-link {{ request()->routeIs('accounts.*') ? 'active' : '' }}" title="Manage Accounts">
                     <i class="bi bi-people"></i>
                     <span class="nav-label">Manage Accounts</span>
                 </a>
                 @endif
-                @if (Auth::user()->isEditor())
+                @if (Auth::user()->canEditModule1())
                 <a href="{{ route('clients.index') }}" class="sidebar-nav-link {{ request()->routeIs('clients.*') ? 'active' : '' }}" title="Manage Clients">
                     <i class="bi bi-building"></i>
                     <span class="nav-label">Manage Clients</span>
                 </a>
                 @endif
-                @if (Auth::user()->isAdmin() || Auth::user()->isAccounting())
-                <a href="{{ route('audit-logs') }}" class="sidebar-nav-link {{ request()->routeIs('audit-logs') ? 'active' : '' }}" title="Audit Log">
-                    <i class="bi bi-journal-text"></i>
-                    <span class="nav-label">Audit Log</span>
-                </a>
-                @endif
+                 @if (Auth::user()->canViewAuditLog())
+                 <a href="{{ route('audit-logs') }}" class="sidebar-nav-link {{ request()->routeIs('audit-logs') ? 'active' : '' }}" title="Audit Log">
+                     <i class="bi bi-journal-text"></i>
+                     <span class="nav-label">Audit Log</span>
+                 </a>
+                 @endif
             @endif
 
             <div class="sidebar-divider"></div>
@@ -913,17 +868,7 @@
                 <div class="user-avatar">{{ $initials }}</div>
                 <div class="user-info">
                     <div class="user-name">{{ Auth::user()->name }}</div>
-                    @if (Auth::user()->isAdmin())
-                        <span class="badge badge-role-admin rounded-pill px-2 py-0" style="font-size: 0.55rem;">Admin</span>
-                    @elseif (Auth::user()->isEditor())
-                        <span class="badge badge-role-editor rounded-pill px-2 py-0" style="font-size: 0.55rem;">Editor</span>
-                    @elseif (Auth::user()->isAccounting())
-                        <span class="badge badge-role-accounting rounded-pill px-2 py-0" style="font-size: 0.55rem;">Accounting</span>
-                    @elseif (Auth::user()->isWarehouse())
-                        <span class="badge badge-role-warehouse rounded-pill px-2 py-0" style="font-size: 0.55rem;">Warehouse</span>
-                    @else
-                        <span class="badge badge-role-viewer rounded-pill px-2 py-0" style="font-size: 0.55rem;">Viewer</span>
-                    @endif
+                    <span class="badge {{ Auth::user()->role_badge_class }} rounded-pill px-2 py-0" style="font-size: 0.55rem;">{{ Auth::user()->role_label }}</span>
                 </div>
                 <i class="bi bi-chevron-up user-chevron"></i>
             </button>

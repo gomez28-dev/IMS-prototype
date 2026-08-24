@@ -46,14 +46,6 @@ class Warehouse extends Model
     }
 
     /**
-     * Total out across active tanks in warehouse.
-     */
-    public function getTotalOutAttribute(): int
-    {
-        return $this->activeTanks->sum(fn ($tank) => $tank->stock_out);
-    }
-
-    /**
      * Total capacity across active tanks in warehouse.
      */
     public function getTotalCapacityAttribute(): int

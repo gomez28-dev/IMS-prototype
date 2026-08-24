@@ -12,7 +12,7 @@
         <a href="{{ route('wetstock.reports.export-live') }}" class="btn btn-success shadow-sm d-flex align-items-center">
             <i class="bi bi-file-earmark-excel me-2"></i> Download Excel
         </a>
-        @if (!Auth::user()->isViewer() && !Auth::user()->isAccounting())
+        @if (Auth::user()->canEditModule2())
         <button type="button" class="btn btn-primary-custom shadow-sm d-flex align-items-center" data-bs-toggle="modal" data-bs-target="#saveSnapshotModal">
             <i class="bi bi-lock-fill me-2"></i> Lock & Save Snapshot
         </button>
@@ -434,7 +434,7 @@
 </div>
 
 <!-- Modal: Save Report Snapshot -->
-@if (!Auth::user()->isViewer() && !Auth::user()->isAccounting())
+@if (Auth::user()->canEditModule2())
 <div class="modal fade" id="saveSnapshotModal" tabindex="-1" aria-labelledby="saveSnapshotModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content border-0 shadow">

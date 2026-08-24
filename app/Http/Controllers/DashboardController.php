@@ -11,6 +11,7 @@ class DashboardController extends Controller
 {
     /**
      * Display the dashboard with orders list and optional search.
+     * Incorporates unfulfilled carry-over orders from previous months alongside current month orders.
      */
     public function index(Request $request): View|RedirectResponse
     {
@@ -31,8 +32,9 @@ class DashboardController extends Controller
         // Restore from session when navigating back without params
         $searchQuery = $request->input('search', session('dashboard_search', ''));
         $page = (int) $request->input('page', session('dashboard_page', 1));
+        $now = now('Asia/Manila');
 
-        $query = Order::query();
+        $query = Order::query()->activeOrCurrentMonth($now);
 
         if ($searchQuery !== '') {
             $query->where(function ($q) use ($searchQuery) {
@@ -41,15 +43,14 @@ class DashboardController extends Controller
             });
         }
 
-        // Summary cards are scoped to the current month (monthly reset) and exclude cancelled orders
-        $now = now('Asia/Manila');
+        // Summary cards count active current-month + carry-over orders (excluding cancelled)
         $statsQuery = (clone $query)->where('status', '!=', 'Cancelled');
-        $statsQuery->whereYear('date', $now->year)->whereMonth('date', $now->month);
 
         $totalOrders = (clone $statsQuery)->count();
         $totalQtyOrdered = (clone $statsQuery)->get()->sum(fn($o) => $o->effective_qty_ordered);
         $totalQtyDelivered = (clone $statsQuery)->get()->sum(fn($o) => $o->total_qty_out);
         $totalRemaining = (clone $statsQuery)->get()->sum(fn($o) => $o->remaining_balance);
+
         $orders = $query->orderBy('so_number', 'desc')
             ->paginate(10, ['*'], 'page', $page)
             ->appends(['search' => $searchQuery]);

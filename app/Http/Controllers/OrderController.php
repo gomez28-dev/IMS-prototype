@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -17,6 +18,10 @@ class OrderController extends Controller
      */
     public function create(): View
     {
+        if (!Auth::user()->canEditModule1()) {
+            abort(403);
+        }
+
         return view('orders.form', [
             'title' => 'New Order',
             'order' => null,
@@ -29,6 +34,10 @@ class OrderController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        if (!Auth::user()->canEditModule1()) {
+            abort(403);
+        }
+
         $validated = $request->validate([
             'account' => ['required', 'string', 'max:128'],
             'date' => ['required', 'date'],
@@ -45,9 +54,9 @@ class OrderController extends Controller
         $order = Order::create($validated);
 
         AuditLog::create([
-            'admin_id' => auth()->id(),
-            'action' => 'created',
-            'description' => "Created order #{$order->id} - {$order->account}",
+            'admin_id' => Auth::id(),
+            'action' => 'CREATED',
+            'description' => "Created order #{$order->id} - {$order->account} (SO# {$order->so_number})",
         ]);
 
         return redirect()->route('dashboard')
@@ -59,7 +68,7 @@ class OrderController extends Controller
      */
     public function edit(Order $order): View
     {
-        if (auth()->user()->isViewer()) {
+        if (!Auth::user()->canEditModule1()) {
             abort(403);
         }
 
@@ -75,7 +84,7 @@ class OrderController extends Controller
      */
     public function update(Request $request, Order $order): RedirectResponse
     {
-        if (auth()->user()->isViewer()) {
+        if (!Auth::user()->canEditModule1()) {
             abort(403);
         }
 
@@ -97,9 +106,9 @@ class OrderController extends Controller
         $order->update($validated);
 
         AuditLog::create([
-            'admin_id' => auth()->id(),
-            'action' => 'updated',
-            'description' => "Updated order #{$order->id} - {$order->account}",
+            'admin_id' => Auth::id(),
+            'action' => 'UPDATED',
+            'description' => "Updated order #{$order->id} - {$order->account} (SO# {$order->so_number})",
         ]);
 
         // Cancelling the SO also cancels all of its outstanding delivery records.
@@ -111,8 +120,8 @@ class OrderController extends Controller
 
             if ($autoCancelled > 0) {
                 AuditLog::create([
-                    'admin_id' => auth()->id(),
-                    'action' => 'updated',
+                    'admin_id' => Auth::id(),
+                    'action' => 'UPDATED',
                     'description' => "Cancelled order #{$order->id} - {$order->account}: {$autoCancelled} delivery record(s) auto-cancelled.",
                 ]);
             }
@@ -132,13 +141,13 @@ class OrderController extends Controller
      */
     public function destroy(Order $order): RedirectResponse
     {
-        if (!auth()->user()->isAdmin()) {
+        if (!Auth::user()->isAdmin()) {
             abort(403);
         }
 
         AuditLog::create([
-            'admin_id' => auth()->id(),
-            'action' => 'deleted',
+            'admin_id' => Auth::id(),
+            'action' => 'DELETED',
             'description' => "Deleted order #{$order->id} - {$order->account}",
         ]);
 
@@ -150,7 +159,7 @@ class OrderController extends Controller
 
     public function updateClearance(Request $request, Order $order): RedirectResponse
     {
-        if (!auth()->user()->isAdmin() && !auth()->user()->isAccounting()) {
+        if (!Auth::user()->canClearOrders()) {
             abort(403);
         }
 
@@ -161,8 +170,8 @@ class OrderController extends Controller
         $order->update(['clearing_status' => $validated['clearing_status']]);
 
         AuditLog::create([
-            'admin_id' => auth()->id(),
-            'action' => 'updated',
+            'admin_id' => Auth::id(),
+            'action' => 'UPDATED',
             'description' => "Updated clearance status for order #{$order->id} ({$order->account}) to {$validated['clearing_status']}",
         ]);
 
@@ -175,7 +184,7 @@ class OrderController extends Controller
      */
     public function bulkUpdateClearance(Request $request): RedirectResponse
     {
-        if (!auth()->user()->isAdmin() && !auth()->user()->isAccounting()) {
+        if (!Auth::user()->canClearOrders()) {
             abort(403);
         }
 
@@ -193,8 +202,8 @@ class OrderController extends Controller
         }
 
         AuditLog::create([
-            'admin_id' => auth()->id(),
-            'action' => 'updated',
+            'admin_id' => Auth::id(),
+            'action' => 'UPDATED',
             'description' => "Bulk updated clearance status to {$validated['clearing_status']} for {$count} order(s): #" . implode(', #', $validated['order_ids']),
         ]);
 

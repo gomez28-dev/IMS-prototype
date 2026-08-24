@@ -14,16 +14,19 @@
         <a href="{{ route('wetstock.reports.index') }}" class="btn btn-outline-primary btn-sm">
             <i class="bi bi-file-earmark-bar-graph me-1"></i> View Wet Stock Report
         </a>
+        <a href="{{ route('wetstock.transfers.index') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left-right me-1"></i> Stock Transfers
+        </a>
         <a href="{{ route('wetstock.supplier-orders.index') }}" class="btn btn-outline-secondary btn-sm">
-            <i class="bi bi-box-arrow-in-down me-1"></i> Incoming Supplier Stock
+            <i class="bi bi-box-arrow-in-down me-1"></i> Incoming Stock
         </a>
         <a href="{{ route('wetstock.deliveries.index') }}" class="btn btn-outline-warning btn-sm position-relative">
-            <i class="bi bi-truck me-1"></i> Unassigned Deliveries
+            <i class="bi bi-truck me-1"></i> Assign Deliveries
             @if (!empty($unassignedCount) && $unassignedCount > 0)
                 <span class="badge bg-warning text-dark rounded-pill ms-1">{{ $unassignedCount }}</span>
             @endif
         </a>
-        @if (Auth::user()->isAdmin() || Auth::user()->isEditor() || Auth::user()->isWarehouse())
+        @if (Auth::user()->canEditModule2())
             <a href="{{ route('wetstock.stock-in.create') }}" class="btn btn-primary-custom btn-sm">
                 <i class="bi bi-plus-circle me-1"></i> Log Stock IN
             </a>
@@ -37,7 +40,7 @@
     </div>
 @else
     @foreach ($warehouses as $warehouse)
-        <div class="card card-custom p-4 mb-5 border-0">
+        <div class="card card-custom p-4 mb-5 border-0 shadow-sm">
             <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
                 <div class="d-flex align-items-center">
                     <h4 class="fw-bold text-dark mb-0 me-3">
@@ -54,27 +57,21 @@
                 </div>
             </div>
 
-            <!-- Warehouse Level Summary -->
+            <!-- Warehouse Level Summary (3-Column Layout without Total Out) -->
             <div class="row g-3 mb-4">
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <div class="p-3 rounded-3" style="background-color: #f0fdf4; border: 1px solid #bbf7d0;">
                         <span class="text-uppercase text-muted fw-bold" style="font-size: 0.7rem; letter-spacing: 0.05em;">Total Stock Available</span>
                         <h4 class="fw-bold text-success mb-0 mt-1">{{ number_format($warehouse->total_stock_available) }} <small class="fs-6 text-muted">L</small></h4>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <div class="p-3 rounded-3" style="background-color: #fefce8; border: 1px solid #fef08a;">
-                        <span class="text-uppercase text-muted fw-bold" style="font-size: 0.7rem; letter-spacing: 0.05em;">Total Stock for Delivery</span>
+                        <span class="text-uppercase text-muted fw-bold" style="font-size: 0.7rem; letter-spacing: 0.05em;">Total Stock for Delivery (Hold)</span>
                         <h4 class="fw-bold text-warning mb-0 mt-1" style="color: #a16207 !important;">{{ number_format($warehouse->total_stock_for_delivery) }} <small class="fs-6 text-muted">L</small></h4>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="p-3 rounded-3" style="background-color: #eff6ff; border: 1px solid #bfdbfe;">
-                        <span class="text-uppercase text-muted fw-bold" style="font-size: 0.7rem; letter-spacing: 0.05em;">Total Out (Fulfilled)</span>
-                        <h4 class="fw-bold text-primary mb-0 mt-1">{{ number_format($warehouse->total_out) }} <small class="fs-6 text-muted">L</small></h4>
-                    </div>
-                </div>
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <div class="p-3 rounded-3" style="background-color: #f8fafc; border: 1px solid #e2e8f0;">
                         <span class="text-uppercase text-muted fw-bold" style="font-size: 0.7rem; letter-spacing: 0.05em;">Total Capacity</span>
                         <h4 class="fw-bold text-dark mb-0 mt-1">{{ number_format($warehouse->total_capacity) }} <small class="fs-6 text-muted">L</small></h4>
@@ -122,30 +119,25 @@
                                         </div>
                                     </div>
 
+                                    <!-- 2-Card Stock Metrics without Total Out -->
                                     <div class="row g-2 text-center my-2">
-                                        <div class="col-4">
+                                        <div class="col-6">
                                             <div class="p-2 rounded bg-light border">
-                                                <div class="text-muted" style="font-size: 0.65rem;">AVAILABLE</div>
-                                                <div class="fw-bold text-success small">{{ number_format($tank->stock_available) }}</div>
+                                                <div class="text-muted" style="font-size: 0.65rem;">AVAILABLE STOCK</div>
+                                                <div class="fw-bold text-success small">{{ number_format($tank->stock_available) }} L</div>
                                             </div>
                                         </div>
-                                        <div class="col-4">
+                                        <div class="col-6">
                                             <div class="p-2 rounded bg-light border">
-                                                <div class="text-muted" style="font-size: 0.65rem;">FOR DELIVERY</div>
-                                                <div class="fw-bold text-warning small" style="color: #a16207 !important;">{{ number_format($tank->stock_for_delivery) }}</div>
-                                            </div>
-                                        </div>
-                                        <div class="col-4">
-                                            <div class="p-2 rounded bg-light border">
-                                                <div class="text-muted" style="font-size: 0.65rem;">OUT</div>
-                                                <div class="fw-bold text-primary small">{{ number_format($tank->stock_out) }}</div>
+                                                <div class="text-muted" style="font-size: 0.65rem;">FOR DELIVERY (HOLD)</div>
+                                                <div class="fw-bold text-warning small" style="color: #a16207 !important;">{{ number_format($tank->stock_for_delivery) }} L</div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="card-footer bg-light border-top-0 d-flex justify-content-between align-items-center py-2">
                                     <span class="text-muted" style="font-size: 0.75rem;">Sellable: {{ number_format($tank->sellable_available) }}L</span>
-                                    @if (Auth::user()->isAdmin() || Auth::user()->isEditor() || Auth::user()->isWarehouse())
+                                    @if (Auth::user()->canEditModule2())
                                         <a href="{{ route('wetstock.stock-in.create', ['tank_id' => $tank->id]) }}" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size: 0.75rem;">
                                             + Stock IN
                                         </a>

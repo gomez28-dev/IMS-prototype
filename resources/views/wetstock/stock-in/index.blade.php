@@ -12,7 +12,7 @@
                 </h3>
                 <p class="text-muted small mb-0">Audit log of all fuel added to storage tanks — corrections are recorded</p>
             </div>
-            @if (Auth::user()->isAdmin() || Auth::user()->isEditor() || Auth::user()->isWarehouse())
+            @if (Auth::user()->canEditModule2())
                 <div>
                     <a href="{{ route('wetstock.stock-in.create') }}" class="btn btn-primary-custom btn-sm">
                         <i class="bi bi-plus-circle me-1"></i> Log Stock IN
@@ -21,13 +21,13 @@
             @endif
         </div>
 
-        <div class="card card-custom p-4 border-0">
+        <div class="card card-custom p-4 border-0 shadow-sm">
             <div class="card-body">
                 @if ($stockIns->isEmpty())
                     <div class="text-center py-5">
                         <i class="bi bi-journal-x display-4 text-muted mb-3 d-block"></i>
                         <p class="text-muted mb-3">No Stock IN entries logged yet.</p>
-                        @if (Auth::user()->isAdmin() || Auth::user()->isEditor() || Auth::user()->isWarehouse())
+                        @if (Auth::user()->canEditModule2())
                             <a href="{{ route('wetstock.stock-in.create') }}" class="btn btn-primary-custom btn-sm">
                                 <i class="bi bi-plus-circle me-1"></i> Log First Stock IN
                             </a>
@@ -44,7 +44,7 @@
                                     <th>Quantity Added</th>
                                     <th>Logged By</th>
                                     <th>Logged Timestamp</th>
-                                    @if (Auth::user()->isAdmin() || Auth::user()->isEditor() || Auth::user()->isWarehouse())
+                                    @if (Auth::user()->canEditModule2())
                                         <th class="text-end">Action</th>
                                     @endif
                                 </tr>
@@ -72,7 +72,7 @@
                                         <td class="text-muted small">
                                             {{ $stockIn->created_at ? $stockIn->created_at->format('Y-m-d H:i') : '-' }}
                                         </td>
-                                        @if (Auth::user()->isAdmin() || Auth::user()->isEditor() || Auth::user()->isWarehouse())
+                                        @if (Auth::user()->canEditModule2())
                                             <td class="text-end">
                                                 <a href="{{ route('wetstock.stock-in.edit', $stockIn->id) }}" class="btn btn-sm btn-outline-primary" title="Correct quantity">
                                                     <i class="bi bi-pencil"></i>

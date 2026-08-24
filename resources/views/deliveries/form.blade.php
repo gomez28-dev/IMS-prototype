@@ -10,7 +10,7 @@
                 <i class="bi bi-arrow-left me-1"></i> Back to Order Deliveries
             </a>
         </div>
-        <div class="card card-custom p-4 border-0">
+        <div class="card card-custom p-4 border-0 shadow-sm">
             <div class="card-body">
                 <div class="mb-3 d-flex flex-wrap align-items-center gap-2">
                     @if ($order && $order->status === 'Cancelled')
@@ -53,33 +53,48 @@
 
                     <div class="row mb-3">
                         <div class="col-md-6">
-                            <label for="qty_out" class="form-label fw-medium text-secondary small">Qty Out</label>
-                            <input type="number" name="qty_out" id="qty_out" class="form-control @error('qty_out') is-invalid @enderror" placeholder="e.g. 50" value="{{ old('qty_out', $delivery ? $delivery->qty_out : '') }}" min="0" max="{{ $available }}" required>
+                            <label for="qty_out" class="form-label fw-medium text-secondary small">Qty Out (Liters)</label>
+                            <input type="number" name="qty_out" id="qty_out" class="form-control font-monospace @error('qty_out') is-invalid @enderror" placeholder="e.g. 50" value="{{ old('qty_out', $delivery ? $delivery->qty_out : '') }}" min="0" max="{{ $available }}" required>
                             @error('qty_out')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
                         <div class="col-md-6">
                             <label for="status" class="form-label fw-medium text-secondary small">Status</label>
-                            <select name="status" id="status" class="form-control form-select @error('status') is-invalid @enderror" required>
-                                <option value="PENDING" {{ old('status', $delivery ? $delivery->status : '') === 'PENDING' ? 'selected' : '' }}>PENDING</option>
-                                <option value="FULFILLED" {{ old('status', $delivery ? $delivery->status : '') === 'FULFILLED' ? 'selected' : '' }}>FULFILLED</option>
-                                <option value="CANCELLED" {{ old('status', $delivery ? $delivery->status : '') === 'CANCELLED' ? 'selected' : '' }}>CANCELLED</option>
-                            </select>
-                            @error('status')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
+                            @if ($delivery && $delivery->status === 'FULFILLED' && !Auth::user()->canMarkFulfilled())
+                                <div class="p-2 border rounded bg-light">
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1">FULFILLED</span>
+                                    <input type="hidden" name="status" value="FULFILLED">
+                                    <small class="text-muted d-block mt-1">Managed by Operations</small>
+                                </div>
+                            @else
+                                <select name="status" id="status" class="form-control form-select @error('status') is-invalid @enderror" required>
+                                    <option value="PENDING" {{ old('status', $delivery ? $delivery->status : '') === 'PENDING' ? 'selected' : '' }}>PENDING</option>
+                                    @if (Auth::user()->canMarkFulfilled())
+                                        <option value="FULFILLED" {{ old('status', $delivery ? $delivery->status : '') === 'FULFILLED' ? 'selected' : '' }}>FULFILLED</option>
+                                    @endif
+                                    <option value="CANCELLED" {{ old('status', $delivery ? $delivery->status : '') === 'CANCELLED' ? 'selected' : '' }}>CANCELLED</option>
+                                </select>
+                                @error('status')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                                @if (!Auth::user()->canMarkFulfilled())
+                                    <small class="text-muted d-block mt-1" style="font-size: 0.75rem;">
+                                        <i class="bi bi-info-circle me-1"></i>Delivery fulfillment is executed by Operations via Wet Stock.
+                                    </small>
+                                @endif
+                            @endif
                         </div>
                     </div>
 
                     <div class="alert alert-warning d-none" id="cancel-warning" role="alert">
                         <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                        <strong>Warning:</strong> Cancelling this DR will reduce the SO's remaining ordered quantity and may close the order. Reassigning it to PENDING/FULFILLED later will restore the original quantity.
+                        <strong>Warning:</strong> Cancelling this DR will reduce the SO's remaining ordered quantity and may close the order. Reassigning it to PENDING later will restore the original quantity.
                     </div>
 
                     <div class="row mb-3">
                         <div class="col-md-6">
-                            <label for="type" class="form-label fw-medium text-secondary small">Type</label>
+                            <label for="type" class="form-label fw-medium text-secondary small">Delivery Type</label>
                             <select name="type" id="type" class="form-control form-select @error('type') is-invalid @enderror" required>
                                 <option value="BIG TANKER" {{ old('type', $delivery ? $delivery->type : 'BIG TANKER') === 'BIG TANKER' || (isset($delivery) && $delivery->type === 'DELIVERY') ? 'selected' : '' }}>BIG TANKER</option>
                                 <option value="SMALL TANKER" {{ old('type', $delivery ? $delivery->type : '') === 'SMALL TANKER' ? 'selected' : '' }}>SMALL TANKER</option>
@@ -90,7 +105,7 @@
                             @enderror
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-medium text-secondary small d-block">Order Status</label>
+                            <label class="form-label fw-medium text-secondary small d-block">Parent Order Status</label>
                             @if ($order && $order->status === 'Cancelled')
                                 <span class="badge bg-danger-subtle text-danger border fw-semibold">
                                     <i class="bi bi-x-circle me-1"></i>{{ $order->status }}
@@ -140,7 +155,7 @@
 
         if (form) {
             form.addEventListener('submit', function(e) {
-                if (statusSelect.value === 'CANCELLED') {
+                if (statusSelect && statusSelect.value === 'CANCELLED') {
                     var msg = 'Warning: Cancelling this DR will reduce the SO\'s remaining ordered quantity and may close the order. Continue?';
                     if (!confirm(msg)) {
                         e.preventDefault();

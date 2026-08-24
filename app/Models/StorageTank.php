@@ -56,6 +56,16 @@ class StorageTank extends Model
         return $this->hasMany(DeliveryAllocation::class, 'storage_tank_id');
     }
 
+    public function transfersOut(): HasMany
+    {
+        return $this->hasMany(StockTransfer::class, 'source_tank_id');
+    }
+
+    public function transfersIn(): HasMany
+    {
+        return $this->hasMany(StockTransfer::class, 'destination_tank_id');
+    }
+
     public function isDepot(): bool
     {
         return $this->category === 'depot';
@@ -67,11 +77,27 @@ class StorageTank extends Model
     }
 
     /**
-     * Total stock added into this tank.
+     * Total stock added into this tank via direct Stock IN.
      */
     public function getTotalStockInAttribute(): int
     {
         return (int) $this->stockIns()->sum('quantity');
+    }
+
+    /**
+     * Total volume transferred out of this tank to other tanks/tankers.
+     */
+    public function getTotalTransfersOutAttribute(): int
+    {
+        return (int) $this->transfersOut()->sum('quantity');
+    }
+
+    /**
+     * Total volume transferred into this tank from other tanks/tankers.
+     */
+    public function getTotalTransfersInAttribute(): int
+    {
+        return (int) $this->transfersIn()->sum('quantity');
     }
 
     /**
@@ -95,11 +121,13 @@ class StorageTank extends Model
     }
 
     /**
-     * Stock currently physically in tank (never below 0).
+     * Stock currently physically in tank (accounting for Stock IN, Transfers In, Fulfilled Stock Out, Transfers Out).
      */
     public function getStockAvailableAttribute(): int
     {
-        return max(0, $this->total_stock_in - $this->stock_out);
+        $totalIn = $this->total_stock_in + $this->total_transfers_in;
+        $totalOut = $this->stock_out + $this->total_transfers_out;
+        return max(0, $totalIn - $totalOut);
     }
 
     /**
@@ -120,7 +148,7 @@ class StorageTank extends Model
     }
 
     /**
-     * Remaining capacity for Stock IN.
+     * Remaining capacity for Stock IN or Transfers In.
      */
     public function getRemainingCapacityAttribute(): int
     {

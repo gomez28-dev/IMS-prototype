@@ -12,11 +12,11 @@ class AuditLogController extends Controller
         $admin = auth()->user();
 
         $logs = AuditLog::with('admin')
-            ->when($admin->isEditor(), function ($query) use ($admin) {
+            ->when($admin->isSales(), function ($query) use ($admin) {
                 $query->where('admin_id', $admin->id);
             })
             ->orderBy('created_at', 'desc')
-            ->paginate(10);
+            ->paginate(15);
 
         return view('audit_logs.index', compact('logs'));
     }

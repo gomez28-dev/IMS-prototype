@@ -18,7 +18,7 @@ class StorageTankController extends Controller
      */
     public function create(Warehouse $warehouse): View
     {
-        if (Auth::user()->isViewer() || Auth::user()->isAccounting()) {
+        if (!Auth::user()->canEditModule2()) {
             abort(403);
         }
 
@@ -34,7 +34,7 @@ class StorageTankController extends Controller
      */
     public function store(Request $request, Warehouse $warehouse): RedirectResponse
     {
-        if (Auth::user()->isViewer() || Auth::user()->isAccounting()) {
+        if (!Auth::user()->canEditModule2()) {
             abort(403);
         }
 
@@ -68,7 +68,7 @@ class StorageTankController extends Controller
      */
     public function edit(StorageTank $tank): View
     {
-        if (Auth::user()->isViewer() || Auth::user()->isAccounting()) {
+        if (!Auth::user()->canEditModule2()) {
             abort(403);
         }
 
@@ -84,7 +84,7 @@ class StorageTankController extends Controller
      */
     public function update(Request $request, StorageTank $tank): RedirectResponse
     {
-        if (Auth::user()->isViewer() || Auth::user()->isAccounting()) {
+        if (!Auth::user()->canEditModule2()) {
             abort(403);
         }
 
@@ -117,7 +117,7 @@ class StorageTankController extends Controller
      */
     public function toggleActive(StorageTank $tank): RedirectResponse
     {
-        if (Auth::user()->isViewer() || Auth::user()->isAccounting()) {
+        if (!Auth::user()->canEditModule2()) {
             abort(403);
         }
 
@@ -139,7 +139,7 @@ class StorageTankController extends Controller
      */
     public function toggleContamination(Request $request, StorageTank $tank): RedirectResponse
     {
-        if (Auth::user()->isViewer() || Auth::user()->isAccounting()) {
+        if (!Auth::user()->canEditModule2()) {
             abort(403);
         }
 

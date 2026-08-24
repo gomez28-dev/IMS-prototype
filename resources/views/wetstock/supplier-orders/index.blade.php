@@ -8,7 +8,7 @@
         <h2 class="fw-bold text-dark mb-1">Incoming Supplier Stock</h2>
         <p class="text-muted small mb-0">Track purchase orders from fuel suppliers (Unlifted Pickups & Pending Depot Deliveries).</p>
     </div>
-    @if (!Auth::user()->isViewer() && !Auth::user()->isAccounting())
+    @if (Auth::user()->canEditModule2())
     <div>
         <a href="{{ route('wetstock.supplier-orders.create') }}" class="btn btn-primary-custom shadow-sm d-flex align-items-center">
             <i class="bi bi-plus-circle me-2"></i> Add Incoming Supplier Stock
@@ -85,7 +85,7 @@
                             <td class="small text-muted">{{ $po->remarks ?: '—' }}</td>
                             <td class="small text-muted">{{ $po->creator->name ?? 'System' }}</td>
                             <td class="text-end">
-                                @if (!Auth::user()->isViewer() && !Auth::user()->isAccounting())
+                                @if (Auth::user()->canEditModule2())
                                     @if ($po->status !== 'COMPLETED')
                                         <form action="{{ route('wetstock.supplier-orders.complete', $po->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Mark PO #{{ $po->po_number }} as COMPLETED / Received?')">
                                             @csrf

@@ -37,7 +37,8 @@ Route::middleware('auth')->group(function () {
     // Audit Log — accessible to all authenticated users (view-only)
     Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('audit-logs');
 
-    Route::middleware('role:admin,editor')->group(function () {
+    // Module 1 (Sales Inventory) Management Routes
+    Route::middleware('role:admin,sales,hod,vp')->group(function () {
         Route::get('/order/new', [OrderController::class, 'create'])->name('order.create');
         Route::post('/order/new', [OrderController::class, 'store'])->name('order.store');
         Route::get('/order/{order}/edit', [OrderController::class, 'edit'])->name('order.edit');
@@ -58,6 +59,7 @@ Route::middleware('auth')->group(function () {
         });
     });
 
+    // Admin-Only Routes
     Route::middleware('role:admin')->group(function () {
         Route::post('/order/{order}/delete', [OrderController::class, 'destroy'])->name('order.delete');
         Route::post('/delivery/{delivery}/delete', [DeliveryController::class, 'destroy'])->name('delivery.delete');
@@ -72,6 +74,7 @@ Route::middleware('auth')->group(function () {
         });
     });
 
+    // Accounting Clearance Routes
     Route::middleware('role:admin,accounting')->group(function () {
         Route::post('/order/{order}/clearance', [OrderController::class, 'updateClearance'])->name('order.clearance');
         Route::post('/orders/bulk-clearance', [OrderController::class, 'bulkUpdateClearance'])->name('orders.bulk-clearance');
@@ -83,7 +86,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/warehouses/{warehouse}', [WetStock\WarehouseController::class, 'show'])->name('warehouses.show');
 
         // Tank CRUD & Contamination
-        Route::middleware('role:admin,editor,warehouse')->group(function () {
+        Route::middleware('role:admin,ops_admin,ops_mgr,ops_wh,ops_log,hod,vp')->group(function () {
             Route::get('/warehouses/{warehouse}/tanks/create', [WetStock\StorageTankController::class, 'create'])->name('tanks.create');
             Route::post('/warehouses/{warehouse}/tanks', [WetStock\StorageTankController::class, 'store'])->name('tanks.store');
             Route::get('/tanks/{tank}/edit', [WetStock\StorageTankController::class, 'edit'])->name('tanks.edit');
@@ -94,29 +97,46 @@ Route::middleware('auth')->group(function () {
 
         // Stock IN
         Route::get('/stock-in', [WetStock\StockInController::class, 'index'])->name('stock-in.index');
-        Route::middleware('role:admin,editor,warehouse')->group(function () {
+        Route::middleware('role:admin,ops_admin,ops_mgr,ops_wh,ops_log,hod,vp')->group(function () {
             Route::get('/stock-in/create', [WetStock\StockInController::class, 'create'])->name('stock-in.create');
             Route::post('/stock-in', [WetStock\StockInController::class, 'store'])->name('stock-in.store');
             Route::get('/stock-in/{stockIn}/edit', [WetStock\StockInController::class, 'edit'])->name('stock-in.edit');
             Route::post('/stock-in/{stockIn}/edit', [WetStock\StockInController::class, 'update'])->name('stock-in.update');
         });
 
-        // Delivery Assignment
+        // Stock Transfers (Depot <-> Tanker)
+        Route::get('/transfers', [WetStock\StockTransferController::class, 'index'])->name('transfers.index');
+        Route::middleware('role:admin,ops_admin,ops_mgr,ops_wh,ops_log,hod,vp')->group(function () {
+            Route::get('/transfers/create', [WetStock\StockTransferController::class, 'create'])->name('transfers.create');
+            Route::post('/transfers', [WetStock\StockTransferController::class, 'store'])->name('transfers.store');
+        });
+
+        // Delivery Assignment & Fulfillment
         Route::get('/deliveries', [WetStock\DeliveryAssignmentController::class, 'index'])->name('deliveries.index');
         Route::get('/deliveries/unassigned', function () {
             return redirect()->route('wetstock.deliveries.index', ['tab' => 'unassigned']);
         })->name('deliveries.unassigned');
+        Route::get('/deliveries/assigned', function () {
+            return redirect()->route('wetstock.deliveries.index', ['tab' => 'assigned']);
+        })->name('deliveries.assigned');
         Route::get('/deliveries/assignment-history', function () {
             return redirect()->route('wetstock.deliveries.index', ['tab' => 'history']);
         })->name('deliveries.assignment-history');
-        Route::middleware('role:admin,editor,warehouse')->group(function () {
+
+        Route::middleware('role:admin,ops_admin,ops_mgr,ops_wh,ops_log,hod,vp')->group(function () {
             Route::post('/deliveries/{delivery}/allocate', [WetStock\DeliveryAssignmentController::class, 'allocate'])->name('deliveries.allocate');
             Route::post('/deliveries/allocations/{allocation}/unassign', [WetStock\DeliveryAssignmentController::class, 'unassign'])->name('deliveries.unassign');
         });
 
+        // Fulfillment Actions (Restricted to canMarkFulfilled roles)
+        Route::middleware('role:admin,ops_admin,ops_mgr')->group(function () {
+            Route::post('/deliveries/{delivery}/fulfill', [WetStock\DeliveryAssignmentController::class, 'markFulfilled'])->name('deliveries.fulfill');
+            Route::post('/deliveries/{delivery}/revert-fulfillment', [WetStock\DeliveryAssignmentController::class, 'revertFulfillment'])->name('deliveries.revert-fulfillment');
+        });
+
         // Incoming Supplier Stock
         Route::get('/supplier-orders', [WetStock\SupplierOrderController::class, 'index'])->name('supplier-orders.index');
-        Route::middleware('role:admin,editor,warehouse')->group(function () {
+        Route::middleware('role:admin,ops_admin,ops_mgr,ops_wh,ops_log,hod,vp')->group(function () {
             Route::get('/supplier-orders/create', [WetStock\SupplierOrderController::class, 'create'])->name('supplier-orders.create');
             Route::post('/supplier-orders', [WetStock\SupplierOrderController::class, 'store'])->name('supplier-orders.store');
             Route::get('/supplier-orders/{supplierOrder}/edit', [WetStock\SupplierOrderController::class, 'edit'])->name('supplier-orders.edit');
@@ -129,7 +149,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/reports/export/live', [WetStock\ReportController::class, 'exportLive'])->name('reports.export-live');
         Route::get('/reports/snapshot/{snapshot}', [WetStock\ReportController::class, 'showSnapshot'])->name('reports.show-snapshot');
         Route::get('/reports/export/snapshot/{snapshot}', [WetStock\ReportController::class, 'exportSnapshot'])->name('reports.export-snapshot');
-        Route::middleware('role:admin,editor,warehouse')->group(function () {
+        Route::middleware('role:admin,ops_admin,ops_mgr,ops_wh,ops_log,hod,vp')->group(function () {
             Route::post('/reports/snapshot', [WetStock\ReportController::class, 'storeSnapshot'])->name('reports.snapshot');
         });
     });

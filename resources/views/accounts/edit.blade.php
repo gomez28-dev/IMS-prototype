@@ -45,11 +45,25 @@
                     <div class="mb-4">
                         <label for="role" class="form-label fw-medium text-secondary small">Role</label>
                         <select name="role" id="role" class="form-control form-select @error('role') is-invalid @enderror" required>
-                            <option value="admin" {{ old('role', $admin->role) === 'admin' ? 'selected' : '' }}>Admin</option>
-                            <option value="editor" {{ old('role', $admin->role) === 'editor' ? 'selected' : '' }}>Editor</option>
-                            <option value="viewer" {{ old('role', $admin->role) === 'viewer' ? 'selected' : '' }}>Viewer</option>
-                            <option value="accounting" {{ old('role', $admin->role) === 'accounting' ? 'selected' : '' }}>Accounting</option>
-                            <option value="warehouse" {{ old('role', $admin->role) === 'warehouse' ? 'selected' : '' }}>Warehouse</option>
+                            <optgroup label="System Administration">
+                                <option value="admin" {{ old('role', $admin->role) === 'admin' ? 'selected' : '' }}>Portal Administrator (Full Access)</option>
+                            </optgroup>
+                            <optgroup label="Executive & Auditing">
+                                <option value="vp" {{ old('role', $admin->role) === 'vp' ? 'selected' : '' }}>Vice President (Editor M1 & M2)</option>
+                                <option value="hod" {{ old('role', $admin->role) === 'hod' ? 'selected' : '' }}>Head of Department (Editor M1 & M2)</option>
+                                <option value="viewer" {{ old('role', $admin->role) === 'viewer' ? 'selected' : '' }}>President (Global Read-Only)</option>
+                                <option value="audit" {{ old('role', $admin->role) === 'audit' ? 'selected' : '' }}>Auditor (Global Read-Only / Reports)</option>
+                            </optgroup>
+                            <optgroup label="Sales & Finance">
+                                <option value="sales" {{ old('role', $admin->role) === 'sales' ? 'selected' : '' }}>Sales Executive (Module 1 Orders & Deliveries)</option>
+                                <option value="accounting" {{ old('role', $admin->role) === 'accounting' ? 'selected' : '' }}>Accounting (Clearance & Audits)</option>
+                            </optgroup>
+                            <optgroup label="Operations & Wet Stock">
+                                <option value="ops_admin" {{ old('role', $admin->role) === 'ops_admin' ? 'selected' : '' }}>Operations Admin (Module 2 + Delivery Fulfillment)</option>
+                                <option value="ops_mgr" {{ old('role', $admin->role) === 'ops_mgr' ? 'selected' : '' }}>Operations Manager (Module 2 + Delivery Fulfillment)</option>
+                                <option value="ops_wh" {{ old('role', $admin->role) === 'ops_wh' ? 'selected' : '' }}>Operations Warehouse (Stock IN, Allocations, Transfers)</option>
+                                <option value="ops_log" {{ old('role', $admin->role) === 'ops_log' ? 'selected' : '' }}>Operations Logistics (Operations & Tracking)</option>
+                            </optgroup>
                         </select>
                         @error('role')
                             <div class="invalid-feedback">{{ $message }}</div>

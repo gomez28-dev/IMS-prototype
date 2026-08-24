@@ -10,57 +10,71 @@ use App\Models\StorageTank;
 use App\Models\Warehouse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class DeliveryAssignmentController extends Controller
 {
     /**
-     * Display delivery assignments — Unassigned & History in a single tabbed page.
+     * Display delivery assignments — 3 tabs: Unassigned, Assigned (Pending Fulfillment), and History (Fulfilled).
      */
     public function index(Request $request): View
     {
-        $unassignedDeliveries = Delivery::with(['order', 'allocations.tank.warehouse'])
+        $activeTab = $request->get('tab', 'unassigned');
+
+        // 1. Unassigned: Deliveries needing tank allocation
+        $unassignedQuery = Delivery::with(['order', 'allocations.tank.warehouse'])
             ->where('status', '!=', 'CANCELLED')
             ->whereHas('order', fn($q) => $q->where('status', '!=', 'Cancelled'))
             ->where(function ($q) {
                 $q->whereDoesntHave('allocations')
                     ->orWhereRaw('(SELECT COALESCE(SUM(quantity), 0) FROM delivery_allocations WHERE delivery_id = deliveries.id) < qty_out');
             })
-            ->orderBy('delivery_date', 'desc')
-            ->paginate(15);
+            ->orderBy('delivery_date', 'desc');
 
-        $assignments = DeliveryAllocation::with(['delivery.order', 'tank.warehouse', 'assignedBy'])
-            ->orderBy('created_at', 'desc')
-            ->paginate(20);
+        $unassignedCount = (clone $unassignedQuery)->count();
+        $unassignedDeliveries = $unassignedQuery->paginate(15, ['*'], 'unassigned_page');
 
-        $warehouses = Warehouse::with(['tanks' => function ($q) {
-            $q->where('is_active', true)->orderBy('name', 'asc');
-        }])->orderBy('name', 'asc')->get();
+        // 2. Assigned: Fully or partially allocated deliveries still in PENDING status (awaiting fulfillment)
+        $assignedQuery = Delivery::with(['order', 'allocations.tank.warehouse', 'allocations.assignedBy'])
+            ->where('status', 'PENDING')
+            ->whereHas('allocations')
+            ->whereRaw('(SELECT COALESCE(SUM(quantity), 0) FROM delivery_allocations WHERE delivery_id = deliveries.id) >= qty_out')
+            ->orderBy('delivery_date', 'desc');
 
-        $unassignedCount = Delivery::where('status', '!=', 'CANCELLED')
-            ->whereHas('order', fn($q) => $q->where('status', '!=', 'Cancelled'))
-            ->where(function ($q) {
-                $q->whereDoesntHave('allocations')
-                    ->orWhereRaw('(SELECT COALESCE(SUM(quantity), 0) FROM delivery_allocations WHERE delivery_id = deliveries.id) < qty_out');
-            })
-            ->count();
+        $assignedCount = (clone $assignedQuery)->count();
+        $assignedDeliveries = $assignedQuery->paginate(15, ['*'], 'assigned_page');
+
+        // 3. History: Deliveries marked FULFILLED with their tank allocation audit trail
+        $historyQuery = Delivery::with(['order', 'allocations.tank.warehouse', 'allocations.assignedBy'])
+            ->where('status', 'FULFILLED')
+            ->orderBy('updated_at', 'desc');
+
+        $historyCount = (clone $historyQuery)->count();
+        $historyDeliveries = $historyQuery->paginate(20, ['*'], 'history_page');
+
+        $warehouses = Warehouse::with(['activeTanks'])->orderBy('name', 'asc')->get();
 
         return view('wetstock.deliveries.index', [
-            'deliveries' => $unassignedDeliveries,
-            'assignments' => $assignments,
-            'warehouses' => $warehouses,
+            'unassignedDeliveries' => $unassignedDeliveries,
+            'assignedDeliveries' => $assignedDeliveries,
+            'historyDeliveries' => $historyDeliveries,
             'unassignedCount' => $unassignedCount,
-            'activeTab' => $request->get('tab', 'unassigned'),
+            'assignedCount' => $assignedCount,
+            'historyCount' => $historyCount,
+            'warehouses' => $warehouses,
+            'activeTab' => $activeTab,
         ]);
     }
 
     /**
-     * Allocate a partial quantity of a delivery to a storage tank.
-     * The delivery becomes FULFILLED once the sum of allocations equals its qty_out.
+     * Allocate a partial or full quantity of a delivery to a storage tank.
+     * The delivery remains PENDING with volume placed on hold (stock_for_delivery).
      */
     public function allocate(Request $request, Delivery $delivery): RedirectResponse
     {
-        if (auth()->user()->isViewer() || auth()->user()->isAccounting()) {
+        if (!Auth::user()->canEditModule2()) {
             abort(403);
         }
 
@@ -95,57 +109,111 @@ class DeliveryAssignmentController extends Controller
 
         $preAllocated = (int) $delivery->allocations->sum('quantity');
         $newAllocated = $preAllocated + $quantity;
-        $isFulfilled = $newAllocated >= (int) $delivery->qty_out;
+        $isFullyAllocated = $newAllocated >= (int) $delivery->qty_out;
 
         DeliveryAllocation::create([
             'delivery_id' => $delivery->id,
             'storage_tank_id' => $tank->id,
             'quantity' => $quantity,
-            'assigned_by' => auth()->id(),
+            'assigned_by' => Auth::id(),
         ]);
-
-        if ($isFulfilled) {
-            $delivery->update(['status' => 'FULFILLED']);
-        }
 
         AuditLog::create([
-            'admin_id' => auth()->id(),
-            'action' => 'updated',
+            'admin_id' => Auth::id(),
+            'action' => 'UPDATED',
             'description' => "Allocated {$quantity}L of DR #{$delivery->dr_number} ({$delivery->qty_out}L) to tank {$tank->name} ({$tank->warehouse->name})"
-                . ($isFulfilled ? ' — DR fully allocated and marked FULFILLED.' : ''),
+                . ($isFullyAllocated ? ' — DR is now fully allocated and ready for fulfillment in the Assigned tab.' : ''),
         ]);
 
-        $message = $isFulfilled
-            ? "DR #{$delivery->dr_number} fully allocated across tanks and marked FULFILLED."
-            : "Allocated {$quantity}L of DR #{$delivery->dr_number} to tank {$tank->name}. Remaining: " . number_format($delivery->qty_out - $newAllocated) . "L.";
+        $message = $isFullyAllocated
+            ? "DR #{$delivery->dr_number} fully allocated across tanks and moved to the Assigned tab."
+            : "Allocated {$quantity}L of DR #{$delivery->dr_number} to tank {$tank->name}. Remaining unallocated: " . number_format($delivery->qty_out - $newAllocated) . "L.";
 
-        return back()->with('success', $message);
+        return redirect()->route('wetstock.deliveries.index', ['tab' => $isFullyAllocated ? 'assigned' : 'unassigned'])
+            ->with('success', $message);
+    }
+
+    /**
+     * Mark an assigned delivery as FULFILLED (Transitions volume from stock_for_delivery to stock_out).
+     */
+    public function markFulfilled(Request $request, Delivery $delivery): RedirectResponse
+    {
+        if (!Auth::user()->canMarkFulfilled()) {
+            abort(403, 'Unauthorized: Only Portal Admin, Operations Admin, and Operations Manager can fulfill deliveries.');
+        }
+
+        if ($delivery->status === 'FULFILLED') {
+            return back()->with('warning', "DR #{$delivery->dr_number} is already marked as FULFILLED.");
+        }
+
+        if ($delivery->status === 'CANCELLED') {
+            return back()->with('danger', "Cannot fulfill a cancelled delivery.");
+        }
+
+        DB::transaction(function () use ($delivery) {
+            $delivery->update(['status' => 'FULFILLED']);
+
+            AuditLog::create([
+                'admin_id' => Auth::id(),
+                'action' => 'UPDATED',
+                'description' => "Marked DR #{$delivery->dr_number} ({$delivery->qty_out}L) as FULFILLED. Fuel dispatched from assigned tanks.",
+            ]);
+        });
+
+        return redirect()->route('wetstock.deliveries.index', ['tab' => 'history'])
+            ->with('success', "DR #{$delivery->dr_number} successfully marked as FULFILLED.");
+    }
+
+    /**
+     * Revert a FULFILLED delivery back to PENDING status for modifications.
+     */
+    public function revertFulfillment(Request $request, Delivery $delivery): RedirectResponse
+    {
+        if (!Auth::user()->canMarkFulfilled()) {
+            abort(403, 'Unauthorized: Only authorized Operations Managers and Admins can revert delivery fulfillment.');
+        }
+
+        if ($delivery->status !== 'FULFILLED') {
+            return back()->with('warning', "DR #{$delivery->dr_number} is not in FULFILLED status.");
+        }
+
+        DB::transaction(function () use ($delivery) {
+            $delivery->update(['status' => 'PENDING']);
+
+            AuditLog::create([
+                'admin_id' => Auth::id(),
+                'action' => 'UPDATED',
+                'description' => "Reverted fulfillment status of DR #{$delivery->dr_number} ({$delivery->qty_out}L) from FULFILLED back to PENDING.",
+            ]);
+        });
+
+        return redirect()->route('wetstock.deliveries.index', ['tab' => 'assigned'])
+            ->with('success', "DR #{$delivery->dr_number} reverted to PENDING status.");
     }
 
     /**
      * Remove a single tank allocation from a delivery.
-     * If no allocations remain, the delivery returns to the unassigned list.
      */
     public function unassign(DeliveryAllocation $allocation): RedirectResponse
     {
-        if (auth()->user()->isViewer() || auth()->user()->isAccounting()) {
+        if (!Auth::user()->canEditModule2()) {
             abort(403);
         }
 
         $delivery = $allocation->delivery;
+
+        if ($delivery->status === 'FULFILLED') {
+            return back()->with('danger', "Cannot modify allocations of a FULFILLED delivery. Please revert the delivery to PENDING first.");
+        }
+
         $tankName = $allocation->tank->name;
         $quantity = $allocation->quantity;
 
         $allocation->delete();
 
-        // A fully allocated (FULFILLED) delivery that loses an allocation reverts to PENDING.
-        if ($delivery->status === 'FULFILLED' && $delivery->remaining_to_allocate > 0) {
-            $delivery->update(['status' => 'PENDING']);
-        }
-
         AuditLog::create([
-            'admin_id' => auth()->id(),
-            'action' => 'updated',
+            'admin_id' => Auth::id(),
+            'action' => 'UPDATED',
             'description' => "Removed {$quantity}L allocation of DR #{$delivery->dr_number} ({$delivery->qty_out}L) from tank {$tankName}",
         ]);
 

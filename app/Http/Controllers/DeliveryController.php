@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\Delivery;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class DeliveryController extends Controller
@@ -39,9 +40,9 @@ class DeliveryController extends Controller
     /**
      * Show the form for creating a new delivery.
      */
-    public function create(Order $order): \Illuminate\View\View|\Illuminate\Http\RedirectResponse
+    public function create(Order $order): View|RedirectResponse
     {
-        if (auth()->user()->isViewer() || auth()->user()->isAccounting()) {
+        if (!Auth::user()->canEditModule1()) {
             abort(403);
         }
 
@@ -61,7 +62,7 @@ class DeliveryController extends Controller
      */
     public function store(Request $request, Order $order): RedirectResponse
     {
-        if (auth()->user()->isViewer() || auth()->user()->isAccounting()) {
+        if (!Auth::user()->canEditModule1()) {
             abort(403);
         }
 
@@ -69,11 +70,15 @@ class DeliveryController extends Controller
             return back()->with('warning', 'This order is awaiting Accounting clearance before delivery can be created.');
         }
 
+        $allowedStatuses = Auth::user()->canMarkFulfilled()
+            ? 'PENDING,FULFILLED,CANCELLED'
+            : 'PENDING,CANCELLED';
+
         $validated = $request->validate([
             'dr_number' => ['required', 'string', 'max:64', 'unique:deliveries,dr_number'],
             'delivery_date' => ['required', 'date'],
             'qty_out' => ['required', 'integer', 'min:0'],
-            'status' => ['required', 'string', 'in:PENDING,FULFILLED,CANCELLED'],
+            'status' => ['required', 'string', "in:{$allowedStatuses}"],
             'type' => ['required', 'string', 'in:PICK-UP,BIG TANKER,SMALL TANKER,DELIVERY'],
             'remarks' => ['nullable', 'string'],
         ]);
@@ -95,9 +100,9 @@ class DeliveryController extends Controller
         $delivery = $order->deliveries()->create($validated);
 
         AuditLog::create([
-            'admin_id' => auth()->id(),
-            'action' => 'created',
-            'description' => "Created delivery {$delivery->dr_number} for order #{$order->id} - {$order->account}",
+            'admin_id' => Auth::id(),
+            'action' => 'CREATED',
+            'description' => "Created delivery {$delivery->dr_number} ({$delivery->qty_out}L) for order #{$order->id} - {$order->account}",
         ]);
 
         return redirect()->route('order.deliveries', $order->id)
@@ -109,7 +114,7 @@ class DeliveryController extends Controller
      */
     public function edit(Delivery $delivery): View
     {
-        if (auth()->user()->isViewer() || auth()->user()->isAccounting()) {
+        if (!Auth::user()->canEditModule1()) {
             abort(403);
         }
 
@@ -125,16 +130,20 @@ class DeliveryController extends Controller
      */
     public function update(Request $request, Delivery $delivery): RedirectResponse
     {
-        if (auth()->user()->isViewer() || auth()->user()->isAccounting()) {
+        if (!Auth::user()->canEditModule1()) {
             abort(403);
         }
         $order = $delivery->order;
+
+        $allowedStatuses = (Auth::user()->canMarkFulfilled() || $delivery->status === 'FULFILLED')
+            ? 'PENDING,FULFILLED,CANCELLED'
+            : 'PENDING,CANCELLED';
 
         $validated = $request->validate([
             'dr_number' => ['required', 'string', 'max:64', 'unique:deliveries,dr_number,' . $delivery->id],
             'delivery_date' => ['required', 'date'],
             'qty_out' => ['required', 'integer', 'min:0'],
-            'status' => ['required', 'string', 'in:PENDING,FULFILLED,CANCELLED'],
+            'status' => ['required', 'string', "in:{$allowedStatuses}"],
             'type' => ['required', 'string', 'in:PICK-UP,BIG TANKER,SMALL TANKER,DELIVERY'],
             'remarks' => ['nullable', 'string'],
         ]);
@@ -165,8 +174,8 @@ class DeliveryController extends Controller
         $delivery->update($validated);
 
         AuditLog::create([
-            'admin_id' => auth()->id(),
-            'action' => 'updated',
+            'admin_id' => Auth::id(),
+            'action' => 'UPDATED',
             'description' => "Updated delivery {$delivery->dr_number} for order #{$order->id} - {$order->account}",
         ]);
 
@@ -179,7 +188,7 @@ class DeliveryController extends Controller
      */
     public function destroy(Delivery $delivery): RedirectResponse
     {
-        if (!auth()->user()->isAdmin()) {
+        if (!Auth::user()->isAdmin()) {
             abort(403);
         }
 
@@ -187,8 +196,8 @@ class DeliveryController extends Controller
         $order = $delivery->order;
 
         AuditLog::create([
-            'admin_id' => auth()->id(),
-            'action' => 'deleted',
+            'admin_id' => Auth::id(),
+            'action' => 'DELETED',
             'description' => "Deleted delivery {$delivery->dr_number} for order #{$order->id} - {$order->account}",
         ]);
 

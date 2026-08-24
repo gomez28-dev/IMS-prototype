@@ -11,7 +11,7 @@
 <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
     <div>
         <h2 class="fw-bold text-dark mb-1">Manage Accounts</h2>
-        <p class="text-muted small mb-0">Create and manage admin accounts with role-based access.</p>
+        <p class="text-muted small mb-0">Create and manage user accounts with 11-role access control.</p>
     </div>
     <a href="{{ route('accounts.create') }}" class="btn btn-primary-custom shadow-sm d-flex align-items-center">
         <i class="bi bi-person-plus me-2"></i> Create Account
@@ -49,17 +49,7 @@
                             <td class="ps-4 fw-semibold text-dark">{{ $admin->name }}</td>
                             <td>{{ $admin->username }}</td>
                             <td>
-                                @if ($admin->role === 'admin')
-                                    <span class="badge rounded-pill px-3 py-1" style="background-color: #FFEDD5; color: #C2410C;">Admin</span>
-                                @elseif ($admin->role === 'editor')
-                                    <span class="badge rounded-pill px-3 py-1" style="background-color: #E0F2FE; color: #075985;">Editor</span>
-                                @elseif ($admin->role === 'accounting')
-                                    <span class="badge rounded-pill px-3 py-1" style="background-color: #F3E8FF; color: #6B21A8;">Accounting</span>
-                                @elseif ($admin->role === 'warehouse')
-                                    <span class="badge rounded-pill px-3 py-1" style="background-color: #FEF3C7; color: #92400E;">Warehouse</span>
-                                @else
-                                    <span class="badge rounded-pill px-3 py-1" style="background-color: #F1F5F9; color: #475569;">Viewer</span>
-                                @endif
+                                <span class="badge {{ $admin->role_badge_class }} rounded-pill px-3 py-1">{{ $admin->role_label }}</span>
                             </td>
                             <td class="text-center">
                                 @if ($admin->is_active)
@@ -112,17 +102,7 @@
                         <h5 class="fw-bold text-dark mb-1">{{ $admin->name }}</h5>
                         <p class="text-muted small mb-2">&#64;{{ $admin->username }}</p>
                         <div class="d-flex flex-wrap gap-2 mb-3">
-                            @if ($admin->role === 'admin')
-                                <span class="badge rounded-pill px-3 py-1" style="background-color: #FFEDD5; color: #C2410C;">Admin</span>
-                            @elseif ($admin->role === 'editor')
-                                <span class="badge rounded-pill px-3 py-1" style="background-color: #E0F2FE; color: #075985;">Editor</span>
-                            @elseif ($admin->role === 'accounting')
-                                <span class="badge rounded-pill px-3 py-1" style="background-color: #F3E8FF; color: #6B21A8;">Accounting</span>
-                            @elseif ($admin->role === 'warehouse')
-                                <span class="badge rounded-pill px-3 py-1" style="background-color: #FEF3C7; color: #92400E;">Warehouse</span>
-                            @else
-                                <span class="badge rounded-pill px-3 py-1" style="background-color: #F1F5F9; color: #475569;">Viewer</span>
-                            @endif
+                            <span class="badge {{ $admin->role_badge_class }} rounded-pill px-3 py-1">{{ $admin->role_label }}</span>
                             @if ($admin->is_active)
                                 <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1">Active</span>
                             @else

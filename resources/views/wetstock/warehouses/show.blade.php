@@ -9,14 +9,14 @@
             <a href="{{ route('wetstock.dashboard') }}" class="text-decoration-none text-secondary small">
                 <i class="bi bi-arrow-left me-1"></i> Back to Wet Stock Dashboard
             </a>
-            @if (Auth::user()->isAdmin() || Auth::user()->isEditor() || Auth::user()->isWarehouse())
+            @if (Auth::user()->canEditModule2())
                 <a href="{{ route('wetstock.tanks.create', $warehouse->id) }}" class="btn btn-primary-custom btn-sm">
                     <i class="bi bi-plus-circle me-1"></i> Add Tank / Tanker
                 </a>
             @endif
         </div>
 
-        <div class="card card-custom p-4 border-0">
+        <div class="card card-custom p-4 border-0 shadow-sm">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <div>
@@ -31,7 +31,7 @@
                     <div class="text-center py-5">
                         <i class="bi bi-box-seam display-4 text-muted mb-3 d-block"></i>
                         <p class="text-muted mb-3">No tanks added for {{ $warehouse->name }} yet.</p>
-                        @if (Auth::user()->isAdmin() || Auth::user()->isEditor() || Auth::user()->isWarehouse())
+                        @if (Auth::user()->canEditModule2())
                             <a href="{{ route('wetstock.tanks.create', $warehouse->id) }}" class="btn btn-primary-custom btn-sm">
                                 <i class="bi bi-plus-circle me-1"></i> Add First Tank
                             </a>
@@ -48,7 +48,7 @@
                                     <th>Stock Available</th>
                                     <th>Sellable Available</th>
                                     <th>Status</th>
-                                    @if (Auth::user()->isAdmin() || Auth::user()->isEditor() || Auth::user()->isWarehouse())
+                                    @if (Auth::user()->canEditModule2())
                                         <th class="text-end">Actions</th>
                                     @endif
                                 </tr>
@@ -86,7 +86,7 @@
                                                 <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle rounded-pill px-2 py-1">Deactivated</span>
                                             @endif
                                         </td>
-                                        @if (Auth::user()->isAdmin() || Auth::user()->isEditor() || Auth::user()->isWarehouse())
+                                        @if (Auth::user()->canEditModule2())
                                             <td class="text-end">
                                                 <div class="d-flex justify-content-end gap-1">
                                                     <!-- Contamination Toggle Button -->
@@ -126,7 +126,7 @@
     </div>
 </div>
 
-{{-- Contamination Flag Modals (declared outside the card so ancestor transforms don't break the fixed-position modal backdrop) --}}
+{{-- Contamination Flag Modals --}}
 @foreach ($tanks as $tank)
     @if (!$tank->is_contaminated)
         <div class="modal fade text-start" id="contamModal-{{ $tank->id }}" tabindex="-1" aria-labelledby="contamLabel-{{ $tank->id }}" aria-hidden="true">
