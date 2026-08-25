@@ -92,6 +92,22 @@ class Admin extends Authenticatable
         return in_array($this->role, ['admin', 'ops_admin', 'ops_mgr', 'ops_wh', 'ops_log', 'hod', 'vp']);
     }
 
+    // Approval Permissions
+    public function canApproveModule1Modification(): bool
+    {
+        return in_array($this->role, ['admin', 'hod']);
+    }
+
+    public function canApproveModule2Modification(): bool
+    {
+        return in_array($this->role, ['admin', 'ops_mgr', 'ops_admin']);
+    }
+
+    public function canViewApprovals(): bool
+    {
+        return $this->canApproveModule1Modification() || $this->canApproveModule2Modification();
+    }
+
     public function getRoleLabelAttribute(): string
     {
         return self::ROLES[$this->role] ?? ucfirst($this->role);

@@ -15,11 +15,25 @@ class AuditLog extends Model
         'admin_id',
         'action',
         'description',
+        'details', // legacy alias — auto-mapped to 'description' on creating
     ];
 
     protected $casts = [
         'created_at' => 'datetime',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (AuditLog $log) {
+            if (empty($log->description) && !empty($log->details)) {
+                $log->description = $log->details;
+            }
+
+            if (array_key_exists('details', $log->getAttributes())) {
+                $log->offsetUnset('details');
+            }
+        });
+    }
 
     public function admin(): BelongsTo
     {

@@ -6,6 +6,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Order extends Model
 {
@@ -19,12 +20,14 @@ class Order extends Model
         'po_number',
         'clearing_status',
         'status',
+        'revised_at',
         'terms',
         'location',
     ];
 
     protected $casts = [
         'date' => 'datetime',
+        'revised_at' => 'datetime',
         'qty_ordered' => 'integer',
         'location' => 'string',
     ];
@@ -35,6 +38,11 @@ class Order extends Model
     public function deliveries(): HasMany
     {
         return $this->hasMany(Delivery::class, 'order_id');
+    }
+
+    public function modificationRequests(): MorphMany
+    {
+        return $this->morphMany(ModificationRequest::class, 'requestable');
     }
 
     /**
@@ -73,11 +81,72 @@ class Order extends Model
     }
 
     /**
+     * Determine whether the order or any of its associated deliveries has been revised.
+     */
+    public function isRevised(): bool
+    {
+        if ($this->revised_at !== null) {
+            return true;
+        }
+
+        if (!$this->exists) {
+            return false;
+        }
+
+        if ($this->relationLoaded('deliveries')) {
+            return $this->deliveries->contains(fn($d) => $d->revised_at !== null);
+        }
+
+        return $this->deliveries()->whereNotNull('revised_at')->exists();
+    }
+
+    /**
+     * Get computed status string:
+     * Pending / Pending - Revised / Fulfilled / Fulfilled - Revised / Cancelled / Cancelled - Revised
+     */
+    public function getComputedStatusAttribute(): string
+    {
+        $base = 'Pending';
+        if ($this->status === 'Cancelled') {
+            $base = 'Cancelled';
+        } elseif ($this->remaining_balance <= 0) {
+            $base = 'Fulfilled';
+        }
+
+        return $this->isRevised() ? "{$base} - Revised" : $base;
+    }
+
+    /**
+     * Get CSS badge class matching computed status.
+     */
+    public function getComputedStatusBadgeClassAttribute(): string
+    {
+        $status = $this->computed_status;
+
+        return match ($status) {
+            'Fulfilled' => 'bg-success-subtle text-success border border-success-subtle',
+            'Fulfilled - Revised' => 'bg-success-subtle text-success border border-success border-2',
+            'Cancelled' => 'bg-danger-subtle text-danger border border-danger-subtle',
+            'Cancelled - Revised' => 'bg-danger-subtle text-danger border border-danger border-2',
+            'Pending - Revised' => 'bg-warning-subtle text-warning-emphasis border border-warning border-2',
+            default => 'bg-warning-subtle text-warning-emphasis border border-warning-subtle',
+        };
+    }
+
+    /**
      * Get total quantity delivered (only FULFILLED deliveries count).
      */
     public function getTotalQtyOutAttribute(): int
     {
-        return $this->deliveries()
+        if (!$this->exists) {
+            return 0;
+        }
+
+        if ($this->relationLoaded('deliveries')) {
+            return (int) $this->deliveries->where('status', 'FULFILLED')->sum('qty_out');
+        }
+
+        return (int) $this->deliveries()
             ->where('status', 'FULFILLED')
             ->sum('qty_out');
     }
@@ -87,7 +156,15 @@ class Order extends Model
      */
     public function getCommittedQtyOutAttribute(): int
     {
-        return $this->deliveries()
+        if (!$this->exists) {
+            return 0;
+        }
+
+        if ($this->relationLoaded('deliveries')) {
+            return (int) $this->deliveries->whereIn('status', ['PENDING', 'FULFILLED'])->sum('qty_out');
+        }
+
+        return (int) $this->deliveries()
             ->whereIn('status', ['PENDING', 'FULFILLED'])
             ->sum('qty_out');
     }
@@ -97,7 +174,15 @@ class Order extends Model
      */
     public function getTotalCancelledQtyAttribute(): int
     {
-        return $this->deliveries()
+        if (!$this->exists) {
+            return 0;
+        }
+
+        if ($this->relationLoaded('deliveries')) {
+            return (int) $this->deliveries->where('status', 'CANCELLED')->sum('qty_out');
+        }
+
+        return (int) $this->deliveries()
             ->where('status', 'CANCELLED')
             ->sum('qty_out');
     }
@@ -107,7 +192,7 @@ class Order extends Model
      */
     public function getEffectiveQtyOrderedAttribute(): int
     {
-        return $this->qty_ordered - $this->total_cancelled_qty;
+        return (int)$this->qty_ordered - $this->total_cancelled_qty;
     }
 
     /**

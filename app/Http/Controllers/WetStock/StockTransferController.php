@@ -4,6 +4,7 @@ namespace App\Http\Controllers\WetStock;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\ModificationRequest;
 use App\Models\StockTransfer;
 use App\Models\StorageTank;
 use App\Models\Warehouse;
@@ -17,21 +18,27 @@ use Illuminate\View\View;
 class StockTransferController extends Controller
 {
     /**
-     * Display a listing of stock transfers.
+     * Display a listing of stock transfers separated by 3 tabs: Transfer, Borrow, Return.
      */
     public function index(Request $request): View
     {
-        $query = StockTransfer::with([
+        $activeType = $request->get('type', 'transfer');
+        if (!in_array($activeType, ['transfer', 'borrow', 'return'])) {
+            $activeType = 'transfer';
+        }
+
+        $baseQuery = StockTransfer::with([
             'sourceTank.warehouse',
             'destinationTank.warehouse',
             'sourceWarehouse',
             'destinationWarehouse',
             'transferredBy',
+            'modificationRequests' => fn ($q) => $q->where('status', 'PENDING')->with('requestedBy:id,name'),
         ])->orderBy('transfer_date', 'desc')->orderBy('created_at', 'desc');
 
         if ($request->filled('search')) {
             $search = $request->search;
-            $query->where(function ($q) use ($search) {
+            $baseQuery->where(function ($q) use ($search) {
                 $q->where('transfer_number', 'like', "%{$search}%")
                   ->orWhereHas('sourceTank', fn($t) => $t->where('name', 'like', "%{$search}%"))
                   ->orWhereHas('destinationTank', fn($t) => $t->where('name', 'like', "%{$search}%"));
@@ -40,25 +47,37 @@ class StockTransferController extends Controller
 
         if ($request->filled('warehouse_id')) {
             $whId = $request->warehouse_id;
-            $query->where(function ($q) use ($whId) {
+            $baseQuery->where(function ($q) use ($whId) {
                 $q->where('source_warehouse_id', $whId)
                   ->orWhere('destination_warehouse_id', $whId);
             });
         }
 
         if ($request->filled('from')) {
-            $query->whereDate('transfer_date', '>=', $request->from);
+            $baseQuery->whereDate('transfer_date', '>=', $request->from);
         }
         if ($request->filled('to')) {
-            $query->whereDate('transfer_date', '<=', $request->to);
+            $baseQuery->whereDate('transfer_date', '<=', $request->to);
         }
 
-        $transfers = $query->paginate(20)->withQueryString();
+        // Tab counts
+        $transferCount = (clone $baseQuery)->where('type', 'transfer')->count();
+        $borrowCount = (clone $baseQuery)->where('type', 'borrow')->count();
+        $returnCount = (clone $baseQuery)->where('type', 'return')->count();
+
+        // Paginated results for active tab
+        $transfers = (clone $baseQuery)->where('type', $activeType)->paginate(20)->withQueryString();
         $warehouses = Warehouse::orderBy('name', 'asc')->get();
+        $outstandingBalances = StockTransfer::getOutstandingBalances();
 
         return view('wetstock.transfers.index', [
             'transfers' => $transfers,
             'warehouses' => $warehouses,
+            'outstandingBalances' => $outstandingBalances,
+            'activeType' => $activeType,
+            'transferCount' => $transferCount,
+            'borrowCount' => $borrowCount,
+            'returnCount' => $returnCount,
             'currentWarehouse' => $request->warehouse_id,
             'searchQuery' => $request->search,
             'from' => $request->from,
@@ -67,34 +86,46 @@ class StockTransferController extends Controller
     }
 
     /**
-     * Show form for creating a new stock transfer.
+     * Show form for creating a new stock transfer / borrow / return.
      */
     public function create(Request $request): View
     {
-        $mode = $request->get('mode', 'general'); // 'depot_to_tanker', 'tanker_to_depot', 'general'
+        $type = $request->get('type', 'transfer');
+        if (!in_array($type, ['transfer', 'borrow', 'return'])) {
+            $type = 'transfer';
+        }
+
         $warehouses = Warehouse::with(['activeTanks'])->orderBy('name', 'asc')->get();
         $allTanks = StorageTank::with('warehouse')->where('is_active', true)->orderBy('name', 'asc')->get();
+        $outstandingBalances = StockTransfer::getOutstandingBalances();
 
         return view('wetstock.transfers.form', [
-            'title' => match ($mode) {
-                'depot_to_tanker' => 'Transfer: Depot → Tanker Truck',
-                'tanker_to_depot' => 'Transfer: Tanker Truck → Depot',
-                default => 'Record Stock Transfer',
+            'title' => match ($type) {
+                'borrow' => 'Record Cross-Site Borrowing',
+                'return' => 'Record Cross-Site Stock Return',
+                default => 'Record Intra-Site Stock Transfer',
             },
-            'mode' => $mode,
+            'type' => $type,
+            'transfer' => null,
             'warehouses' => $warehouses,
             'allTanks' => $allTanks,
+            'outstandingBalances' => $outstandingBalances,
             'sourceTankId' => $request->source_tank_id,
             'destinationTankId' => $request->destination_tank_id,
         ]);
     }
 
     /**
-     * Store a newly executed stock transfer.
+     * Store a newly executed stock transfer / borrow / return.
      */
     public function store(Request $request): RedirectResponse
     {
+        if (!Auth::user()->canEditModule2()) {
+            abort(403);
+        }
+
         $validated = $request->validate([
+            'type' => ['required', 'string', 'in:transfer,borrow,return'],
             'source_tank_id' => ['required', 'exists:storage_tanks,id', 'different:destination_tank_id'],
             'destination_tank_id' => ['required', 'exists:storage_tanks,id'],
             'quantity' => ['required', 'integer', 'min:1'],
@@ -105,6 +136,19 @@ class StockTransferController extends Controller
         $sourceTank = StorageTank::with('warehouse')->findOrFail($validated['source_tank_id']);
         $destinationTank = StorageTank::with('warehouse')->findOrFail($validated['destination_tank_id']);
         $quantity = (int) $validated['quantity'];
+        $type = $validated['type'];
+
+        // Warehouse Rule Validation per Tab
+        if ($type === 'transfer') {
+            if ($sourceTank->warehouse_id !== $destinationTank->warehouse_id) {
+                return back()->withInput()->with('danger', "Validation Error: 'Transfer' is strictly for intra-site movements within the same warehouse. Source ({$sourceTank->warehouse->name}) and Destination ({$destinationTank->warehouse->name}) must be the same site. For cross-site fuel movements, please use the 'Borrow' or 'Return' tab.");
+            }
+        } else {
+            // borrow or return
+            if ($sourceTank->warehouse_id === $destinationTank->warehouse_id) {
+                return back()->withInput()->with('danger', "Validation Error: '" . ucfirst($type) . "' is strictly for cross-site movements between different warehouses. Source ({$sourceTank->warehouse->name}) and Destination ({$destinationTank->warehouse->name}) cannot be the same site. For movements within the same site, please use the 'Transfer' tab.");
+            }
+        }
 
         // Safety Rule 1: Contamination check
         if ($sourceTank->is_contaminated) {
@@ -121,15 +165,21 @@ class StockTransferController extends Controller
             return back()->withInput()->with('danger', "Transfer Blocked: Quantity ({$quantity}L) exceeds remaining capacity of destination tank '{$destinationTank->name}' (Capacity remaining: {$destinationTank->remaining_capacity}L).");
         }
 
-        $transferNumber = 'ST-' . date('Ymd', strtotime($validated['transfer_date'])) . '-' . strtoupper(Str::random(5));
+        $prefix = match ($type) {
+            'borrow' => 'BR-',
+            'return' => 'RT-',
+            default => 'ST-',
+        };
+        $transferNumber = $prefix . date('Ymd', strtotime($validated['transfer_date'])) . '-' . strtoupper(Str::random(5));
 
-        DB::transaction(function () use ($validated, $sourceTank, $destinationTank, $quantity, $transferNumber) {
+        DB::transaction(function () use ($validated, $sourceTank, $destinationTank, $quantity, $transferNumber, $type) {
             $transfer = StockTransfer::create([
                 'transfer_number' => $transferNumber,
                 'source_tank_id' => $sourceTank->id,
                 'destination_tank_id' => $destinationTank->id,
                 'source_warehouse_id' => $sourceTank->warehouse_id,
                 'destination_warehouse_id' => $destinationTank->warehouse_id,
+                'type' => $type,
                 'quantity' => $quantity,
                 'transfer_date' => $validated['transfer_date'],
                 'notes' => $validated['notes'] ?? null,
@@ -139,11 +189,115 @@ class StockTransferController extends Controller
             AuditLog::create([
                 'admin_id' => Auth::id(),
                 'action' => 'CREATED',
-                'description' => "Executed Stock Transfer #{$transfer->transfer_number}: " . number_format($quantity) . "L transferred from {$sourceTank->name} ({$sourceTank->warehouse->name}) to {$destinationTank->name} ({$destinationTank->warehouse->name})",
+                'description' => "Executed [" . strtoupper($type) . "] #{$transfer->transfer_number}: " . number_format($quantity) . "L from {$sourceTank->name} ({$sourceTank->warehouse->name}) to {$destinationTank->name} ({$destinationTank->warehouse->name})",
             ]);
         });
 
-        return redirect()->route('wetstock.transfers.index')
-            ->with('success', "Stock Transfer {$transferNumber} (" . number_format($quantity) . "L) recorded successfully.");
+        return redirect()->route('wetstock.transfers.index', ['type' => $type])
+            ->with('success', ucfirst($type) . " record {$transferNumber} (" . number_format($quantity) . "L) saved successfully.");
+    }
+
+    /**
+     * Show form for editing an existing transfer (Submits Modification Request).
+     */
+    public function edit(StockTransfer $transfer): View
+    {
+        if (!Auth::user()->canEditModule2()) {
+            abort(403);
+        }
+
+        $warehouses = Warehouse::with(['activeTanks'])->orderBy('name', 'asc')->get();
+        $allTanks = StorageTank::with('warehouse')->where('is_active', true)->orderBy('name', 'asc')->get();
+        $outstandingBalances = StockTransfer::getOutstandingBalances();
+
+        return view('wetstock.transfers.form', [
+            'title' => "Request Modification: {$transfer->transfer_number}",
+            'type' => $transfer->type,
+            'transfer' => $transfer,
+            'warehouses' => $warehouses,
+            'allTanks' => $allTanks,
+            'outstandingBalances' => $outstandingBalances,
+            'sourceTankId' => $transfer->source_tank_id,
+            'destinationTankId' => $transfer->destination_tank_id,
+        ]);
+    }
+
+    /**
+     * Update transfer via Modification Request (Module 2 approval).
+     */
+    public function update(Request $request, StockTransfer $transfer): RedirectResponse
+    {
+        if (!Auth::user()->canEditModule2()) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'type' => ['required', 'string', 'in:transfer,borrow,return'],
+            'source_tank_id' => ['required', 'exists:storage_tanks,id', 'different:destination_tank_id'],
+            'destination_tank_id' => ['required', 'exists:storage_tanks,id'],
+            'quantity' => ['required', 'integer', 'min:1'],
+            'transfer_date' => ['required', 'date'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+            'modification_reason' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $sourceTank = StorageTank::with('warehouse')->findOrFail($validated['source_tank_id']);
+        $destinationTank = StorageTank::with('warehouse')->findOrFail($validated['destination_tank_id']);
+
+        $newValues = [
+            'type' => $validated['type'],
+            'source_tank_id' => $sourceTank->id,
+            'destination_tank_id' => $destinationTank->id,
+            'source_warehouse_id' => $sourceTank->warehouse_id,
+            'destination_warehouse_id' => $destinationTank->warehouse_id,
+            'quantity' => (int) $validated['quantity'],
+            'transfer_date' => $validated['transfer_date'],
+            'notes' => $validated['notes'] ?? null,
+        ];
+
+        // Diff changes
+        $changes = [];
+        foreach ($newValues as $field => $newVal) {
+            $oldVal = $transfer->{$field};
+            if ($field === 'transfer_date' && $oldVal) {
+                $oldVal = $oldVal->format('Y-m-d');
+            }
+
+            if ((string)$oldVal !== (string)$newVal) {
+                $changes[$field] = [
+                    'old' => $oldVal,
+                    'new' => $newVal,
+                ];
+            }
+        }
+
+        if (empty($changes)) {
+            return redirect()->route('wetstock.transfers.index', ['type' => $transfer->type])
+                ->with('info', "No changes detected on Transfer #{$transfer->transfer_number}.");
+        }
+
+        $existingPending = $transfer->modificationRequests()->where('status', 'PENDING')->first();
+        if ($existingPending) {
+            return redirect()->route('wetstock.transfers.index', ['type' => $transfer->type])
+                ->with('warning', "Transfer #{$transfer->transfer_number} already has a Pending Modification Request (#{$existingPending->id}) awaiting review. Please wait for it to be approved or rejected before submitting another.");
+        }
+
+        $modRequest = ModificationRequest::create([
+            'requestable_type' => StockTransfer::class,
+            'requestable_id' => $transfer->id,
+            'requested_by' => Auth::id(),
+            'changes' => $changes,
+            'reason' => $validated['modification_reason'] ?? 'Stock Transfer modification submitted',
+            'status' => 'PENDING',
+        ]);
+
+        AuditLog::create([
+            'admin_id' => Auth::id(),
+            'action' => 'REQUESTED',
+            'description' => "Submitted Modification Request #{$modRequest->id} for Transfer #{$transfer->transfer_number} (" . count($changes) . " field(s) changed)",
+        ]);
+
+        return redirect()->route('wetstock.transfers.index', ['type' => $transfer->type])
+            ->with('success', "Modification request for Transfer #{$transfer->transfer_number} submitted to the Approvals Queue for Operations Manager review.");
     }
 }

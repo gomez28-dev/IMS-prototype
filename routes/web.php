@@ -6,6 +6,7 @@ use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeliveryController;
+use App\Http\Controllers\ModificationRequestController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PortalController;
 use App\Http\Controllers\ReportController;
@@ -36,6 +37,11 @@ Route::middleware('auth')->group(function () {
 
     // Audit Log — accessible to all authenticated users (view-only)
     Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('audit-logs');
+
+    // Approvals Hub (Module 1: admin/hod, Module 2: ops_mgr/ops_admin/admin)
+    Route::get('/approvals', [ModificationRequestController::class, 'index'])->name('approvals.index');
+    Route::post('/approvals/{modificationRequest}/approve', [ModificationRequestController::class, 'approve'])->name('approvals.approve');
+    Route::post('/approvals/{modificationRequest}/reject', [ModificationRequestController::class, 'reject'])->name('approvals.reject');
 
     // Module 1 (Sales Inventory) Management Routes
     Route::middleware('role:admin,sales,hod,vp')->group(function () {
@@ -109,6 +115,8 @@ Route::middleware('auth')->group(function () {
         Route::middleware('role:admin,ops_admin,ops_mgr,ops_wh,ops_log,hod,vp')->group(function () {
             Route::get('/transfers/create', [WetStock\StockTransferController::class, 'create'])->name('transfers.create');
             Route::post('/transfers', [WetStock\StockTransferController::class, 'store'])->name('transfers.store');
+            Route::get('/transfers/{transfer}/edit', [WetStock\StockTransferController::class, 'edit'])->name('transfers.edit');
+            Route::post('/transfers/{transfer}/edit', [WetStock\StockTransferController::class, 'update'])->name('transfers.update');
         });
 
         // Delivery Assignment & Fulfillment

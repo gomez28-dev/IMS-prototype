@@ -3,8 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
-use App\Models\Order;
 use App\Models\Delivery;
+use App\Models\ModificationRequest;
+use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
@@ -126,7 +127,7 @@ class DeliveryController extends Controller
     }
 
     /**
-     * Update the specified delivery in storage.
+     * Update the specified delivery via Modification Request workflow.
      */
     public function update(Request $request, Delivery $delivery): RedirectResponse
     {
@@ -146,41 +147,50 @@ class DeliveryController extends Controller
             'status' => ['required', 'string', "in:{$allowedStatuses}"],
             'type' => ['required', 'string', 'in:PICK-UP,BIG TANKER,SMALL TANKER,DELIVERY'],
             'remarks' => ['nullable', 'string'],
+            'modification_reason' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $committed = $order->committed_qty_out;
-        $cancelled = $order->total_cancelled_qty;
+        // Diff changes against existing model attributes
+        $changes = [];
+        $comparableFields = ['dr_number', 'delivery_date', 'qty_out', 'status', 'type', 'remarks'];
 
-        if ($delivery->status !== 'CANCELLED') {
-            $committed -= $delivery->qty_out;
-        } else {
-            $cancelled -= $delivery->qty_out;
-        }
-
-        if ($validated['status'] !== 'CANCELLED') {
-            $committed += $validated['qty_out'];
-        } else {
-            $cancelled += $validated['qty_out'];
-        }
-
-        if ($committed > $order->qty_ordered - $cancelled) {
-            $available = $order->effective_qty_ordered - $order->committed_qty_out;
-            if ($delivery->status !== 'CANCELLED') {
-                $available += $delivery->qty_out;
+        foreach ($comparableFields as $field) {
+            $oldVal = $delivery->{$field};
+            if ($field === 'delivery_date' && $oldVal) {
+                $oldVal = $oldVal->format('Y-m-d');
             }
-            return back()->withInput()->with('danger', 'Error: Delivery quantity would exceed the SO remaining quantity (Available: ' . max($available, 0) . 'L).');
+            $newVal = $validated[$field] ?? null;
+
+            if ((string)$oldVal !== (string)$newVal) {
+                $changes[$field] = [
+                    'old' => $oldVal,
+                    'new' => $newVal,
+                ];
+            }
         }
 
-        $delivery->update($validated);
+        if (empty($changes)) {
+            return redirect()->route('order.deliveries', $order->id)
+                ->with('info', "No changes detected on DR# {$delivery->dr_number}.");
+        }
+
+        $modRequest = ModificationRequest::create([
+            'requestable_type' => Delivery::class,
+            'requestable_id' => $delivery->id,
+            'requested_by' => Auth::id(),
+            'changes' => $changes,
+            'reason' => $validated['modification_reason'] ?? 'Delivery modification submitted',
+            'status' => 'PENDING',
+        ]);
 
         AuditLog::create([
             'admin_id' => Auth::id(),
-            'action' => 'UPDATED',
-            'description' => "Updated delivery {$delivery->dr_number} for order #{$order->id} - {$order->account}",
+            'action' => 'REQUESTED',
+            'description' => "Submitted Modification Request #{$modRequest->id} for DR# {$delivery->dr_number} (" . count($changes) . " field(s) changed)",
         ]);
 
         return redirect()->route('order.deliveries', $order->id)
-            ->with('success', 'Delivery updated successfully.');
+            ->with('success', "Modification request for DR# {$delivery->dr_number} submitted to the Approvals Queue for HOD / Administrator review.");
     }
 
     /**

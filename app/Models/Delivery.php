@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Delivery extends Model
 {
@@ -17,6 +18,7 @@ class Delivery extends Model
         'delivery_date',
         'qty_out',
         'status',
+        'revised_at',
         'type',
         'remarks',
         'assigned_by',
@@ -24,6 +26,7 @@ class Delivery extends Model
 
     protected $casts = [
         'delivery_date' => 'datetime',
+        'revised_at' => 'datetime',
         'qty_out' => 'integer',
         'type' => 'string',
     ];
@@ -42,6 +45,11 @@ class Delivery extends Model
     public function storageTank(): BelongsTo
     {
         return $this->belongsTo(StorageTank::class, 'storage_tank_id');
+    }
+
+    public function modificationRequests(): MorphMany
+    {
+        return $this->morphMany(ModificationRequest::class, 'requestable');
     }
 
     /**

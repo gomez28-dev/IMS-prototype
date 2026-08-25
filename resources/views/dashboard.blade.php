@@ -142,6 +142,7 @@
                         <th>SO#</th>
                         <th class="text-center">Qty Ordered</th>
                         <th class="text-center">Remaining Balance</th>
+                        <th class="text-center">Status</th>
                         <th class="text-center">Clearance</th>
                         <th class="text-end pe-4">Actions</th>
                     </tr>
@@ -188,6 +189,11 @@
                                         <i class="bi bi-clock-history me-1"></i> {{ number_format($order->remaining_balance) }}
                                     </span>
                                 @endif
+                            </td>
+                            <td class="text-center">
+                                <span class="badge rounded-pill px-3 py-1 {{ $order->computed_status_badge_class }}">
+                                    {{ $order->computed_status }}
+                                </span>
                             </td>
                             <td class="text-center">
                                 @php
@@ -327,6 +333,12 @@
                                     </span>
                                 @endif
                             </div>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted small">Status:</span>
+                            <span class="badge rounded-pill px-3 py-1 {{ $order->computed_status_badge_class }}">
+                                {{ $order->computed_status }}
+                            </span>
                         </div>
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <span class="text-muted small">Clearance:</span>

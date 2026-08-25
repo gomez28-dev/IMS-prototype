@@ -71,6 +71,7 @@
                                         <th class="ps-3 py-3">DR Number</th>
                                         <th class="py-3">Account / Client</th>
                                         <th class="py-3">SO Number</th>
+                                        <th class="py-3 text-center">Type</th>
                                         <th class="py-3">Delivery Date</th>
                                         <th class="py-3">Qty Out</th>
                                         <th class="py-3">Allocated / Remaining</th>
@@ -88,6 +89,15 @@
                                                 <span class="badge bg-light text-dark border">
                                                     SO# {{ $delivery->order->so_number ?? '-' }}
                                                 </span>
+                                            </td>
+                                            <td class="text-center">
+                                                @if ($delivery->type === 'PICK-UP')
+                                                    <span class="badge badge-type-pickup rounded-pill px-2.5 py-1">PICK-UP</span>
+                                                @elseif ($delivery->type === 'SMALL TANKER')
+                                                    <span class="badge badge-type-small-tanker rounded-pill px-2.5 py-1">SMALL TANKER</span>
+                                                @else
+                                                    <span class="badge badge-type-big-tanker rounded-pill px-2.5 py-1">BIG TANKER</span>
+                                                @endif
                                             </td>
                                             <td class="text-muted small">
                                                 {{ $delivery->delivery_date ? $delivery->delivery_date->format('M d, Y') : '-' }}
@@ -156,6 +166,7 @@
                                         <th class="ps-3 py-3">DR Number</th>
                                         <th class="py-3">Account / Client</th>
                                         <th class="py-3">SO#</th>
+                                        <th class="py-3 text-center">Type</th>
                                         <th class="py-3">Volume</th>
                                         <th class="py-3">Assigned Tanks Breakdown</th>
                                         <th class="py-3">Status</th>
@@ -171,6 +182,15 @@
                                                 <span class="badge bg-light text-dark border">
                                                     SO# {{ $delivery->order->so_number ?? '-' }}
                                                 </span>
+                                            </td>
+                                            <td class="text-center">
+                                                @if ($delivery->type === 'PICK-UP')
+                                                    <span class="badge badge-type-pickup rounded-pill px-2.5 py-1">PICK-UP</span>
+                                                @elseif ($delivery->type === 'SMALL TANKER')
+                                                    <span class="badge badge-type-small-tanker rounded-pill px-2.5 py-1">SMALL TANKER</span>
+                                                @else
+                                                    <span class="badge badge-type-big-tanker rounded-pill px-2.5 py-1">BIG TANKER</span>
+                                                @endif
                                             </td>
                                             <td class="fw-bold text-dark font-monospace">{{ number_format($delivery->qty_out) }} L</td>
                                             <td>
@@ -245,6 +265,7 @@
                                         <th class="ps-3 py-3">DR Number</th>
                                         <th class="py-3">Account / Client</th>
                                         <th class="py-3">SO#</th>
+                                        <th class="py-3 text-center">Type</th>
                                         <th class="py-3">Volume</th>
                                         <th class="py-3">Tanks Dispatched From</th>
                                         <th class="py-3">Status</th>
@@ -263,6 +284,15 @@
                                                 <span class="badge bg-light text-dark border">
                                                     SO# {{ $delivery->order->so_number ?? '-' }}
                                                 </span>
+                                            </td>
+                                            <td class="text-center">
+                                                @if ($delivery->type === 'PICK-UP')
+                                                    <span class="badge badge-type-pickup rounded-pill px-2.5 py-1">PICK-UP</span>
+                                                @elseif ($delivery->type === 'SMALL TANKER')
+                                                    <span class="badge badge-type-small-tanker rounded-pill px-2.5 py-1">SMALL TANKER</span>
+                                                @else
+                                                    <span class="badge badge-type-big-tanker rounded-pill px-2.5 py-1">BIG TANKER</span>
+                                                @endif
                                             </td>
                                             <td class="fw-bold text-dark font-monospace">{{ number_format($delivery->qty_out) }} L</td>
                                             <td>

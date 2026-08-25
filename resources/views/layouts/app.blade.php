@@ -684,6 +684,13 @@
                 })
                 ->count()
             : 0;
+
+        $__pendingApprovalsCount = Auth::user()->canViewApprovals()
+            ? \App\Models\ModificationRequest::where('status', 'PENDING')
+                ->when(!Auth::user()->canApproveModule1Modification(), fn($q) => $q->where('requestable_type', \App\Models\StockTransfer::class))
+                ->when(!Auth::user()->canApproveModule2Modification(), fn($q) => $q->whereIn('requestable_type', [\App\Models\Order::class, \App\Models\Delivery::class]))
+                ->count()
+            : 0;
     @endphp
     {{-- ============ MOBILE SIDEBAR DRAWER (< 992px, preserved) ============ --}}
     <div class="sidebar-drawer d-lg-none" id="sidebarDrawer">
@@ -714,6 +721,14 @@
                     <a class="nav-link d-flex align-items-center" href="{{ route('wetstock.reports.index') }}">
                         <i class="bi bi-file-earmark-bar-graph me-2"></i> Wet Stock Report
                     </a>
+                    @if (Auth::user()->canViewApprovals())
+                        <a class="nav-link d-flex align-items-center" href="{{ route('approvals.index', ['tab' => 'module2']) }}">
+                            <i class="bi bi-check2-circle me-2"></i> Approvals
+                            @if ($__pendingApprovalsCount > 0)
+                                <span class="badge rounded-pill ms-1 bg-danger text-white">{{ $__pendingApprovalsCount }}</span>
+                            @endif
+                        </a>
+                    @endif
                 @elseif (!request()->routeIs('portal'))
                     <a class="nav-link d-flex align-items-center" href="{{ route('dashboard') }}">
                         <i class="bi bi-speedometer2 me-2"></i> Dashboard
@@ -734,6 +749,14 @@
                     @if (Auth::user()->canViewAuditLog())
                     <a class="nav-link d-flex align-items-center" href="{{ route('audit-logs') }}">
                         <i class="bi bi-journal-text me-2"></i> Audit Log
+                    </a>
+                    @endif
+                    @if (Auth::user()->canViewApprovals())
+                    <a class="nav-link d-flex align-items-center" href="{{ route('approvals.index') }}">
+                        <i class="bi bi-check2-circle me-2"></i> Approvals
+                        @if ($__pendingApprovalsCount > 0)
+                            <span class="badge rounded-pill ms-1 bg-danger text-white">{{ $__pendingApprovalsCount }}</span>
+                        @endif
                     </a>
                     @endif
                 @endif
@@ -814,6 +837,15 @@
                     <i class="bi bi-file-earmark-bar-graph"></i>
                     <span class="nav-label">Wet Stock Report</span>
                 </a>
+                @if (Auth::user()->canViewApprovals())
+                <a href="{{ route('approvals.index', ['tab' => 'module2']) }}" class="sidebar-nav-link {{ request()->routeIs('approvals.*') ? 'active' : '' }}" title="Approvals Hub">
+                    <i class="bi bi-check2-circle"></i>
+                    <span class="nav-label">Approvals</span>
+                    @if ($__pendingApprovalsCount > 0)
+                        <span class="badge rounded-pill ms-auto bg-danger text-white">{{ $__pendingApprovalsCount }}</span>
+                    @endif
+                </a>
+                @endif
             @else
                 <a href="{{ route('dashboard') }}" class="sidebar-nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}" title="Dashboard">
                     <i class="bi bi-speedometer2"></i>
@@ -839,6 +871,15 @@
                  <a href="{{ route('audit-logs') }}" class="sidebar-nav-link {{ request()->routeIs('audit-logs') ? 'active' : '' }}" title="Audit Log">
                      <i class="bi bi-journal-text"></i>
                      <span class="nav-label">Audit Log</span>
+                 </a>
+                 @endif
+                 @if (Auth::user()->canViewApprovals())
+                 <a href="{{ route('approvals.index') }}" class="sidebar-nav-link {{ request()->routeIs('approvals.*') ? 'active' : '' }}" title="Approvals Hub">
+                     <i class="bi bi-check2-circle"></i>
+                     <span class="nav-label">Approvals</span>
+                     @if ($__pendingApprovalsCount > 0)
+                         <span class="badge rounded-pill ms-auto bg-danger text-white">{{ $__pendingApprovalsCount }}</span>
+                     @endif
                  </a>
                  @endif
             @endif

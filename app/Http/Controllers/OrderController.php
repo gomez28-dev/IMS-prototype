@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\Client;
+use App\Models\ModificationRequest;
 use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
@@ -80,7 +81,7 @@ class OrderController extends Controller
     }
 
     /**
-     * Update the specified order in storage.
+     * Update the specified order via Modification Request workflow.
      */
     public function update(Request $request, Order $order): RedirectResponse
     {
@@ -101,39 +102,50 @@ class OrderController extends Controller
             'location' => ['required', 'string', 'in:Valenzuela,San Simon'],
             'status' => ['required', 'string', 'in:Active,Cancelled'],
             'terms' => ['nullable', 'string', 'max:64'],
+            'modification_reason' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $order->update($validated);
+        // Diff changes against existing model attributes
+        $changes = [];
+        $comparableFields = ['account', 'date', 'qty_ordered', 'so_number', 'po_number', 'location', 'status', 'terms'];
 
-        AuditLog::create([
-            'admin_id' => Auth::id(),
-            'action' => 'UPDATED',
-            'description' => "Updated order #{$order->id} - {$order->account} (SO# {$order->so_number})",
-        ]);
+        foreach ($comparableFields as $field) {
+            $oldVal = $order->{$field};
+            if ($field === 'date' && $oldVal) {
+                $oldVal = $oldVal->format('Y-m-d');
+            }
+            $newVal = $validated[$field] ?? null;
 
-        // Cancelling the SO also cancels all of its outstanding delivery records.
-        $autoCancelled = 0;
-        if (($validated['status'] ?? null) === 'Cancelled') {
-            $autoCancelled = $order->deliveries()
-                ->where('status', '!=', 'CANCELLED')
-                ->update(['status' => 'CANCELLED']);
-
-            if ($autoCancelled > 0) {
-                AuditLog::create([
-                    'admin_id' => Auth::id(),
-                    'action' => 'UPDATED',
-                    'description' => "Cancelled order #{$order->id} - {$order->account}: {$autoCancelled} delivery record(s) auto-cancelled.",
-                ]);
+            if ((string)$oldVal !== (string)$newVal) {
+                $changes[$field] = [
+                    'old' => $oldVal,
+                    'new' => $newVal,
+                ];
             }
         }
 
-        if ($autoCancelled > 0) {
+        if (empty($changes)) {
             return redirect()->route('dashboard')
-                ->with('success', "Order updated and cancelled. {$autoCancelled} delivery record(s) were auto-cancelled.");
+                ->with('info', "No changes detected on SO# {$order->so_number}.");
         }
 
+        $modRequest = ModificationRequest::create([
+            'requestable_type' => Order::class,
+            'requestable_id' => $order->id,
+            'requested_by' => Auth::id(),
+            'changes' => $changes,
+            'reason' => $validated['modification_reason'] ?? 'Sales Order modification submitted',
+            'status' => 'PENDING',
+        ]);
+
+        AuditLog::create([
+            'admin_id' => Auth::id(),
+            'action' => 'REQUESTED',
+            'description' => "Submitted Modification Request #{$modRequest->id} for SO# {$order->so_number} (" . count($changes) . " field(s) changed)",
+        ]);
+
         return redirect()->route('dashboard')
-            ->with('success', 'Order updated successfully.');
+            ->with('success', "Modification request for SO# {$order->so_number} submitted to the Approvals Queue for HOD / Administrator review.");
     }
 
     /**
