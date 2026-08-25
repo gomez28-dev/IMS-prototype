@@ -75,6 +75,23 @@ class StockTransfer extends Model
     }
 
     /**
+     * Net outstanding borrowed balance for a single warehouse.
+     * Outstanding = SUM(borrow WHERE source_warehouse_id = X) - SUM(return WHERE destination_warehouse_id = X)
+     * May be negative if historical over-returns exist.
+     */
+    public static function getOutstandingBalanceFor(int $warehouseId, ?int $excludeTransferId = null): int
+    {
+        $borrowed = (int) self::where('type', 'borrow')->where('source_warehouse_id', $warehouseId)->sum('quantity');
+
+        $returned = (int) self::where('type', 'return')
+            ->where('destination_warehouse_id', $warehouseId)
+            ->when($excludeTransferId, fn (Builder $q) => $q->where('id', '!=', $excludeTransferId))
+            ->sum('quantity');
+
+        return $borrowed - $returned;
+    }
+
+    /**
      * Compute net outstanding borrowed balance per warehouse.
      * Outstanding borrowed FROM Warehouse X:
      * SUM(quantity WHERE type='borrow' AND source_warehouse_id = X) - SUM(quantity WHERE type='return' AND destination_warehouse_id = X)

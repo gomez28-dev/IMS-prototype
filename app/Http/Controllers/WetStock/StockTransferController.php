@@ -150,6 +150,14 @@ class StockTransferController extends Controller
             }
         }
 
+        // Safety Rule 0 (returns): cannot repay more than the outstanding borrowed balance
+        if ($type === 'return') {
+            $outstanding = StockTransfer::getOutstandingBalanceFor($destinationTank->warehouse_id);
+            if ($quantity > $outstanding) {
+                return back()->withInput()->with('danger', "Return Blocked: The outstanding borrowed balance for {$destinationTank->warehouse->name} is " . number_format(max(0, $outstanding)) . "L — you cannot log a return of " . number_format($quantity) . "L. Borrow more fuel from this site first, or reduce the return quantity.");
+            }
+        }
+
         // Safety Rule 1: Contamination check
         if ($sourceTank->is_contaminated) {
             return back()->withInput()->with('danger', "Transfer Blocked: Source tank '{$sourceTank->name}' is marked CONTAMINATED. Contaminated fuel cannot be transferred into other tanks/tankers.");
@@ -274,6 +282,16 @@ class StockTransferController extends Controller
         if (empty($changes)) {
             return redirect()->route('wetstock.transfers.index', ['type' => $transfer->type])
                 ->with('info', "No changes detected on Transfer #{$transfer->transfer_number}.");
+        }
+
+        // Return validation on the modification path: the requested new state must not
+        // exceed the outstanding borrowed balance (excluding this record's own current return).
+        if ($validated['type'] === 'return') {
+            $outstanding = StockTransfer::getOutstandingBalanceFor($destinationTank->warehouse_id, $transfer->id);
+            $newQty = (int) $validated['quantity'];
+            if ($newQty > $outstanding) {
+                return back()->withInput()->with('danger', "Return Blocked: The outstanding borrowed balance for {$destinationTank->warehouse->name} (excluding this record's current return) is " . number_format(max(0, $outstanding)) . "L — a return of " . number_format($newQty) . "L cannot be requested. Reduce the return quantity.");
+            }
         }
 
         $existingPending = $transfer->modificationRequests()->where('status', 'PENDING')->first();
