@@ -103,6 +103,13 @@ class DeliveryAssignmentController extends Controller
             return back()->with('danger', "Cannot allocate: DR #{$delivery->dr_number} already has an allocation on tank {$tank->name}.");
         }
 
+        // Site lock: the tank must belong to the same warehouse as the order's location.
+        // Cross-site stock must be moved via a Borrow transfer first, then allocated locally.
+        $tank->load('warehouse');
+        if ($tank->warehouse->name !== $delivery->order->location) {
+            return back()->with('danger', "Cannot allocate: tank {$tank->name} belongs to {$tank->warehouse->name}, but this order's site is " . ($delivery->order->location ?? '(no site)') . ". Cross-site stock must be moved via a Borrow transfer first, then allocated from the local tank.");
+        }
+
         if ($quantity > $tank->effective_available) {
             return back()->with('danger', "Cannot allocate: {$quantity}L exceeds available stock in {$tank->name} ({$tank->effective_available}L available after accounting for pending deliveries).");
         }

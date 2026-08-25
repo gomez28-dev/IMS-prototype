@@ -118,18 +118,21 @@
                                                     <form method="POST" action="{{ route('wetstock.deliveries.allocate', $delivery->id) }}" class="d-flex gap-2 align-items-center">
                                                         @csrf
                                                         <input type="number" name="quantity" id="allocate-qty-{{ $delivery->id }}" class="form-control form-control-sm allocate-qty-input" style="width: 100px;" min="1" max="{{ $delivery->remaining_to_allocate }}" value="{{ $delivery->remaining_to_allocate }}" title="Quantity to allocate from this DR" required>
+                                                        @php
+                                                            $siteWarehouse = $warehouses->firstWhere('name', $delivery->order->location ?? null);
+                                                        @endphp
                                                         <select name="storage_tank_id" id="allocate-tank-{{ $delivery->id }}" class="form-select form-select-sm allocate-tank-select" style="min-width: 220px;" required>
-                                                            <option value="">-- Select Tank --</option>
-                                                            @foreach ($warehouses as $wh)
-                                                                <optgroup label="{{ $wh->name }}">
-                                                                    @foreach ($wh->activeTanks as $t)
-                                                                        <option value="{{ $t->id }}" data-available="{{ $t->effective_available }}" {{ $t->is_contaminated ? 'disabled' : '' }}>
-                                                                            {{ $t->name }} ({{ ucfirst($t->category) }}) — {{ number_format($t->effective_available) }}L Avail
-                                                                            {{ $t->is_contaminated ? ' [CONTAMINATED]' : '' }}
-                                                                        </option>
-                                                                    @endforeach
-                                                                </optgroup>
-                                                            @endforeach
+                                                            <option value="">-- Select Tank ({{ $delivery->order->location ?? 'No Site' }} only) --</option>
+                                                            @if (!$siteWarehouse)
+                                                                <option value="" disabled>No warehouse matches this order's site ({{ $delivery->order->location ?? '-' }})</option>
+                                                            @else
+                                                                @foreach ($siteWarehouse->activeTanks as $t)
+                                                                    <option value="{{ $t->id }}" data-available="{{ $t->effective_available }}" {{ $t->is_contaminated ? 'disabled' : '' }}>
+                                                                        {{ $t->name }} ({{ ucfirst($t->category) }}) — {{ number_format($t->effective_available) }}L Avail
+                                                                        {{ $t->is_contaminated ? ' [CONTAMINATED]' : '' }}
+                                                                    </option>
+                                                                @endforeach
+                                                            @endif
                                                         </select>
                                                         <button type="submit" class="btn btn-sm btn-primary-custom py-1 px-3">Allocate</button>
                                                     </form>
