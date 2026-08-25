@@ -26,9 +26,10 @@
 .vscode/
 .idea/
 
-# Superpowers agent files
+# Superpowers agent files (design docs are local-only, not needed for deployment)
 .superpowers/
 .opencode/
+docs/superpowers/
 
 
 # Stray SQLite database from old Python prototype (local only)

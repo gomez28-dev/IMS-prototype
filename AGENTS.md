@@ -99,3 +99,15 @@ Don't test changes only on the live site. Set up a local Laravel environment (La
 - Consider rotating the GitHub Actions deploy SSH key, since it passed through a screenshot during setup (not a confirmed compromise, just good hygiene).
 - Test the full data flow: Excel import (via the in-app "Import Excel" button) and Excel export ("Download Excel" button) end-to-end with real data, not just the sample file.
 - Decide on a path for migrating historical data from the original Python app's SQLite database, if that hasn't been done yet (`php artisan import:sqlite-data` custom command exists for this).
+
+---
+
+## AI Agent Workflow Notes
+
+- **Skills:** If your harness provides the "superpowers" skill library (e.g., opencode's `skill` tool), check available skills before starting any task. Commonly relevant here: `brainstorming` (before feature work), `systematic-debugging` (before fixing bugs), `verification-before-completion` (before claiming done), `writing-plans`, `test-driven-development`.
+- **Project design docs:** Past feature specs and implementation plans live in `docs/superpowers/specs/` and `docs/superpowers/plans/` — but note these are **local-only** (gitignored, not in the repo), so they exist only on the developer's machine and won't be present on a fresh clone or the live server.
+- **AGENTS.md is the source of truth** for deployment context — update it when deployment facts change.
+
+### Storage symlink caveat (Hostinger)
+
+Hostinger shared hosting often disables PHP's `symlink()`, so `php artisan storage:link` may fail. The app currently does **not** serve user-uploaded files, so no storage link is needed. If file uploads/serving are ever added, create the link manually via SSH (`ln -s <project>/storage/app/public <project>/public/storage`) instead of relying on the artisan command.
