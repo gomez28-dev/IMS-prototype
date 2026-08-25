@@ -168,9 +168,6 @@
                                 @endif
                             </td>
                             <td>
-                                @if ($order->status === 'Cancelled')
-                                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill me-1"><i class="bi bi-x-circle me-1"></i>CANCELLED</span>
-                                @endif
                                 <span class="badge {{ $order->status === 'Cancelled' ? 'bg-danger text-white' : 'bg-light text-dark border' }}">{{ $order->so_number }}</span>
                                 @if ($order->isCarryOver($now))
                                     <span class="badge bg-secondary-subtle text-secondary border rounded-pill ms-1" style="font-size: 0.65rem;" title="Unfulfilled order from previous month">
@@ -301,9 +298,6 @@
                                 <span class="badge ms-1" style="background-color: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; font-size: 0.6rem;">Valenzuela</span>
                             @endif
                             </h5>
-                            @endif
-                            @if ($order->status === 'Cancelled')
-                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill me-1"><i class="bi bi-x-circle me-1"></i>CANCELLED</span>
                             @endif
                             <span class="badge {{ $order->status === 'Cancelled' ? 'bg-danger text-white' : 'bg-light text-dark border' }}">{{ $order->so_number }}</span>
                         </div>
