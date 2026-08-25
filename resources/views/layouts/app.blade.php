@@ -685,10 +685,15 @@
                 ->count()
             : 0;
 
-        $__pendingApprovalsCount = Auth::user()->canViewApprovals()
+        $__pendingM1Count = Auth::user()->canApproveModule1Modification()
             ? \App\Models\ModificationRequest::where('status', 'PENDING')
-                ->when(!Auth::user()->canApproveModule1Modification(), fn($q) => $q->where('requestable_type', \App\Models\StockTransfer::class))
-                ->when(!Auth::user()->canApproveModule2Modification(), fn($q) => $q->whereIn('requestable_type', [\App\Models\Order::class, \App\Models\Delivery::class]))
+                ->whereIn('requestable_type', [\App\Models\Order::class, \App\Models\Delivery::class])
+                ->count()
+            : 0;
+
+        $__pendingM2Count = Auth::user()->canApproveModule2Modification()
+            ? \App\Models\ModificationRequest::where('status', 'PENDING')
+                ->where('requestable_type', \App\Models\StockTransfer::class)
                 ->count()
             : 0;
     @endphp
@@ -721,11 +726,11 @@
                     <a class="nav-link d-flex align-items-center" href="{{ route('wetstock.reports.index') }}">
                         <i class="bi bi-file-earmark-bar-graph me-2"></i> Wet Stock Report
                     </a>
-                    @if (Auth::user()->canViewApprovals())
-                        <a class="nav-link d-flex align-items-center" href="{{ route('approvals.index', ['tab' => 'module2']) }}">
+                    @if (Auth::user()->canApproveModule2Modification())
+                        <a class="nav-link d-flex align-items-center" href="{{ route('wetstock.approvals.index') }}">
                             <i class="bi bi-check2-circle me-2"></i> Approvals
-                            @if ($__pendingApprovalsCount > 0)
-                                <span class="badge rounded-pill ms-1 bg-danger text-white">{{ $__pendingApprovalsCount }}</span>
+                            @if ($__pendingM2Count > 0)
+                                <span class="badge rounded-pill ms-1 bg-danger text-white">{{ $__pendingM2Count }}</span>
                             @endif
                         </a>
                     @endif
@@ -751,11 +756,11 @@
                         <i class="bi bi-journal-text me-2"></i> Audit Log
                     </a>
                     @endif
-                    @if (Auth::user()->canViewApprovals())
+                    @if (Auth::user()->canApproveModule1Modification())
                     <a class="nav-link d-flex align-items-center" href="{{ route('approvals.index') }}">
                         <i class="bi bi-check2-circle me-2"></i> Approvals
-                        @if ($__pendingApprovalsCount > 0)
-                            <span class="badge rounded-pill ms-1 bg-danger text-white">{{ $__pendingApprovalsCount }}</span>
+                        @if ($__pendingM1Count > 0)
+                            <span class="badge rounded-pill ms-1 bg-danger text-white">{{ $__pendingM1Count }}</span>
                         @endif
                     </a>
                     @endif
@@ -837,12 +842,12 @@
                     <i class="bi bi-file-earmark-bar-graph"></i>
                     <span class="nav-label">Wet Stock Report</span>
                 </a>
-                @if (Auth::user()->canViewApprovals())
-                <a href="{{ route('approvals.index', ['tab' => 'module2']) }}" class="sidebar-nav-link {{ request()->routeIs('approvals.*') ? 'active' : '' }}" title="Approvals Hub">
+                @if (Auth::user()->canApproveModule2Modification())
+                <a href="{{ route('wetstock.approvals.index') }}" class="sidebar-nav-link {{ request()->routeIs('wetstock.approvals.*') ? 'active' : '' }}" title="Approvals — Stock Transfers">
                     <i class="bi bi-check2-circle"></i>
                     <span class="nav-label">Approvals</span>
-                    @if ($__pendingApprovalsCount > 0)
-                        <span class="badge rounded-pill ms-auto bg-danger text-white">{{ $__pendingApprovalsCount }}</span>
+                    @if ($__pendingM2Count > 0)
+                        <span class="badge rounded-pill ms-auto bg-danger text-white">{{ $__pendingM2Count }}</span>
                     @endif
                 </a>
                 @endif
@@ -873,12 +878,12 @@
                      <span class="nav-label">Audit Log</span>
                  </a>
                  @endif
-                 @if (Auth::user()->canViewApprovals())
-                 <a href="{{ route('approvals.index') }}" class="sidebar-nav-link {{ request()->routeIs('approvals.*') ? 'active' : '' }}" title="Approvals Hub">
+                 @if (Auth::user()->canApproveModule1Modification())
+                 <a href="{{ route('approvals.index') }}" class="sidebar-nav-link {{ request()->routeIs('approvals.*') ? 'active' : '' }}" title="Approvals — Sales Orders & DRs">
                      <i class="bi bi-check2-circle"></i>
                      <span class="nav-label">Approvals</span>
-                     @if ($__pendingApprovalsCount > 0)
-                         <span class="badge rounded-pill ms-auto bg-danger text-white">{{ $__pendingApprovalsCount }}</span>
+                     @if ($__pendingM1Count > 0)
+                         <span class="badge rounded-pill ms-auto bg-danger text-white">{{ $__pendingM1Count }}</span>
                      @endif
                  </a>
                  @endif

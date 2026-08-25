@@ -17,49 +17,57 @@ use Illuminate\View\View;
 class ModificationRequestController extends Controller
 {
     /**
-     * Display centralized Approvals Hub.
+     * Module 1 Approvals — Sales Orders & Deliveries (admin/hod only).
      */
-    public function index(Request $request): View
+    public function indexModule1(Request $request): View
     {
         $user = Auth::user();
-        if (!$user->canViewApprovals()) {
-            abort(403, 'Unauthorized: You do not have approval permissions.');
+        if (!$user->canApproveModule1Modification()) {
+            abort(403, 'Unauthorized: Only Portal Admins and HODs can view Module 1 approvals.');
         }
 
-        $activeTab = $request->get('tab', 'module1');
-
-        // Module 1 (Sales Orders & Deliveries) Pending
-        $module1PendingQuery = ModificationRequest::with(['requestedBy', 'requestable'])
+        $pendingQuery = ModificationRequest::with(['requestedBy', 'requestable'])
             ->whereIn('requestable_type', [Order::class, Delivery::class])
             ->where('status', 'PENDING')
             ->orderBy('created_at', 'desc');
 
-        $module1Count = (clone $module1PendingQuery)->count();
-        $module1Requests = $module1PendingQuery->paginate(15, ['*'], 'm1_page');
+        $historyQuery = ModificationRequest::with(['requestedBy', 'reviewedBy', 'requestable'])
+            ->whereIn('requestable_type', [Order::class, Delivery::class])
+            ->whereIn('status', ['APPROVED', 'REJECTED'])
+            ->orderBy('reviewed_at', 'desc');
 
-        // Module 2 (Wet Stock Transfers) Pending
-        $module2PendingQuery = ModificationRequest::with(['requestedBy', 'requestable'])
+        return view('approvals.module1', [
+            'module1Requests' => (clone $pendingQuery)->paginate(15),
+            'module1Count' => (clone $pendingQuery)->count(),
+            'historyRequests' => $historyQuery->paginate(20),
+            'user' => $user,
+        ]);
+    }
+
+    /**
+     * Module 2 Approvals — Wet Stock Transfers (admin/ops_admin/ops_mgr only).
+     */
+    public function indexModule2(Request $request): View
+    {
+        $user = Auth::user();
+        if (!$user->canApproveModule2Modification()) {
+            abort(403, 'Unauthorized: Only Operations Managers and Portal Admins can view Module 2 approvals.');
+        }
+
+        $pendingQuery = ModificationRequest::with(['requestedBy', 'requestable'])
             ->where('requestable_type', StockTransfer::class)
             ->where('status', 'PENDING')
             ->orderBy('created_at', 'desc');
 
-        $module2Count = (clone $module2PendingQuery)->count();
-        $module2Requests = $module2PendingQuery->paginate(15, ['*'], 'm2_page');
-
-        // History
         $historyQuery = ModificationRequest::with(['requestedBy', 'reviewedBy', 'requestable'])
+            ->where('requestable_type', StockTransfer::class)
             ->whereIn('status', ['APPROVED', 'REJECTED'])
             ->orderBy('reviewed_at', 'desc');
 
-        $historyRequests = $historyQuery->paginate(20, ['*'], 'history_page');
-
-        return view('approvals.index', [
-            'activeTab' => $activeTab,
-            'module1Requests' => $module1Requests,
-            'module2Requests' => $module2Requests,
-            'historyRequests' => $historyRequests,
-            'module1Count' => $module1Count,
-            'module2Count' => $module2Count,
+        return view('approvals.module2', [
+            'module2Requests' => (clone $pendingQuery)->paginate(15),
+            'module2Count' => (clone $pendingQuery)->count(),
+            'historyRequests' => $historyQuery->paginate(20),
             'user' => $user,
         ]);
     }

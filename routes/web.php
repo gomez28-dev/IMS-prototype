@@ -38,8 +38,11 @@ Route::middleware('auth')->group(function () {
     // Audit Log — accessible to all authenticated users (view-only)
     Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('audit-logs');
 
-    // Approvals Hub (Module 1: admin/hod, Module 2: ops_mgr/ops_admin/admin)
-    Route::get('/approvals', [ModificationRequestController::class, 'index'])->name('approvals.index');
+    // Approvals — Module 1 (Sales Orders & DRs) — admin/hod only
+    Route::get('/approvals', [ModificationRequestController::class, 'indexModule1'])
+        ->middleware('role:admin,hod')->name('approvals.index');
+    // Approve/reject actions are shared by both modules — per-module role
+    // checks live inside the controller (canApproveModule1/2Modification).
     Route::post('/approvals/{modificationRequest}/approve', [ModificationRequestController::class, 'approve'])->name('approvals.approve');
     Route::post('/approvals/{modificationRequest}/reject', [ModificationRequestController::class, 'reject'])->name('approvals.reject');
 
@@ -88,6 +91,10 @@ Route::middleware('auth')->group(function () {
 
     // Wet Stock Module Routes
     Route::prefix('wetstock')->name('wetstock.')->group(function () {
+        // Approvals — Module 2 (Stock Transfers) — admin/ops_admin/ops_mgr only
+        Route::get('/approvals', [ModificationRequestController::class, 'indexModule2'])
+            ->middleware('role:admin,ops_mgr,ops_admin')->name('approvals.index');
+
         Route::get('/', [WetStock\DashboardController::class, 'index'])->name('dashboard');
         Route::get('/warehouses/{warehouse}', [WetStock\WarehouseController::class, 'show'])->name('warehouses.show');
 
