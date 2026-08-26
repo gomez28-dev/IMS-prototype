@@ -75,6 +75,7 @@
                                         <th class="py-3">Delivery Date</th>
                                         <th class="py-3">Qty Out</th>
                                         <th class="py-3">Allocated / Remaining</th>
+                                        <th class="py-3">Created / Modified By</th>
                                         @if (Auth::user()->canEditModule2())
                                             <th class="py-3 pe-3">Allocate to Storage Tank</th>
                                         @endif
@@ -112,6 +113,23 @@
                                                 @else
                                                     <span class="badge bg-secondary-subtle text-secondary rounded-pill">0 L / {{ number_format($delivery->qty_out) }} L</span>
                                                 @endif
+                                            </td>
+                                            <td class="small">
+                                                <div class="d-flex flex-column gap-1">
+                                                    @foreach ($delivery->allocations as $alloc)
+                                                        <span><i class="bi bi-person-plus me-1 text-secondary"></i>{{ $alloc->assignedBy->name ?? '—' }}</span>
+                                                    @endforeach
+                                                    @if ($delivery->status === 'FULFILLED' && $delivery->fulfilledBy)
+                                                        <span class="text-success"><i class="bi bi-check-circle me-1"></i>{{ $delivery->fulfilledBy->name }}</span>
+                                                    @endif
+                                                    @php $latestMod = $delivery->modificationRequests->sortByDesc('created_at')->first(); @endphp
+                                                    @if ($latestMod)
+                                                        <span class="text-warning"><i class="bi bi-pencil me-1"></i>{{ $latestMod->requestedBy->name ?? '—' }}</span>
+                                                    @endif
+                                                    @if ($delivery->allocations->isEmpty() && !$latestMod)
+                                                        <span class="text-muted">—</span>
+                                                    @endif
+                                                </div>
                                             </td>
                                             @if (Auth::user()->canEditModule2())
                                                 <td class="pe-3">

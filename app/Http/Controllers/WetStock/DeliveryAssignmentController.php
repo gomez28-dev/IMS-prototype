@@ -24,7 +24,7 @@ class DeliveryAssignmentController extends Controller
         $activeTab = $request->get('tab', 'unassigned');
 
         // 1. Unassigned: Deliveries needing tank allocation
-        $unassignedQuery = Delivery::with(['order', 'allocations.tank.warehouse'])
+        $unassignedQuery = Delivery::with(['order', 'allocations.tank.warehouse', 'allocations.assignedBy', 'fulfilledBy', 'modificationRequests.requestedBy', 'modificationRequests.reviewedBy'])
             ->where('status', '!=', 'CANCELLED')
             ->whereHas('order', fn($q) => $q->where('status', '!=', 'Cancelled'))
             ->where(function ($q) {
