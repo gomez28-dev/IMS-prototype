@@ -115,7 +115,7 @@
                                                     <span class="badge bg-secondary-subtle text-secondary rounded-pill">0 L / {{ number_format($delivery->qty_out) }} L</span>
                                                 @endif
                                             </td>
-                                            <td class="small">{{ $delivery->createdBy->name ?? '—' }}</td>
+                                            <td class="small">{{ $delivery->createdBy->name ?? 'Legacy Data' }}</td>
                                             <td class="small">
                                                 @php $latestApprovedMod = $delivery->modificationRequests->where('status', 'APPROVED')->sortByDesc('created_at')->first(); @endphp
                                                 @if ($latestApprovedMod)
@@ -238,7 +238,7 @@
                                                     HOLD (Pending)
                                                 </span>
                                             </td>
-                                            <td class="small">{{ $delivery->createdBy->name ?? '—' }}</td>
+                                            <td class="small">{{ $delivery->createdBy->name ?? 'Legacy Data' }}</td>
                                             <td class="small">
                                                 @php $latestApprovedMod = $delivery->modificationRequests->where('status', 'APPROVED')->sortByDesc('created_at')->first(); @endphp
                                                 @if ($latestApprovedMod)
@@ -336,7 +336,7 @@
                                                     FULFILLED
                                                 </span>
                                             </td>
-                                            <td class="small">{{ $delivery->createdBy->name ?? '—' }}</td>
+                                            <td class="small">{{ $delivery->createdBy->name ?? 'Legacy Data' }}</td>
                                             <td class="small">
                                                 @php $latestApprovedMod = $delivery->modificationRequests->where('status', 'APPROVED')->sortByDesc('created_at')->first(); @endphp
                                                 @if ($latestApprovedMod)
