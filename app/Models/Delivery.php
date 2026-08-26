@@ -23,6 +23,7 @@ class Delivery extends Model
         'remarks',
         'assigned_by',
         'fulfilled_by',
+        'created_by',
     ];
 
     protected $casts = [
@@ -96,5 +97,10 @@ class Delivery extends Model
     public function fulfilledBy(): BelongsTo
     {
         return $this->belongsTo(Admin::class, 'fulfilled_by');
+    }
+
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(Admin::class, 'created_by');
     }
 }

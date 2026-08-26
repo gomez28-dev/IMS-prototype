@@ -98,7 +98,7 @@ class DeliveryController extends Controller
             return back()->withInput()->with('danger', 'Error: Delivery quantity would exceed the SO remaining quantity (Available: ' . $available . 'L).');
         }
 
-        $delivery = $order->deliveries()->create($validated);
+        $delivery = $order->deliveries()->create(array_merge($validated, ['created_by' => Auth::id()]));
 
         AuditLog::create([
             'admin_id' => Auth::id(),

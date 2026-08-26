@@ -24,7 +24,7 @@ class DeliveryAssignmentController extends Controller
         $activeTab = $request->get('tab', 'unassigned');
 
         // 1. Unassigned: Deliveries needing tank allocation
-        $unassignedQuery = Delivery::with(['order', 'allocations.tank.warehouse', 'allocations.assignedBy', 'fulfilledBy', 'modificationRequests.requestedBy', 'modificationRequests.reviewedBy'])
+        $unassignedQuery = Delivery::with(['order', 'allocations.tank.warehouse', 'allocations.assignedBy', 'fulfilledBy', 'createdBy', 'modificationRequests.requestedBy', 'modificationRequests.reviewedBy'])
             ->where('status', '!=', 'CANCELLED')
             ->whereHas('order', fn($q) => $q->where('status', '!=', 'Cancelled'))
             ->where(function ($q) {
@@ -37,7 +37,7 @@ class DeliveryAssignmentController extends Controller
         $unassignedDeliveries = $unassignedQuery->paginate(15, ['*'], 'unassigned_page');
 
         // 2. Assigned: Fully or partially allocated deliveries still in PENDING status (awaiting fulfillment)
-        $assignedQuery = Delivery::with(['order', 'allocations.tank.warehouse', 'allocations.assignedBy', 'fulfilledBy', 'modificationRequests.requestedBy', 'modificationRequests.reviewedBy'])
+        $assignedQuery = Delivery::with(['order', 'allocations.tank.warehouse', 'allocations.assignedBy', 'fulfilledBy', 'createdBy', 'modificationRequests.requestedBy', 'modificationRequests.reviewedBy'])
             ->where('status', 'PENDING')
             ->whereHas('allocations')
             ->whereRaw('(SELECT COALESCE(SUM(quantity), 0) FROM delivery_allocations WHERE delivery_id = deliveries.id) >= qty_out')
@@ -47,7 +47,7 @@ class DeliveryAssignmentController extends Controller
         $assignedDeliveries = $assignedQuery->paginate(15, ['*'], 'assigned_page');
 
         // 3. History: Deliveries marked FULFILLED with their tank allocation audit trail
-        $historyQuery = Delivery::with(['order', 'allocations.tank.warehouse', 'allocations.assignedBy', 'fulfilledBy', 'modificationRequests.requestedBy', 'modificationRequests.reviewedBy'])
+        $historyQuery = Delivery::with(['order', 'allocations.tank.warehouse', 'allocations.assignedBy', 'fulfilledBy', 'createdBy', 'modificationRequests.requestedBy', 'modificationRequests.reviewedBy'])
             ->where('status', 'FULFILLED')
             ->orderBy('updated_at', 'desc');
 
