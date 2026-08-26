@@ -158,9 +158,11 @@ class StockTransferController extends Controller
             }
         }
 
-        // Safety Rule 1: Contamination check
-        if ($sourceTank->is_contaminated) {
-            return back()->withInput()->with('danger', "Transfer Blocked: Source tank '{$sourceTank->name}' is marked CONTAMINATED. Contaminated fuel cannot be transferred into other tanks/tankers.");
+        // Safety Rule 1: Contamination check — only FULLY contaminated tanks are blocked.
+        // Partially contaminated tanks may transfer up to effective_available (contaminated
+        // volume is already excluded from that figure).
+        if ($sourceTank->isFullyContaminated()) {
+            return back()->withInput()->with('danger', "Transfer Blocked: Source tank '{$sourceTank->name}' is FULLY CONTAMINATED (" . number_format($sourceTank->contaminated_liters) . "L). Contaminated fuel cannot be transferred into other tanks/tankers.");
         }
 
         // Safety Rule 2: Source available volume check

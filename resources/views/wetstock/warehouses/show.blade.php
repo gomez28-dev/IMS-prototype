@@ -55,7 +55,7 @@
                             </thead>
                             <tbody>
                                 @foreach ($tanks as $tank)
-                                    <tr class="{{ $tank->is_contaminated ? 'table-danger-subtle' : '' }}">
+                                    <tr class="{{ $tank->hasContamination() ? ($tank->isFullyContaminated() ? 'table-danger' : 'table-warning-subtle') : '' }}">
                                         <td>
                                             @if ($tank->isTanker())
                                                 <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle rounded-pill px-2 py-1"><i class="bi bi-truck me-1"></i>Tanker Truck</span>
@@ -71,11 +71,11 @@
                                         </td>
                                         <td>{{ number_format($tank->max_capacity) }} L</td>
                                         <td class="fw-semibold text-dark">{{ number_format($tank->stock_available) }} L</td>
-                                        <td class="fw-semibold {{ $tank->is_contaminated ? 'text-danger' : 'text-success' }}">
+                                        <td class="fw-semibold {{ $tank->hasContamination() ? 'text-danger' : 'text-success' }}">
                                             {{ number_format($tank->sellable_available) }} L
-                                            @if ($tank->is_contaminated)
-                                                <div class="badge bg-danger text-white mt-1 d-block" style="font-size: 0.65rem;">
-                                                    <i class="bi bi-exclamation-triangle-fill me-1"></i>CONTAMINATED ({{ number_format($tank->contaminated_liters) }}L)
+                                            @if ($tank->hasContamination())
+                                                <div class="badge {{ $tank->isFullyContaminated() ? 'bg-danger' : 'bg-warning text-dark border' }} mt-1 d-block" style="font-size: 0.65rem;">
+                                                    <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ $tank->isFullyContaminated() ? 'FULLY ' : '' }}CONTAMINATED ({{ number_format($tank->contaminated_liters) }}L{{ $tank->hasContamination() && !$tank->isFullyContaminated() ? ' — ' . number_format($tank->sellable_available) . 'L still sellable' : '' }})
                                                 </div>
                                             @endif
                                         </td>
@@ -89,19 +89,21 @@
                                         @if (Auth::user()->canEditModule2())
                                             <td class="text-end">
                                                 <div class="d-flex justify-content-end gap-1">
-                                                    <!-- Contamination Toggle Button -->
-                                                    @if ($tank->is_contaminated)
+                                                    <!-- Contamination Controls (set/adjust quantity, or clear) -->
+                                                    @if ($tank->hasContamination())
+                                                        <span class="badge bg-danger text-white align-self-center me-1" title="Contaminated volume excluded from sellable stock">
+                                                            {{ number_format($tank->contaminated_liters) }}L Contaminated{{ $tank->isFullyContaminated() ? ' (FULL)' : '' }}
+                                                        </span>
                                                         <form method="POST" action="{{ route('wetstock.tanks.toggle-contamination', $tank->id) }}" class="d-inline">
                                                             @csrf
                                                             <button type="submit" class="btn btn-sm btn-success" onclick="return confirm('Clear contamination flag on {{ $tank->name }}?')">
-                                                                <i class="bi bi-shield-check me-1"></i> Clear Contamination
+                                                                <i class="bi bi-shield-check me-1"></i> Clear
                                                             </button>
                                                         </form>
-                                                    @else
-                                                        <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#contamModal-{{ $tank->id }}">
-                                                            <i class="bi bi-exclamation-triangle me-1"></i> Flag Contaminated
-                                                        </button>
                                                     @endif
+                                                    <button type="button" class="btn btn-sm {{ $tank->hasContamination() ? 'btn-outline-warning' : 'btn-outline-danger' }}" data-bs-toggle="modal" data-bs-target="#contamModal-{{ $tank->id }}">
+                                                        <i class="bi bi-exclamation-triangle me-1"></i> {{ $tank->hasContamination() ? 'Adjust' : 'Flag Contaminated' }}
+                                                    </button>
 
                                                     <a href="{{ route('wetstock.tanks.edit', $tank->id) }}" class="btn btn-sm btn-outline-secondary">
                                                         <i class="bi bi-pencil"></i> Edit
@@ -126,37 +128,44 @@
     </div>
 </div>
 
-{{-- Contamination Flag Modals --}}
+{{-- Contamination Flag/Adjust Modals (always available; prefilled with current contaminated liters) --}}
 @foreach ($tanks as $tank)
-    @if (!$tank->is_contaminated)
         <div class="modal fade text-start" id="contamModal-{{ $tank->id }}" tabindex="-1" aria-labelledby="contamLabel-{{ $tank->id }}" aria-hidden="true">
             <div class="modal-dialog">
                 <div class="modal-content border-0 shadow">
                     <form method="POST" action="{{ route('wetstock.tanks.toggle-contamination', $tank->id) }}">
                         @csrf
-                        <div class="modal-header bg-danger text-white">
-                            <h5 class="modal-title fw-bold" id="contamLabel-{{ $tank->id }}"><i class="bi bi-exclamation-triangle-fill me-2"></i>Flag Contaminated: {{ $tank->name }}</h5>
-                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <div class="modal-header {{ $tank->hasContamination() ? 'bg-warning text-dark' : 'bg-danger text-white' }}">
+                            <h5 class="modal-title fw-bold" id="contamLabel-{{ $tank->id }}"><i class="bi bi-exclamation-triangle-fill me-2"></i>{{ $tank->hasContamination() ? 'Adjust Contaminated Volume' : 'Flag Contaminated' }}: {{ $tank->name }}</h5>
+                            <button type="button" class="btn-close {{ $tank->hasContamination() ? '' : 'btn-close-white' }}" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div class="modal-body p-4">
+                            @if ($tank->hasContamination())
+                                <div class="alert alert-warning small py-2">Currently {{ number_format($tank->contaminated_liters) }}L contaminated — {{ number_format($tank->sellable_available) }}L still sellable. Adjust below or use <em>Clear</em> to remove.</div>
+                            @endif
                             <div class="mb-3">
                                 <label for="liters-{{ $tank->id }}" class="form-label fw-semibold">Contaminated Fuel Volume (Liters)</label>
-                                <input type="number" name="contaminated_liters" id="liters-{{ $tank->id }}" class="form-control" value="{{ old('contaminated_liters', $tank->stock_available) }}" min="1" max="{{ max(1, $tank->stock_available) }}" required>
-                                <div class="form-text">Defaults to current available volume ({{ number_format($tank->stock_available) }}L). Adjust if only part is contaminated.</div>
+                                <input type="number" name="contaminated_liters" id="liters-{{ $tank->id }}" class="form-control" value="{{ old('contaminated_liters', $tank->hasContamination() ? $tank->contaminated_liters : $tank->stock_available) }}" min="1" max="{{ max(1, $tank->stock_available) }}" required>
+                                <div class="form-text">
+                                    @if ($tank->hasContamination())
+                                        Adjust the affected volume (max {{ number_format($tank->stock_available) }}L available). Set via this form; clear entirely with the <em>Clear</em> button.
+                                    @else
+                                        Defaults to current available volume ({{ number_format($tank->stock_available) }}L). Adjust if only part is contaminated.
+                                    @endif
+                                </div>
                             </div>
                             <div class="mb-3">
                                 <label for="rem-{{ $tank->id }}" class="form-label fw-semibold">Reason / Remarks</label>
-                                <textarea name="remarks" id="rem-{{ $tank->id }}" rows="2" class="form-control" placeholder="e.g. Water contamination detected during quality check"></textarea>
+                                <textarea name="remarks" id="rem-{{ $tank->id }}" rows="2" class="form-control" placeholder="e.g. Water contamination detected during quality check">{{ old('remarks', $tank->remarks) }}</textarea>
                             </div>
                         </div>
                         <div class="modal-footer bg-light">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" class="btn btn-danger fw-semibold"><i class="bi bi-exclamation-triangle-fill me-1"></i>Flag as Contaminated</button>
+                            <button type="submit" class="btn {{ $tank->hasContamination() ? 'btn-warning' : 'btn-danger' }} fw-semibold"><i class="bi bi-exclamation-triangle-fill me-1"></i>{{ $tank->hasContamination() ? 'Update Contamination' : 'Flag as Contaminated' }}</button>
                         </div>
                     </form>
                 </div>
             </div>
         </div>
-    @endif
 @endforeach
 @endsection

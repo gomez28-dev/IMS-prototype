@@ -127,9 +127,9 @@
                                                                 <option value="" disabled>No warehouse matches this order's site ({{ $delivery->order->location ?? '-' }})</option>
                                                             @else
                                                                 @foreach ($siteWarehouse->activeTanks as $t)
-                                                                    <option value="{{ $t->id }}" data-available="{{ $t->effective_available }}" {{ $t->is_contaminated ? 'disabled' : '' }}>
+                                                                    <option value="{{ $t->id }}" data-available="{{ $t->effective_available }}" {{ $t->isFullyContaminated() ? 'disabled' : '' }}>
                                                                         {{ $t->name }} ({{ ucfirst($t->category) }}) — {{ number_format($t->effective_available) }}L Avail
-                                                                        {{ $t->is_contaminated ? ' [CONTAMINATED]' : '' }}
+                                                                        {{ $t->hasContamination() ? ' [' . number_format($t->contaminated_liters) . 'L Contaminated' . ($t->isFullyContaminated() ? ' - BLOCKED' : '') . ']' : '' }}
                                                                     </option>
                                                                 @endforeach
                                                             @endif

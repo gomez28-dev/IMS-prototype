@@ -70,11 +70,11 @@
                                                 data-warehouse-name="{{ $wh->name }}"
                                                 data-category="{{ $tank->category }}"
                                                 data-available="{{ $tank->effective_available }}"
-                                                data-contaminated="{{ $tank->is_contaminated ? 1 : 0 }}"
+                                                data-contaminated="{{ $tank->contaminated_liters }}"
                                                 {{ (old('source_tank_id', $transfer ? $transfer->source_tank_id : $sourceTankId) == $tank->id) ? 'selected' : '' }}
-                                                {{ ($tank->is_contaminated && (!$transfer || $transfer->source_tank_id != $tank->id)) ? 'disabled' : '' }}>
+                                                {{ ($tank->isFullyContaminated() && (!$transfer || $transfer->source_tank_id != $tank->id)) ? 'disabled' : '' }}>
                                                 {{ $tank->name }} ({{ ucfirst($tank->category) }}) — {{ number_format($tank->effective_available) }}L Avail
-                                                {{ $tank->is_contaminated ? ' [CONTAMINATED - BLOCKED]' : '' }}
+                                                {{ $tank->hasContamination() ? ' [' . number_format($tank->contaminated_liters) . 'L Contaminated' . ($tank->isFullyContaminated() ? ' - BLOCKED' : '') . ']' : '' }}
                                             </option>
                                         @endforeach
                                     </optgroup>

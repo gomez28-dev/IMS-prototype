@@ -131,12 +131,28 @@ class StorageTank extends Model
     }
 
     /**
+     * Whether the tank has ANY contaminated volume flagged (partial or full).
+     */
+    public function hasContamination(): bool
+    {
+        return $this->contaminated_liters > 0;
+    }
+
+    /**
+     * Whether the tank is FULLY contaminated (contaminated volume covers all
+     * physically available stock) — only then is it unusable for transfers/allocation.
+     */
+    public function isFullyContaminated(): bool
+    {
+        return $this->contaminated_liters > 0 && $this->contaminated_liters >= $this->stock_available;
+    }
+
+    /**
      * Stock available for selling (physical volume minus contaminated liters).
      */
     public function getSellableAvailableAttribute(): int
     {
-        $contaminated = $this->is_contaminated ? $this->contaminated_liters : 0;
-        return max(0, $this->stock_available - $contaminated);
+        return max(0, $this->stock_available - $this->contaminated_liters);
     }
 
     /**

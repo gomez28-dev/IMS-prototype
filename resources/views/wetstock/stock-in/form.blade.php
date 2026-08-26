@@ -134,7 +134,8 @@
             warehouse.tanks.forEach(tank => {
                 const opt = document.createElement('option');
                 opt.value = tank.id;
-                opt.textContent = `${tank.name} (Capacity: ${tank.max_capacity.toLocaleString()}L)`;
+                const contamNote = tank.contaminated_liters > 0 ? ` — ${tank.contaminated_liters.toLocaleString()}L Contaminated${tank.contaminated_liters >= tank.stock_available && tank.stock_available > 0 ? ' (FULL)' : ''}` : '';
+                opt.textContent = `${tank.name} (Capacity: ${tank.max_capacity.toLocaleString()}L)${contamNote}`;
                 opt.dataset.maxCap = tank.max_capacity;
                 opt.dataset.available = tank.stock_available;
                 opt.dataset.remaining = tank.remaining_capacity;

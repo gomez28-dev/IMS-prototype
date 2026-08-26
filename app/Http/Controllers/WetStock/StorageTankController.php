@@ -135,7 +135,7 @@ class StorageTankController extends Controller
     }
 
     /**
-     * Toggle contaminated status for a tank or tanker.
+     * Toggle contaminated status for a tank or tanker (partial quantity supported).
      */
     public function toggleContamination(Request $request, StorageTank $tank): RedirectResponse
     {
@@ -143,8 +143,8 @@ class StorageTankController extends Controller
             abort(403);
         }
 
-        if ($tank->is_contaminated) {
-            // Turn off contamination
+        if ($tank->hasContamination()) {
+            // Clear contamination
             $tank->update([
                 'is_contaminated' => false,
                 'contaminated_liters' => 0,
@@ -160,15 +160,18 @@ class StorageTankController extends Controller
 
             return redirect()->back()->with('success', "Contamination flag CLEARED for '{$tank->name}'.");
         } else {
-            // Turn on contamination
+            // Set contamination (partial quantity supported)
             $validated = $request->validate([
-                'contaminated_liters' => ['required', 'integer', 'min:1'],
+                'contaminated_liters' => ['required', 'integer', 'min:1', 'max:' . max(1, $tank->stock_available)],
                 'remarks' => ['nullable', 'string', 'max:1000'],
             ]);
 
+            $liters = (int) $validated['contaminated_liters'];
+            $isFull = $liters >= $tank->stock_available;
+
             $tank->update([
                 'is_contaminated' => true,
-                'contaminated_liters' => $validated['contaminated_liters'],
+                'contaminated_liters' => $liters,
                 'contaminated_date' => now(),
                 'contaminated_by' => Auth::id(),
                 'remarks' => $validated['remarks'] ?? $tank->remarks,
@@ -177,10 +180,11 @@ class StorageTankController extends Controller
             AuditLog::create([
                 'admin_id' => Auth::id(),
                 'action' => 'UPDATED',
-                'description' => "FLAGGED Contaminated on " . strtoupper($tank->category) . " tank '{$tank->name}' in {$tank->warehouse->name}. Affected Volume: " . number_format($tank->contaminated_liters) . "L. Remarks: " . ($validated['remarks'] ?? 'None'),
+                'description' => ($isFull ? "FLAGGED FULLY Contaminated" : "FLAGGED Partially Contaminated") . " on " . strtoupper($tank->category) . " tank '{$tank->name}' in {$tank->warehouse->name}. Affected Volume: " . number_format($liters) . "L of " . number_format($tank->stock_available) . "L. Remarks: " . ($validated['remarks'] ?? 'None'),
             ]);
 
-            return redirect()->back()->with('warning', "Contamination FLAGGED on '{$tank->name}' for " . number_format($tank->contaminated_liters) . "L.");
+            $scope = $isFull ? "FULLY contaminated" : "partially contaminated ({$liters}L of " . number_format($tank->stock_available) . "L)";
+            return redirect()->back()->with('warning', "Contamination FLAGGED on '{$tank->name}' — " . $scope . ". Only the affected volume is blocked from sellable stock.");
         }
     }
 }

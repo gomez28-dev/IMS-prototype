@@ -150,8 +150,8 @@
                 $tt1 = $tankerTanks1[$i] ?? null;
                 $dt2 = $depotTanks2[$i] ?? null;
                 $tt2 = $tankerTanks2[$i] ?? null;
-                $remark1 = fn($t) => $t && $t['is_contaminated'] ? 'CONTAMINATED' : ($t['remarks'] ?? '');
-                $remark2 = fn($t) => $t && $t['is_contaminated'] ? 'CONTAMINATED' : ($t['remarks'] ?? '');
+                $remark1 = fn($t) => $t && ($t['contaminated_liters'] ?? 0) > 0 ? 'CONTAMINATED (' . number_format($t['contaminated_liters']) . 'L)' . (($t['contaminated_liters'] ?? 0) >= ($t['stock_available'] ?? 0) && ($t['stock_available'] ?? 0) > 0 ? ' FULL' : '') : ($t['remarks'] ?? '');
+                $remark2 = fn($t) => $t && ($t['contaminated_liters'] ?? 0) > 0 ? 'CONTAMINATED (' . number_format($t['contaminated_liters']) . 'L)' . (($t['contaminated_liters'] ?? 0) >= ($t['stock_available'] ?? 0) && ($t['stock_available'] ?? 0) > 0 ? ' FULL' : '') : ($t['remarks'] ?? '');
             @endphp
             <tr>
                 <td></td>

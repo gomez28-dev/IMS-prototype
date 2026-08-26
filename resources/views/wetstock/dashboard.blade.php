@@ -90,7 +90,7 @@
                             $barColor = $percentageUsed > 85 ? 'bg-danger' : ($percentageUsed > 60 ? 'bg-warning' : 'bg-success');
                         @endphp
                         <div class="col-md-6 col-lg-4">
-                            <div class="card h-100 border shadow-sm rounded-3 {{ $tank->is_contaminated ? 'border-danger' : '' }}">
+                            <div class="card h-100 border shadow-sm rounded-3 {{ $tank->hasContamination() ? ($tank->isFullyContaminated() ? 'border-danger' : 'border-warning') : '' }}">
                                 <div class="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom-0">
                                     <h6 class="fw-bold mb-0 text-dark">
                                         @if ($tank->isTanker())
@@ -101,8 +101,8 @@
                                         {{ $tank->name }}
                                     </h6>
                                     <div>
-                                        @if ($tank->is_contaminated)
-                                            <span class="badge bg-danger text-white me-1">CONTAMINATED</span>
+                                        @if ($tank->hasContamination())
+                                            <span class="badge {{ $tank->isFullyContaminated() ? 'bg-danger' : 'bg-warning text-dark border' }} me-1" title="{{ number_format($tank->contaminated_liters) }}L contaminated — {{ number_format($tank->sellable_available) }}L still sellable">{{ $tank->isFullyContaminated() ? 'FULLY ' : '' }}CONTAMINATED ({{ number_format($tank->contaminated_liters) }}L)</span>
                                         @endif
                                         <span class="badge bg-light text-muted border small">{{ number_format($tank->max_capacity) }}L max</span>
                                     </div>
