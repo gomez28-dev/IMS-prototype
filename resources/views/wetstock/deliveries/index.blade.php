@@ -173,6 +173,7 @@
                                         <th class="py-3">Volume</th>
                                         <th class="py-3">Assigned Tanks Breakdown</th>
                                         <th class="py-3">Status</th>
+                                        <th class="py-3">Created / Modified By</th>
                                         <th class="pe-3 py-3 text-end">Fulfillment Actions</th>
                                     </tr>
                                 </thead>
@@ -225,6 +226,20 @@
                                                     HOLD (Pending)
                                                 </span>
                                             </td>
+                                            <td class="small">
+                                                <div class="d-flex flex-column gap-1">
+                                                    @foreach ($delivery->allocations as $alloc)
+                                                        <span><i class="bi bi-person-plus me-1 text-secondary"></i>{{ $alloc->assignedBy->name ?? '—' }}</span>
+                                                    @endforeach
+                                                    @if ($delivery->status === 'FULFILLED' && $delivery->fulfilledBy)
+                                                        <span class="text-success"><i class="bi bi-check-circle me-1"></i>{{ $delivery->fulfilledBy->name }}</span>
+                                                    @endif
+                                                    @php $latestMod = $delivery->modificationRequests->sortByDesc('created_at')->first(); @endphp
+                                                    @if ($latestMod)
+                                                        <span class="text-warning"><i class="bi bi-pencil me-1"></i>{{ $latestMod->requestedBy->name ?? '—' }}</span>
+                                                    @endif
+                                                </div>
+                                            </td>
                                             <td class="pe-3 text-end">
                                                 @if (Auth::user()->canMarkFulfilled())
                                                     <form method="POST" action="{{ route('wetstock.deliveries.fulfill', $delivery->id) }}" class="d-inline" onsubmit="return confirm('Mark DR #{{ $delivery->dr_number }} as FULFILLED? This will officially dispatch fuel from the assigned tanks.');">
@@ -272,6 +287,7 @@
                                         <th class="py-3">Volume</th>
                                         <th class="py-3">Tanks Dispatched From</th>
                                         <th class="py-3">Status</th>
+                                        <th class="py-3">Created / Modified By</th>
                                         <th class="py-3">Fulfillment Time</th>
                                         @if (Auth::user()->canMarkFulfilled())
                                             <th class="pe-3 py-3 text-end">Action</th>
@@ -311,6 +327,20 @@
                                                 <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1">
                                                     FULFILLED
                                                 </span>
+                                            </td>
+                                            <td class="small">
+                                                <div class="d-flex flex-column gap-1">
+                                                    @foreach ($delivery->allocations as $alloc)
+                                                        <span><i class="bi bi-person-plus me-1 text-secondary"></i>{{ $alloc->assignedBy->name ?? '—' }}</span>
+                                                    @endforeach
+                                                    @if ($delivery->fulfilledBy)
+                                                        <span class="text-success"><i class="bi bi-check-circle me-1"></i>{{ $delivery->fulfilledBy->name }}</span>
+                                                    @endif
+                                                    @php $latestMod = $delivery->modificationRequests->sortByDesc('created_at')->first(); @endphp
+                                                    @if ($latestMod)
+                                                        <span class="text-warning"><i class="bi bi-pencil me-1"></i>{{ $latestMod->requestedBy->name ?? '—' }}</span>
+                                                    @endif
+                                                </div>
                                             </td>
                                             <td class="text-muted small">
                                                 {{ $delivery->updated_at ? $delivery->updated_at->timezone('Asia/Manila')->format('M d, Y h:i A') : '—' }}

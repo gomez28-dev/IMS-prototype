@@ -37,7 +37,7 @@ class DeliveryAssignmentController extends Controller
         $unassignedDeliveries = $unassignedQuery->paginate(15, ['*'], 'unassigned_page');
 
         // 2. Assigned: Fully or partially allocated deliveries still in PENDING status (awaiting fulfillment)
-        $assignedQuery = Delivery::with(['order', 'allocations.tank.warehouse', 'allocations.assignedBy'])
+        $assignedQuery = Delivery::with(['order', 'allocations.tank.warehouse', 'allocations.assignedBy', 'fulfilledBy', 'modificationRequests.requestedBy', 'modificationRequests.reviewedBy'])
             ->where('status', 'PENDING')
             ->whereHas('allocations')
             ->whereRaw('(SELECT COALESCE(SUM(quantity), 0) FROM delivery_allocations WHERE delivery_id = deliveries.id) >= qty_out')
@@ -47,7 +47,7 @@ class DeliveryAssignmentController extends Controller
         $assignedDeliveries = $assignedQuery->paginate(15, ['*'], 'assigned_page');
 
         // 3. History: Deliveries marked FULFILLED with their tank allocation audit trail
-        $historyQuery = Delivery::with(['order', 'allocations.tank.warehouse', 'allocations.assignedBy'])
+        $historyQuery = Delivery::with(['order', 'allocations.tank.warehouse', 'allocations.assignedBy', 'fulfilledBy', 'modificationRequests.requestedBy', 'modificationRequests.reviewedBy'])
             ->where('status', 'FULFILLED')
             ->orderBy('updated_at', 'desc');
 
@@ -158,7 +158,7 @@ class DeliveryAssignmentController extends Controller
         }
 
         DB::transaction(function () use ($delivery) {
-            $delivery->update(['status' => 'FULFILLED']);
+            $delivery->update(['status' => 'FULFILLED', 'fulfilled_by' => Auth::id()]);
 
             AuditLog::create([
                 'admin_id' => Auth::id(),
