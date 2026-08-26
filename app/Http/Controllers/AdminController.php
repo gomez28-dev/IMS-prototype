@@ -74,13 +74,16 @@ class AdminController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:128'],
+            'username' => ['required', 'string', 'max:64', 'unique:admins,username,' . $admin->id],
             'role' => ['required', 'string', "in:{$rolesList}"],
             'password' => ['nullable', 'string', 'min:8'],
         ]);
 
         $oldRole = $admin->role_label;
+        $oldUsername = $admin->username;
         $admin->update([
             'name' => $validated['name'],
+            'username' => $validated['username'],
             'role' => $validated['role'],
         ]);
 
@@ -90,14 +93,43 @@ class AdminController extends Controller
             ]);
         }
 
+        $desc = "Updated account {$oldUsername}";
+        if ($oldUsername !== $admin->username) {
+            $desc .= " → {$admin->username}";
+        }
+        $desc .= " (Role: {$admin->role_label})";
         AuditLog::create([
             'admin_id' => auth()->id(),
             'action' => 'UPDATED',
-            'description' => "Updated account {$admin->username} (Role: {$admin->role_label})",
+            'description' => $desc,
         ]);
 
         return redirect()->route('accounts.index')
             ->with('success', 'Account updated successfully.');
+    }
+
+    public function destroy(Admin $admin): RedirectResponse
+    {
+        if (!auth()->user()->canManageAccounts()) {
+            abort(403);
+        }
+        if ($admin->id === auth()->id()) {
+            return back()->with('danger', 'You cannot delete your own account.');
+        }
+        if (Admin::where('role', 'admin')->count() <= 1 && $admin->role === 'admin') {
+            return back()->with('danger', 'Cannot delete the last Portal Administrator account.');
+        }
+
+        $username = $admin->username;
+        $admin->delete();
+
+        AuditLog::create([
+            'admin_id' => auth()->id(),
+            'action' => 'DELETED',
+            'description' => "Deleted account {$username}",
+        ]);
+
+        return redirect()->route('accounts.index')->with('success', "Account {$username} deleted successfully.");
     }
 
     public function toggleActive(Admin $admin): RedirectResponse

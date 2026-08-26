@@ -76,6 +76,13 @@
                                             </button>
                                         @endif
                                     </form>
+                                    <form method="POST" action="{{ route('accounts.destroy', $admin->id) }}" class="d-inline" onsubmit="return confirm('Delete account {{ $admin->username }}? This cannot be undone.');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-3 px-3 py-1" title="Delete Account">
+                                            <i class="bi bi-trash me-1"></i> Delete
+                                        </button>
+                                    </form>
                                     @endif
                                 </div>
                             </td>
@@ -125,6 +132,13 @@
                                         <i class="bi bi-play-circle"></i> Reactivate
                                     </button>
                                 @endif
+                            </form>
+                            <form method="POST" action="{{ route('accounts.destroy', $admin->id) }}" class="d-inline" onsubmit="return confirm('Delete account {{ $admin->username }}? This cannot be undone.');">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-3 px-3 py-2" title="Delete Account">
+                                    <i class="bi bi-trash"></i> Delete
+                                </button>
                             </form>
                             @endif
                         </div>

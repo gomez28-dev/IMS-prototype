@@ -28,9 +28,11 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-medium text-secondary small">Username</label>
-                        <input type="text" class="form-control" value="{{ $admin->username }}" disabled readonly>
-                        <div class="form-text small text-muted">Username cannot be changed.</div>
+                        <label for="username" class="form-label fw-medium text-secondary small">Username</label>
+                        <input type="text" name="username" id="username" class="form-control @error('username') is-invalid @enderror" value="{{ old('username', $admin->username) }}" required>
+                        @error('username')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
                     </div>
 
                     <div class="mb-3">

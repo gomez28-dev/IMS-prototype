@@ -80,6 +80,7 @@ Route::middleware('auth')->group(function () {
             Route::get('/{admin}/edit', [AdminController::class, 'edit'])->name('edit');
             Route::post('/{admin}/edit', [AdminController::class, 'update'])->name('update');
             Route::post('/{admin}/toggle-active', [AdminController::class, 'toggleActive'])->name('toggle-active');
+            Route::delete('/{admin}', [AdminController::class, 'destroy'])->name('destroy');
         });
     });
 
