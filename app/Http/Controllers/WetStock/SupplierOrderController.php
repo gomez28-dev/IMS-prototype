@@ -10,6 +10,7 @@ use App\Models\Warehouse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class SupplierOrderController extends Controller
@@ -60,6 +61,7 @@ class SupplierOrderController extends Controller
     {
         $validated = $request->validate([
             'po_number' => ['required', 'string', 'max:255'],
+            'atl_dr_number' => ['required', 'string', 'max:255', Rule::unique('supplier_orders', 'atl_dr_number')],
             'warehouse_id' => ['required', 'exists:warehouses,id'],
             'supplier_name' => ['required', 'string', 'max:255'],
             'liters' => ['required', 'integer', 'min:1'],
@@ -67,23 +69,11 @@ class SupplierOrderController extends Controller
             'remarks' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $po = trim($validated['po_number']);
-        $supplier = trim($validated['supplier_name']);
-        $dup = SupplierOrder::where('po_number', $po)
-            ->whereRaw('LOWER(supplier_name) = ?', [strtolower($supplier)])
-            ->first();
-
-        if ($dup) {
-            return back()->withInput()->with('danger', "Duplicate blocked: PO #{$dup->po_number} already exists for supplier {$dup->supplier_name} (" . number_format($dup->liters) . "L, added " . $dup->created_at->format('M d, Y') . ") — edit the existing entry instead, or use a distinguishing PO reference.");
-        }
-
-        $validated['po_number'] = $po;
-        $validated['supplier_name'] = $supplier;
-
         $supplierOrder = SupplierOrder::create([
-            'po_number' => $validated['po_number'],
+            'po_number' => trim($validated['po_number']),
+            'atl_dr_number' => trim($validated['atl_dr_number']),
             'warehouse_id' => $validated['warehouse_id'],
-            'supplier_name' => $validated['supplier_name'],
+            'supplier_name' => trim($validated['supplier_name']),
             'liters' => $validated['liters'],
             'status' => $validated['status'],
             'remarks' => $validated['remarks'] ?? null,
@@ -124,6 +114,7 @@ class SupplierOrderController extends Controller
 
         $validated = $request->validate([
             'po_number' => ['required', 'string', 'max:255'],
+            'atl_dr_number' => ['required', 'string', 'max:255', Rule::unique('supplier_orders', 'atl_dr_number')->ignore($supplierOrder->id)],
             'warehouse_id' => ['required', 'exists:warehouses,id'],
             'supplier_name' => ['required', 'string', 'max:255'],
             'liters' => ['required', 'integer', 'min:1'],
@@ -132,24 +123,11 @@ class SupplierOrderController extends Controller
             'modification_reason' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $po = trim($validated['po_number']);
-        $supplier = trim($validated['supplier_name']);
-        $validated['po_number'] = $po;
-        $validated['supplier_name'] = $supplier;
-
-        $dup = SupplierOrder::where('po_number', $po)
-            ->whereRaw('LOWER(supplier_name) = ?', [strtolower($supplier)])
-            ->where('id', '!=', $supplierOrder->id)
-            ->first();
-
-        if ($dup) {
-            return back()->withInput()->with('danger', "Duplicate blocked: PO #{$dup->po_number} already exists for supplier {$dup->supplier_name} (" . number_format($dup->liters) . "L, added " . $dup->created_at->format('M d, Y') . ") — edit the existing entry instead, or use a distinguishing PO reference.");
-        }
-
         $newValues = [
-            'po_number' => $po,
+            'po_number' => trim($validated['po_number']),
+            'atl_dr_number' => trim($validated['atl_dr_number']),
             'warehouse_id' => $validated['warehouse_id'],
-            'supplier_name' => $supplier,
+            'supplier_name' => trim($validated['supplier_name']),
             'liters' => (int) $validated['liters'],
             'status' => $validated['status'],
             'remarks' => $validated['remarks'] ?? null,

@@ -25,6 +25,14 @@
                     </div>
 
                     <div class="mb-3">
+                        <label for="atl_dr_number" class="form-label fw-semibold">ATL / D.R. #</label>
+                        <input type="text" name="atl_dr_number" id="atl_dr_number" class="form-control @error('atl_dr_number') is-invalid @enderror" value="{{ old('atl_dr_number', $supplierOrder->atl_dr_number ?? '') }}" required placeholder="e.g. ATL-2026-00123">
+                        @error('atl_dr_number')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <div class="mb-3">
                         <label for="warehouse_id" class="form-label fw-semibold">Destination Location / Warehouse</label>
                         <select name="warehouse_id" id="warehouse_id" class="form-select form-control @error('warehouse_id') is-invalid @enderror" required>
                             <option value="">Select Warehouse...</option>

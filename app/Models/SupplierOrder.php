@@ -12,6 +12,7 @@ class SupplierOrder extends Model
 
     protected $fillable = [
         'po_number',
+        'atl_dr_number',
         'warehouse_id',
         'supplier_name',
         'liters',

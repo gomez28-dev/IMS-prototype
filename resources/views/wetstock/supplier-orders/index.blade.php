@@ -56,6 +56,7 @@
                 <thead>
                     <tr>
                         <th>PO #</th>
+                        <th>ATL/D.R. #</th>
                         <th>Location</th>
                         <th>Supplier</th>
                         <th class="text-end">Volume</th>
@@ -69,6 +70,7 @@
                     @forelse ($supplierOrders as $po)
                         <tr>
                             <td class="fw-bold text-dark">{{ $po->po_number }}</td>
+                            <td class="text-dark">{{ $po->atl_dr_number }}</td>
                             <td>
                                 <span class="badge bg-light text-dark border">{{ $po->warehouse->name ?? 'N/A' }}</span>
                             </td>
