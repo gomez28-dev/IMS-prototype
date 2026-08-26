@@ -6,8 +6,8 @@
 <div class="row justify-content-center">
     <div class="col-md-8 col-lg-6">
         <div class="mb-3">
-            <a href="{{ route('wetstock.stock-in.index') }}" class="text-decoration-none text-secondary small">
-                <i class="bi bi-arrow-left me-1"></i> Back to Stock IN History
+            <a href="{{ $returnUrl ?? route('wetstock.stock-in.index') }}" class="text-decoration-none text-secondary small">
+                <i class="bi bi-arrow-left me-1"></i> {{ ($returnTo ?? null) === 'dashboard' ? 'Back to Dashboard' : 'Back to Stock IN History' }}
             </a>
         </div>
 
@@ -107,7 +107,7 @@
                     </div>
 
                     <div class="d-flex justify-content-end gap-2">
-                        <a href="{{ route('wetstock.stock-in.index') }}" class="btn btn-light border">Cancel</a>
+                        <a href="{{ $returnUrl ?? route('wetstock.stock-in.index') }}" class="btn btn-light border">Cancel</a>
                         <button type="submit" class="btn btn-primary-custom">{{ isset($stockIn) ? 'Save Correction' : 'Log Stock IN' }}</button>
                     </div>
                 </form>
@@ -154,9 +154,14 @@
         const infoBox = document.getElementById('tankInfoBox');
 
         if (selectedOpt && selectedOpt.value) {
-            document.getElementById('infoMaxCap').textContent = Number(selectedOpt.dataset.maxCap).toLocaleString();
-            document.getElementById('infoAvailable').textContent = Number(selectedOpt.dataset.available).toLocaleString();
-            document.getElementById('infoRemaining').textContent = Number(selectedOpt.dataset.remaining).toLocaleString();
+            const maxCap = Number(selectedOpt.dataset.maxCap || 0);
+            const availRaw = selectedOpt.dataset.available;
+            const remainRaw = selectedOpt.dataset.remaining;
+            const avail = Number(availRaw);
+            const remain = Number(remainRaw);
+            document.getElementById('infoMaxCap').textContent = maxCap.toLocaleString();
+            document.getElementById('infoAvailable').textContent = Number.isFinite(avail) ? avail.toLocaleString() : '0';
+            document.getElementById('infoRemaining').textContent = Number.isFinite(remain) ? remain.toLocaleString() : Math.max(0, maxCap - (Number.isFinite(avail) ? avail : 0)).toLocaleString();
             infoBox.classList.remove('d-none');
         } else {
             infoBox.classList.add('d-none');

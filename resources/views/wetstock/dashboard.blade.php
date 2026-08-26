@@ -138,7 +138,7 @@
                                 <div class="card-footer bg-light border-top-0 d-flex justify-content-between align-items-center py-2">
                                     <span class="text-muted" style="font-size: 0.75rem;">Sellable: {{ number_format($tank->sellable_available) }}L</span>
                                     @if (Auth::user()->canEditModule2())
-                                        <a href="{{ route('wetstock.stock-in.create', ['tank_id' => $tank->id]) }}" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size: 0.75rem;">
+                                        <a href="{{ route('wetstock.stock-in.create', ['tank_id' => $tank->id, 'return_to' => 'dashboard']) }}" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size: 0.75rem;">
                                             + Stock IN
                                         </a>
                                     @endif

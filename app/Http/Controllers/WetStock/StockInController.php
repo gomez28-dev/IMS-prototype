@@ -40,11 +40,22 @@ class StockInController extends Controller
             $q->where('is_active', true)->orderBy('name', 'asc');
         }])->orderBy('name', 'asc')->get();
 
+        // Ensure computed stock attributes are present in the JSON payload for the form's JS.
+        $warehouses->each(function ($wh) {
+            $wh->tanks->each->append(['stock_available', 'remaining_capacity', 'effective_available', 'sellable_available']);
+        });
+
         $selectedTankId = $request->query('tank_id');
+        $returnTo = $request->query('return_to');
+        $returnUrl = $returnTo === 'dashboard'
+            ? route('wetstock.dashboard')
+            : route('wetstock.stock-in.index');
 
         return view('wetstock.stock-in.form', [
             'warehouses' => $warehouses,
             'selectedTankId' => $selectedTankId,
+            'returnTo' => $returnTo,
+            'returnUrl' => $returnUrl,
         ]);
     }
 
