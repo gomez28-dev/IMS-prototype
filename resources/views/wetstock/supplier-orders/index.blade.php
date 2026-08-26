@@ -27,6 +27,7 @@
                     <option value="UNLIFTED_PICKUP" {{ $currentStatus === 'UNLIFTED_PICKUP' ? 'selected' : '' }}>Unlifted Stock Pick Up</option>
                     <option value="PENDING_DELIVERY" {{ $currentStatus === 'PENDING_DELIVERY' ? 'selected' : '' }}>Pending Stock Delivery</option>
                     <option value="COMPLETED" {{ $currentStatus === 'COMPLETED' ? 'selected' : '' }}>Completed / Received</option>
+                    <option value="CANCELLED" {{ $currentStatus === 'CANCELLED' ? 'selected' : '' }}>Cancelled Order</option>
                 </select>
             </div>
             <div class="col-md-4">
@@ -78,15 +79,22 @@
                                     <span class="badge bg-warning text-dark px-2 py-1"><i class="bi bi-box-arrow-in-down me-1"></i>Unlifted Pick Up</span>
                                 @elseif ($po->status === 'PENDING_DELIVERY')
                                     <span class="badge bg-info text-dark px-2 py-1"><i class="bi bi-truck me-1"></i>Pending Delivery</span>
+                                @elseif ($po->status === 'CANCELLED')
+                                    <span class="badge bg-danger text-white px-2 py-1"><i class="bi bi-x-circle me-1"></i>Cancelled Order</span>
                                 @else
                                     <span class="badge bg-success px-2 py-1"><i class="bi bi-check-circle me-1"></i>Completed</span>
+                                @endif
+                                @php $pendingReq = $po->modificationRequests->first(); @endphp
+                                @if ($pendingReq)
+                                    <div class="mt-1"><span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-2 py-1" title="Pending modification #{{ $pendingReq->id }}: {{ $pendingReq->reason }}"><i class="bi bi-hourglass-split me-1"></i>Pending Approval</span></div>
                                 @endif
                             </td>
                             <td class="small text-muted">{{ $po->remarks ?: '—' }}</td>
                             <td class="small text-muted">{{ $po->creator->name ?? 'System' }}</td>
                             <td class="text-end">
                                 @if (Auth::user()->canEditModule2())
-                                    @if ($po->status !== 'COMPLETED')
+                                    @php $hasPending = $po->modificationRequests->isNotEmpty(); @endphp
+                                    @if ($po->status !== 'COMPLETED' && $po->status !== 'CANCELLED' && !$hasPending)
                                         <form action="{{ route('wetstock.supplier-orders.complete', $po->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Mark PO #{{ $po->po_number }} as COMPLETED / Received?')">
                                             @csrf
                                             <button type="submit" class="btn btn-sm btn-outline-success me-1" title="Mark Completed">
@@ -94,9 +102,25 @@
                                             </button>
                                         </form>
                                     @endif
-                                    <a href="{{ route('wetstock.supplier-orders.edit', $po->id) }}" class="btn btn-sm btn-outline-primary" title="Edit PO">
-                                        <i class="bi bi-pencil"></i>
-                                    </a>
+                                    @if ($hasPending)
+                                        @if (Auth::user()->canApproveModule2Modification())
+                                            @php $pr = $po->modificationRequests->first(); @endphp
+                                            <form method="POST" action="{{ route('approvals.approve', $pr->id) }}" class="d-inline" onsubmit="return confirm('Approve modification for PO #{{ $po->po_number }}?');">
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm btn-success me-1" title="Approve & Apply"><i class="bi bi-check-lg"></i></button>
+                                            </form>
+                                            <form method="POST" action="{{ route('approvals.reject', $pr->id) }}" class="d-inline" onsubmit="return confirm('Reject modification for PO #{{ $po->po_number }}?');">
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Reject"><i class="bi bi-x-lg"></i></button>
+                                            </form>
+                                        @else
+                                            <span class="text-muted small"><i class="bi bi-lock me-1"></i>Awaiting Approval</span>
+                                        @endif
+                                    @else
+                                        <a href="{{ route('wetstock.supplier-orders.edit', $po->id) }}" class="btn btn-sm btn-outline-primary" title="Edit PO">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                    @endif
                                 @endif
                             </td>
                         </tr>

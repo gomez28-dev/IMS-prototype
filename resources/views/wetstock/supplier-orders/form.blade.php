@@ -59,6 +59,7 @@
                             <option value="UNLIFTED_PICKUP" {{ old('status', $supplierOrder->status ?? 'UNLIFTED_PICKUP') === 'UNLIFTED_PICKUP' ? 'selected' : '' }}>Unlifted Stock Pick Up (Purchased, waiting for our pickup)</option>
                             <option value="PENDING_DELIVERY" {{ old('status', $supplierOrder->status ?? '') === 'PENDING_DELIVERY' ? 'selected' : '' }}>Pending Stock Delivery (In transit to depot)</option>
                             <option value="COMPLETED" {{ old('status', $supplierOrder->status ?? '') === 'COMPLETED' ? 'selected' : '' }}>Completed / Received (Fuel arrived at depot/tanker)</option>
+                            <option value="CANCELLED" {{ old('status', $supplierOrder->status ?? '') === 'CANCELLED' ? 'selected' : '' }}>Cancelled Order</option>
                         </select>
                         @error('status')
                             <div class="invalid-feedback">{{ $message }}</div>
@@ -72,6 +73,17 @@
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
                     </div>
+
+                    @if ($supplierOrder)
+                    <div class="mb-4">
+                        <label for="modification_reason" class="form-label fw-bold text-dark small">Reason for Modification</label>
+                        <textarea name="modification_reason" id="modification_reason" class="form-control @error('modification_reason') is-invalid @enderror" rows="2" placeholder="e.g. PO correction per supplier confirmation...">{{ old('modification_reason') }}</textarea>
+                        @error('modification_reason')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                        <div class="form-text small">This change will be submitted as a modification request for Operations Manager review before updating the live record.</div>
+                    </div>
+                    @endif
 
                     <div class="d-flex justify-content-between align-items-center">
                         <a href="{{ route('wetstock.supplier-orders.index') }}" class="btn btn-secondary-custom">Cancel</a>

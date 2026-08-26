@@ -55,12 +55,12 @@ class ModificationRequestController extends Controller
         }
 
         $pendingQuery = ModificationRequest::with(['requestedBy', 'requestable'])
-            ->where('requestable_type', StockTransfer::class)
+            ->whereIn('requestable_type', [StockTransfer::class, SupplierOrder::class])
             ->where('status', 'PENDING')
             ->orderBy('created_at', 'desc');
 
         $historyQuery = ModificationRequest::with(['requestedBy', 'reviewedBy', 'requestable'])
-            ->where('requestable_type', StockTransfer::class)
+            ->whereIn('requestable_type', [StockTransfer::class, SupplierOrder::class])
             ->whereIn('status', ['APPROVED', 'REJECTED'])
             ->orderBy('reviewed_at', 'desc');
 

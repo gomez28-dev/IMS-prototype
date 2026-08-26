@@ -61,7 +61,7 @@ class ModificationRequest extends Model
     {
         return match ($this->requestable_type) {
             Order::class, Delivery::class => 'Module 1',
-            StockTransfer::class, StorageTank::class => 'Module 2',
+            StockTransfer::class, StorageTank::class, SupplierOrder::class => 'Module 2',
             default => 'General',
         };
     }
@@ -72,6 +72,7 @@ class ModificationRequest extends Model
             Order::class => 'Sales Order',
             Delivery::class => 'Delivery Record (DR)',
             StockTransfer::class => 'Stock Transfer',
+            SupplierOrder::class => 'Supplier Stock PO',
             default => class_basename($this->requestable_type),
         };
     }
@@ -92,6 +93,10 @@ class ModificationRequest extends Model
 
         if ($this->requestable instanceof StockTransfer) {
             return "Transfer #{$this->requestable->transfer_number}";
+        }
+
+        if ($this->requestable instanceof SupplierOrder) {
+            return "PO #{$this->requestable->po_number} ({$this->requestable->supplier_name})";
         }
 
         return "#{$this->requestable_id}";
