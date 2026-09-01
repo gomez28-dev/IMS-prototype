@@ -1,4 +1,4 @@
-﻿@extends('layouts.app')
+@extends('layouts.app')
 
 @section('title', 'Assign Deliveries & Fulfillment')
 
@@ -101,7 +101,7 @@
             <p class="text-muted small mb-3">Allocate sales deliveries to tanks (hold stock) and mark as fulfilled (dispatched fuel).</p>
 
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                {{-- Search by DR Number or ATL Number ΓÇö applies to whichever tab is active --}}
+                {{-- Search by DR Number or ATL Number — applies to whichever tab is active --}}
                 <form method="GET" action="{{ route('wetstock.deliveries.index') }}" class="mb-0 flex-grow-1" style="max-width: 600px;">
                     <input type="hidden" name="tab" value="{{ $activeTab }}">
                     <div class="d-flex align-items-center bg-white border shadow-sm rounded-pill px-3 py-1">
@@ -189,7 +189,7 @@
                                                 @if (!empty($delivery->atl_number))
                                                     {{ $delivery->atl_number }}
                                                 @else
-                                                    <span class="text-muted">ΓÇö</span>
+                                                    <span class="text-muted">—</span>
                                                 @endif
                                             </td>
                                             <td class="client-cell" title="{{ $delivery->order->account ?? '-' }}">{{ $delivery->order->account ?? '-' }}</td>
@@ -220,7 +220,7 @@
                                                 <div class="text-dark">{{ $delivery->createdBy->name ?? 'Legacy Data' }}</div>
                                                 @php $latestApprovedMod = $delivery->modificationRequests->where('status', 'APPROVED')->sortByDesc('created_at')->first(); @endphp
                                                 @if ($latestApprovedMod)
-                                                    <div class="text-warning"><i class="bi bi-pencil me-1"></i>{{ $latestApprovedMod->requestedBy->name ?? 'ΓÇö' }}</div>
+                                                    <div class="text-warning"><i class="bi bi-pencil me-1"></i>{{ $latestApprovedMod->requestedBy->name ?? '—' }}</div>
                                                 @endif
                                             </td>
                                             @if (Auth::user()->canEditModule2())
@@ -239,7 +239,7 @@
                                                                 @else
                                                                     @foreach ($siteWarehouse->activeTanks as $t)
                                                                         <option value="{{ $t->id }}" data-available="{{ $t->effective_available }}" {{ $t->isFullyContaminated() ? 'disabled' : '' }}>
-                                                                            {{ $t->name }} ({{ ucfirst($t->category) }}) ΓÇö {{ number_format($t->effective_available) }}L Avail
+                                                                            {{ $t->name }} ({{ ucfirst($t->category) }}) — {{ number_format($t->effective_available) }}L Avail
                                                                             {{ $t->hasContamination() ? ' [' . number_format($t->contaminated_liters) . 'L Contaminated' . ($t->isFullyContaminated() ? ' - BLOCKED' : '') . ']' : '' }}
                                                                         </option>
                                                                     @endforeach
@@ -297,7 +297,7 @@
                                                 @if (!empty($delivery->atl_number))
                                                     {{ $delivery->atl_number }}
                                                 @else
-                                                    <span class="text-muted">ΓÇö</span>
+                                                    <span class="text-muted">—</span>
                                                 @endif
                                             </td>
                                             <td class="client-cell" title="{{ $delivery->order->account ?? '-' }}">{{ $delivery->order->account ?? '-' }}</td>
@@ -317,8 +317,8 @@
                                                         <div class="d-flex align-items-center justify-content-between bg-light rounded px-2 py-1 border small">
                                                             <div>
                                                                 <i class="bi bi-fuel-pump text-primary me-1"></i>
-                                                                <strong>{{ $alloc->tank->name ?? 'ΓÇö' }}</strong>
-                                                                <span class="text-muted">({{ $alloc->tank->warehouse->name ?? 'ΓÇö' }})</span>
+                                                                <strong>{{ $alloc->tank->name ?? '—' }}</strong>
+                                                                <span class="text-muted">({{ $alloc->tank->warehouse->name ?? '—' }})</span>
                                                             </div>
                                                             <div class="d-flex align-items-center gap-2">
                                                                 <span class="font-monospace fw-bold">{{ number_format($alloc->quantity) }} L</span>
@@ -344,7 +344,7 @@
                                                 <div class="text-dark">{{ $delivery->createdBy->name ?? 'Legacy Data' }}</div>
                                                 @php $latestApprovedMod = $delivery->modificationRequests->where('status', 'APPROVED')->sortByDesc('created_at')->first(); @endphp
                                                 @if ($latestApprovedMod)
-                                                    <div class="text-warning"><i class="bi bi-pencil me-1"></i>{{ $latestApprovedMod->requestedBy->name ?? 'ΓÇö' }}</div>
+                                                    <div class="text-warning"><i class="bi bi-pencil me-1"></i>{{ $latestApprovedMod->requestedBy->name ?? '—' }}</div>
                                                 @endif
                                             </td>
                                             <td class="pe-3 text-end">
@@ -409,7 +409,7 @@
                                                 @if (!empty($delivery->atl_number))
                                                     {{ $delivery->atl_number }}
                                                 @else
-                                                    <span class="text-muted">ΓÇö</span>
+                                                    <span class="text-muted">—</span>
                                                 @endif
                                             </td>
                                             <td class="client-cell" title="{{ $delivery->order->account ?? '-' }}">{{ $delivery->order->account ?? '-' }}</td>
@@ -427,7 +427,7 @@
                                                 <div class="d-flex flex-wrap gap-1">
                                                     @foreach ($delivery->allocations as $alloc)
                                                         <span class="badge bg-light text-dark border px-2 py-1 small">
-                                                            {{ $alloc->tank->name ?? 'ΓÇö' }} ({{ number_format($alloc->quantity) }}L)
+                                                            {{ $alloc->tank->name ?? '—' }} ({{ number_format($alloc->quantity) }}L)
                                                         </span>
                                                     @endforeach
                                                 </div>
@@ -441,11 +441,11 @@
                                                 <div class="text-dark">{{ $delivery->createdBy->name ?? 'Legacy Data' }}</div>
                                                 @php $latestApprovedMod = $delivery->modificationRequests->where('status', 'APPROVED')->sortByDesc('created_at')->first(); @endphp
                                                 @if ($latestApprovedMod)
-                                                    <div class="text-warning"><i class="bi bi-pencil me-1"></i>{{ $latestApprovedMod->requestedBy->name ?? 'ΓÇö' }}</div>
+                                                    <div class="text-warning"><i class="bi bi-pencil me-1"></i>{{ $latestApprovedMod->requestedBy->name ?? '—' }}</div>
                                                 @endif
                                             </td>
                                             <td class="text-muted small">
-                                                {{ $delivery->updated_at ? $delivery->updated_at->timezone('Asia/Manila')->format('M d, Y h:i A') : 'ΓÇö' }}
+                                                {{ $delivery->updated_at ? $delivery->updated_at->timezone('Asia/Manila')->format('M d, Y h:i A') : '—' }}
                                             </td>
                                             @if (Auth::user()->canMarkFulfilled())
                                                 <td class="pe-3 text-end">

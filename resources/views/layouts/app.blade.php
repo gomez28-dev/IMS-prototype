@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -859,7 +859,7 @@
                     <span class="nav-label">Wet Stock Report</span>
                 </a>
                 @if (Auth::user()->canApproveModule2Modification())
-                <a href="{{ route('wetstock.approvals.index') }}" class="sidebar-nav-link {{ request()->routeIs('wetstock.approvals.*') ? 'active' : '' }}" title="Approvals ΓÇö Stock Transfers">
+                <a href="{{ route('wetstock.approvals.index') }}" class="sidebar-nav-link {{ request()->routeIs('wetstock.approvals.*') ? 'active' : '' }}" title="Approvals — Stock Transfers">
                     <i class="bi bi-check2-circle"></i>
                     <span class="nav-label">Approvals</span>
                     @if ($__pendingM2Count > 0)
@@ -889,7 +889,7 @@
                     <span class="nav-label">Reports</span>
                 </a>
                  @if (Auth::user()->canApproveModule1Modification())
-                 <a href="{{ route('approvals.index') }}" class="sidebar-nav-link {{ request()->routeIs('approvals.*') ? 'active' : '' }}" title="Approvals ΓÇö Sales Orders & DRs">
+                 <a href="{{ route('approvals.index') }}" class="sidebar-nav-link {{ request()->routeIs('approvals.*') ? 'active' : '' }}" title="Approvals — Sales Orders & DRs">
                      <i class="bi bi-check2-circle"></i>
                      <span class="nav-label">Approvals</span>
                      @if ($__pendingM1Count > 0)
