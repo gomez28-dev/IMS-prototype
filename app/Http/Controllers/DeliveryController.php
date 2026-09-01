@@ -77,6 +77,7 @@ class DeliveryController extends Controller
 
         $validated = $request->validate([
             'dr_number' => ['required', 'string', 'max:64', 'unique:deliveries,dr_number'],
+            'atl_number' => ['nullable', 'string', 'max:64'],
             'delivery_date' => ['required', 'date'],
             'qty_out' => ['required', 'integer', 'min:0'],
             'status' => ['required', 'string', "in:{$allowedStatuses}"],
@@ -142,6 +143,7 @@ class DeliveryController extends Controller
 
         $validated = $request->validate([
             'dr_number' => ['required', 'string', 'max:64', 'unique:deliveries,dr_number,' . $delivery->id],
+            'atl_number' => ['nullable', 'string', 'max:64'],
             'delivery_date' => ['required', 'date'],
             'qty_out' => ['required', 'integer', 'min:0'],
             'status' => ['required', 'string', "in:{$allowedStatuses}"],
@@ -152,7 +154,7 @@ class DeliveryController extends Controller
 
         // Diff changes against existing model attributes
         $changes = [];
-        $comparableFields = ['dr_number', 'delivery_date', 'qty_out', 'status', 'type', 'remarks'];
+        $comparableFields = ['dr_number', 'atl_number', 'delivery_date', 'qty_out', 'status', 'type', 'remarks'];
 
         foreach ($comparableFields as $field) {
             $oldVal = $delivery->{$field};

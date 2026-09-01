@@ -90,6 +90,7 @@
                 <thead>
                     <tr>
                         <th class="ps-4">DR#</th>
+                        <th>ATL#</th>
                         <th>Delivery Date</th>
                         <th class="text-end">Qty Out</th>
                         <th class="text-center">Status</th>
@@ -104,6 +105,7 @@
                         @foreach ($deliveries as $delivery)
                         <tr class="{{ $delivery->status == 'CANCELLED' ? 'delivery-cancelled' : '' }}">
                             <td class="ps-4 fw-semibold">{{ $delivery->dr_number }}</td>
+                            <td class="text-muted small">{{ $delivery->atl_number ?: '—' }}</td>
                             <td>{{ $delivery->delivery_date ? $delivery->delivery_date->format('Y-m-d') : '' }}</td>
                             <td class="text-end fw-medium">{{ number_format($delivery->qty_out) }}</td>
                             <td class="text-center">
@@ -147,7 +149,7 @@
                         @endforeach
                     @else
                         <tr>
-                            <td colspan="{{ Auth::user()->canEditModule1() ? 6 : 5 }}" class="text-center py-5 text-muted">
+                            <td colspan="{{ Auth::user()->canEditModule1() ? 7 : 6 }}" class="text-center py-5 text-muted">
                                 <i class="bi bi-box-seam fs-1 d-block mb-3 text-secondary"></i>
                                 No deliveries recorded yet for this order.
                             </td>
@@ -175,6 +177,7 @@
                                 @endif
                             </div>
                         </div>
+                        <div class="small text-muted mb-1">ATL#: <span class="fw-medium">{{ $delivery->atl_number ?: '—' }}</span></div>
                         <div class="row mb-2 small text-muted">
                             <div class="col-6">
                                 <span class="fw-medium">Date:</span> {{ $delivery->delivery_date ? $delivery->delivery_date->format('Y-m-d') : '' }}

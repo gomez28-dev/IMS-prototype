@@ -15,6 +15,7 @@ class Delivery extends Model
         'order_id',
         'storage_tank_id',
         'dr_number',
+        'atl_number',
         'delivery_date',
         'qty_out',
         'status',

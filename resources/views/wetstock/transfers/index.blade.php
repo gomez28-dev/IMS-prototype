@@ -32,8 +32,14 @@
         @endif
     </div>
 
+    <div class="d-flex justify-content-end mb-3">
+        <a href="{{ route('wetstock.dashboard') }}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+            <i class="bi bi-arrow-left me-1"></i> Back to Dashboard
+        </a>
+    </div>
+
     {{-- Tabs --}}
-    <ul class="nav nav-pills mb-4 gap-2 bg-white p-2 rounded-4 shadow-sm border">
+    <ul class="nav nav-pills mb-4 gap-2 bg-white p-2 rounded-4 shadow-sm border justify-content-center">
         <li class="nav-item">
             <a class="nav-link rounded-3 {{ $activeType === 'transfer' ? 'active bg-primary text-white fw-semibold' : 'text-dark' }}" href="{{ route('wetstock.transfers.index', ['type' => 'transfer']) }}">
                 <i class="bi bi-arrow-left-right me-1"></i> Intra-Site Transfers

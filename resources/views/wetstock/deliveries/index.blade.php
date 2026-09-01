@@ -18,9 +18,17 @@
                 </h3>
                 <p class="text-muted small mb-0">Allocate sales deliveries to tanks (hold stock) and mark as fulfilled (dispatch fuel).</p>
             </div>
-            <div>
+            <div class="d-flex align-items-center gap-2">
+                <form method="GET" action="{{ route('wetstock.deliveries.index') }}" class="d-flex gap-2 align-items-center">
+                    <input type="hidden" name="tab" value="{{ $activeTab }}">
+                    <input type="text" name="search" value="{{ $search ?? '' }}" placeholder="Search DR # or ATL #..." class="form-control form-control-sm" style="width: 210px;">
+                    <button type="submit" class="btn btn-primary btn-sm">Search</button>
+                    @if (!empty($search))
+                        <a href="{{ route('wetstock.deliveries.index', ['tab' => $activeTab]) }}" class="btn btn-outline-secondary btn-sm">Clear</a>
+                    @endif
+                </form>
                 <a href="{{ route('wetstock.dashboard') }}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
-                    <i class="bi bi-arrow-left me-1"></i> Dashboard
+                    <i class="bi bi-arrow-left me-1"></i> Back to Dashboard
                 </a>
             </div>
         </div>
@@ -28,7 +36,7 @@
         <!-- 3 Nav Tabs -->
         <ul class="nav nav-tabs border-bottom mb-4" id="assignTabs" role="tablist">
             <li class="nav-item" role="presentation">
-                <a class="nav-link fw-semibold {{ $activeTab === 'unassigned' ? 'active text-primary' : 'text-secondary' }}" href="{{ route('wetstock.deliveries.index', ['tab' => 'unassigned']) }}">
+                <a class="nav-link fw-semibold {{ $activeTab === 'unassigned' ? 'active text-primary' : 'text-secondary' }}" href="{{ route('wetstock.deliveries.index', ['tab' => 'unassigned', 'search' => $search ?? '']) }}">
                     <i class="bi bi-inbox me-1 text-warning"></i> 1. Unassigned
                     @if ($unassignedCount > 0)
                         <span class="badge bg-warning text-dark rounded-pill ms-1">{{ $unassignedCount }}</span>
@@ -36,7 +44,7 @@
                 </a>
             </li>
             <li class="nav-item" role="presentation">
-                <a class="nav-link fw-semibold {{ $activeTab === 'assigned' ? 'active text-primary' : 'text-secondary' }}" href="{{ route('wetstock.deliveries.index', ['tab' => 'assigned']) }}">
+                <a class="nav-link fw-semibold {{ $activeTab === 'assigned' ? 'active text-primary' : 'text-secondary' }}" href="{{ route('wetstock.deliveries.index', ['tab' => 'assigned', 'search' => $search ?? '']) }}">
                     <i class="bi bi-check2-circle me-1 text-primary"></i> 2. Assigned (Pending Fulfillment)
                     @if ($assignedCount > 0)
                         <span class="badge bg-primary text-white rounded-pill ms-1">{{ $assignedCount }}</span>
@@ -44,7 +52,7 @@
                 </a>
             </li>
             <li class="nav-item" role="presentation">
-                <a class="nav-link fw-semibold {{ $activeTab === 'history' ? 'active text-primary' : 'text-secondary' }}" href="{{ route('wetstock.deliveries.index', ['tab' => 'history']) }}">
+                <a class="nav-link fw-semibold {{ $activeTab === 'history' ? 'active text-primary' : 'text-secondary' }}" href="{{ route('wetstock.deliveries.index', ['tab' => 'history', 'search' => $search ?? '']) }}">
                     <i class="bi bi-clock-history me-1 text-success"></i> 3. Fulfillment History
                     @if ($historyCount > 0)
                         <span class="badge bg-secondary-subtle text-secondary rounded-pill ms-1">{{ $historyCount }}</span>
@@ -69,6 +77,7 @@
                                 <thead class="bg-light">
                                     <tr>
                                         <th class="ps-3 py-3">DR Number</th>
+                                        <th class="py-3">ATL#</th>
                                         <th class="py-3">Account / Client</th>
                                         <th class="py-3">SO Number</th>
                                         <th class="py-3 text-center">Type</th>
@@ -86,6 +95,7 @@
                                     @foreach ($unassignedDeliveries as $delivery)
                                         <tr>
                                             <td class="ps-3 fw-bold text-dark">{{ $delivery->dr_number }}</td>
+                                            <td class="text-muted small">{{ $delivery->atl_number ?: '—' }}</td>
                                             <td>{{ $delivery->order->account ?? '-' }}</td>
                                             <td>
                                                 <span class="badge bg-light text-dark border">
@@ -156,7 +166,7 @@
                         </div>
 
                         <div class="p-3">
-                            {{ $unassignedDeliveries->appends(['tab' => 'unassigned'])->links() }}
+                            {{ $unassignedDeliveries->appends(['tab' => 'unassigned', 'search' => $search ?? ''])->links() }}
                         </div>
                     @endif
                 </div>
@@ -178,6 +188,7 @@
                                 <thead class="bg-light">
                                     <tr>
                                         <th class="ps-3 py-3">DR Number</th>
+                                        <th class="py-3">ATL#</th>
                                         <th class="py-3">Account / Client</th>
                                         <th class="py-3">SO#</th>
                                         <th class="py-3 text-center">Type</th>
@@ -193,6 +204,7 @@
                                     @foreach ($assignedDeliveries as $delivery)
                                         <tr>
                                             <td class="ps-3 fw-bold text-dark">{{ $delivery->dr_number }}</td>
+                                            <td class="text-muted small">{{ $delivery->atl_number ?: '—' }}</td>
                                             <td>{{ $delivery->order->account ?? '-' }}</td>
                                             <td>
                                                 <span class="badge bg-light text-dark border">
@@ -266,7 +278,7 @@
                         </div>
 
                         <div class="p-3">
-                            {{ $assignedDeliveries->appends(['tab' => 'assigned'])->links() }}
+                            {{ $assignedDeliveries->appends(['tab' => 'assigned', 'search' => $search ?? ''])->links() }}
                         </div>
                     @endif
                 </div>
@@ -288,6 +300,7 @@
                                 <thead class="bg-light">
                                     <tr>
                                         <th class="ps-3 py-3">DR Number</th>
+                                        <th class="py-3">ATL#</th>
                                         <th class="py-3">Account / Client</th>
                                         <th class="py-3">SO#</th>
                                         <th class="py-3 text-center">Type</th>
@@ -306,6 +319,7 @@
                                     @foreach ($historyDeliveries as $delivery)
                                         <tr>
                                             <td class="ps-3 fw-bold text-dark">{{ $delivery->dr_number }}</td>
+                                            <td class="text-muted small">{{ $delivery->atl_number ?: '—' }}</td>
                                             <td>{{ $delivery->order->account ?? '-' }}</td>
                                             <td>
                                                 <span class="badge bg-light text-dark border">
@@ -365,7 +379,7 @@
                         </div>
 
                         <div class="p-3">
-                            {{ $historyDeliveries->appends(['tab' => 'history'])->links() }}
+                            {{ $historyDeliveries->appends(['tab' => 'history', 'search' => $search ?? ''])->links() }}
                         </div>
                     @endif
                 </div>

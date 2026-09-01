@@ -17,6 +17,11 @@
                         <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill"><i class="bi bi-x-circle me-1"></i>CANCELLED ORDER</span>
                     @endif
                     <span class="badge {{ $order && $order->status === 'Cancelled' ? 'bg-danger text-white' : 'bg-light text-dark border' }}">SO# {{ $order->so_number }}</span>
+                    @if ($order && $order->status === 'Cancelled')
+                        <span class="badge bg-danger-subtle text-danger border fw-semibold"><i class="bi bi-x-circle me-1"></i>{{ $order->status }}</span>
+                    @else
+                        <span class="badge bg-success-subtle text-success border fw-semibold"><i class="bi bi-check-circle me-1"></i>{{ $order ? $order->status : 'Active' }}</span>
+                    @endif
                     <span class="text-muted small ms-2">{{ $order->account }}</span>
                     @php
                         $available = $order->effective_qty_ordered - $order->committed_qty_out;
@@ -104,17 +109,12 @@
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-medium text-secondary small d-block">Parent Order Status</label>
-                            @if ($order && $order->status === 'Cancelled')
-                                <span class="badge bg-danger-subtle text-danger border fw-semibold">
-                                    <i class="bi bi-x-circle me-1"></i>{{ $order->status }}
-                                </span>
-                            @else
-                                <span class="badge bg-success-subtle text-success border fw-semibold">
-                                    <i class="bi bi-check-circle me-1"></i>{{ $order ? $order->status : 'Active' }}
-                                </span>
-                            @endif
+                        <div class="col-md-6" id="atl-number-group" style="display:none;">
+                            <label for="atl_number" class="form-label fw-medium text-secondary small">ATL #</label>
+                            <input type="text" name="atl_number" id="atl_number" class="form-control @error('atl_number') is-invalid @enderror" placeholder="e.g. ATL-00123" value="{{ old('atl_number', $delivery ? $delivery->atl_number : '') }}">
+                            @error('atl_number')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
                         </div>
                     </div>
 
@@ -141,6 +141,8 @@
         var statusSelect = document.getElementById('status');
         var warning = document.getElementById('cancel-warning');
         var form = statusSelect ? statusSelect.closest('form') : null;
+        var typeSelect = document.getElementById('type');
+        var atlGroup = document.getElementById('atl-number-group');
 
         function updateWarning() {
             if (statusSelect && warning) {
@@ -148,9 +150,21 @@
             }
         }
 
+        function updateAtlVisibility() {
+            if (typeSelect && atlGroup) {
+                var v = typeSelect.value;
+                atlGroup.style.display = (v === 'PICK-UP') ? '' : 'none';
+            }
+        }
+
         if (statusSelect) {
             statusSelect.addEventListener('change', updateWarning);
             updateWarning();
+        }
+
+        if (typeSelect) {
+            typeSelect.addEventListener('change', updateAtlVisibility);
+            updateAtlVisibility();
         }
 
         if (form) {

@@ -666,6 +666,9 @@
             padding: 0.25rem 0.5rem;
             cursor: pointer;
         }
+
+        .breadcrumb-item a { color: var(--text-muted); }
+        .breadcrumb-item a:hover { color: var(--text-dark); }
     </style>
 </head>
 <body>

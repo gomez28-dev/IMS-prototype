@@ -22,9 +22,16 @@ class DeliveryAssignmentController extends Controller
     public function index(Request $request): View
     {
         $activeTab = $request->get('tab', 'unassigned');
+        $search = trim((string) $request->get('search', ''));
 
         // 1. Unassigned: Deliveries needing tank allocation
         $unassignedQuery = Delivery::with(['order', 'allocations.tank.warehouse', 'allocations.assignedBy', 'fulfilledBy', 'createdBy', 'modificationRequests.requestedBy', 'modificationRequests.reviewedBy'])
+            ->when($search !== '', function ($q) use ($search) {
+                $q->where(function ($sub) use ($search) {
+                    $sub->where('dr_number', 'like', "%{$search}%")
+                        ->orWhere('atl_number', 'like', "%{$search}%");
+                });
+            })
             ->where('status', '!=', 'CANCELLED')
             ->whereHas('order', fn($q) => $q->where('status', '!=', 'Cancelled'))
             ->where(function ($q) {
@@ -38,6 +45,12 @@ class DeliveryAssignmentController extends Controller
 
         // 2. Assigned: Fully or partially allocated deliveries still in PENDING status (awaiting fulfillment)
         $assignedQuery = Delivery::with(['order', 'allocations.tank.warehouse', 'allocations.assignedBy', 'fulfilledBy', 'createdBy', 'modificationRequests.requestedBy', 'modificationRequests.reviewedBy'])
+            ->when($search !== '', function ($q) use ($search) {
+                $q->where(function ($sub) use ($search) {
+                    $sub->where('dr_number', 'like', "%{$search}%")
+                        ->orWhere('atl_number', 'like', "%{$search}%");
+                });
+            })
             ->where('status', 'PENDING')
             ->whereHas('allocations')
             ->whereRaw('(SELECT COALESCE(SUM(quantity), 0) FROM delivery_allocations WHERE delivery_id = deliveries.id) >= qty_out')
@@ -48,6 +61,12 @@ class DeliveryAssignmentController extends Controller
 
         // 3. History: Deliveries marked FULFILLED with their tank allocation audit trail
         $historyQuery = Delivery::with(['order', 'allocations.tank.warehouse', 'allocations.assignedBy', 'fulfilledBy', 'createdBy', 'modificationRequests.requestedBy', 'modificationRequests.reviewedBy'])
+            ->when($search !== '', function ($q) use ($search) {
+                $q->where(function ($sub) use ($search) {
+                    $sub->where('dr_number', 'like', "%{$search}%")
+                        ->orWhere('atl_number', 'like', "%{$search}%");
+                });
+            })
             ->where('status', 'FULFILLED')
             ->orderBy('updated_at', 'desc');
 
@@ -65,6 +84,7 @@ class DeliveryAssignmentController extends Controller
             'historyCount' => $historyCount,
             'warehouses' => $warehouses,
             'activeTab' => $activeTab,
+            'search' => $search,
         ]);
     }
 

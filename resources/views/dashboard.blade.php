@@ -241,15 +241,22 @@
                             <td colspan="{{ auth()->user()->canClearOrders() ? 9 : 8 }}" class="p-3 border-top-0">
                                 <div class="px-4 py-2">
                                     <div class="row g-3">
-                                        <div class="col-sm-4">
+                                        <div class="col-sm-3">
                                             <span class="text-muted small d-block mb-1">Order Date</span>
                                             <span class="fw-medium text-dark">{{ $order->date ? $order->date->format('Y-m-d') : '—' }}</span>
                                         </div>
-                                        <div class="col-sm-4">
+                                        <div class="col-sm-3">
                                             <span class="text-muted small d-block mb-1">PO#</span>
                                             <span class="fw-medium text-dark">{{ $order->po_number ?: '—' }}</span>
                                         </div>
-                                        <div class="col-sm-4">
+                                        <div class="col-sm-3">
+                                            <span class="text-muted small d-block mb-1">ATL#</span>
+                                            @php
+                                                $atlList = $order->deliveries->pluck('atl_number')->filter()->unique()->values();
+                                            @endphp
+                                            <span class="fw-medium text-dark" title="{{ $atlList->implode(', ') }}">{{ $atlList->isNotEmpty() ? $atlList->implode(', ') : '—' }}</span>
+                                        </div>
+                                        <div class="col-sm-3">
                                             <span class="text-muted small d-block mb-1">Qty Out</span>
                                             <span class="fw-medium text-dark">{{ number_format($order->total_qty_out) }}</span>
                                         </div>
