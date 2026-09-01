@@ -1,94 +1,34 @@
-﻿@extends('layouts.app')
+@extends('layouts.app')
 
 @section('title', 'Wet Stock Dashboard')
 
 @section('content')
-<style>
-    .wetstock-dash-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        flex-wrap: nowrap;
-        gap: 0.75rem;
-        margin-bottom: 1.5rem;
-    }
-    .wetstock-dash-title {
-        flex-shrink: 0;
-        transition: font-size 0.15s ease;
-    }
-    html:not([data-sidebar-collapsed]) .wetstock-dash-title h3 {
-        font-size: 1.3rem;
-    }
-    html:not([data-sidebar-collapsed]) .wetstock-dash-title p {
-        display: none;
-    }
-    .wetstock-dash-actions {
-        display: flex;
-        align-items: center;
-        gap: 0.35rem;
-        flex-wrap: nowrap;
-        flex: 1 1 auto;
-        min-width: 0;
-        justify-content: flex-end;
-    }
-    .wetstock-dash-actions .btn {
-        flex: 0 0 auto;
-        white-space: nowrap;
-        transition: padding 0.15s ease, font-size 0.15s ease;
-    }
-    .wetstock-dash-actions .btn-label {
-        white-space: nowrap;
-    }
-    /* Sidebar expanded (default, no data-sidebar-collapsed attr) = less room available:
-       shrink button padding/font/icon-spacing so full labels still fit on one line ΓÇö
-       text is never cut off or ellipsized, only the button chrome shrinks. */
-    html:not([data-sidebar-collapsed]) .wetstock-dash-actions {
-        gap: 0.25rem;
-    }
-    html:not([data-sidebar-collapsed]) .wetstock-dash-actions .btn {
-        font-size: 0.68rem;
-        padding: 0.3rem 0.5rem;
-    }
-    html:not([data-sidebar-collapsed]) .wetstock-dash-actions .btn i {
-        margin-right: 0.25rem !important;
-        font-size: 0.85rem;
-    }
-    html:not([data-sidebar-collapsed]) .wetstock-dash-actions .badge {
-        font-size: 0.6rem !important;
-        padding: 0.2em 0.4em;
-    }
-    /* Sidebar collapsed = more room available: buttons can breathe at full size. */
-    html[data-sidebar-collapsed] .wetstock-dash-actions .btn {
-        font-size: 0.85rem;
-        padding: 0.5rem 0.9rem;
-    }
-</style>
-<div class="wetstock-dash-header">
-    <div class="wetstock-dash-title">
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
         <h3 class="fw-bold text-dark mb-1">
             <i class="bi bi-fuel-pump text-primary me-2"></i>Wet Stock Dashboard
         </h3>
         <p class="text-muted small mb-0">Real-time fuel storage tracking & capacity management</p>
     </div>
-    <div class="wetstock-dash-actions">
-        <a href="{{ route('wetstock.reports.index') }}" class="btn btn-light border shadow-sm rounded-pill btn-sm px-3 d-flex align-items-center">
-            <i class="bi bi-file-earmark-bar-graph me-2 text-primary"></i><span class="fw-medium text-dark btn-label">View Wet Stock Report</span>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ route('wetstock.reports.index') }}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-file-earmark-bar-graph me-1"></i> View Wet Stock Report
         </a>
-        <a href="{{ route('wetstock.transfers.index') }}" class="btn btn-light border shadow-sm rounded-pill btn-sm px-3 d-flex align-items-center">
-            <i class="bi bi-arrow-left-right me-2 text-secondary"></i><span class="fw-medium text-dark btn-label">Stock Transfers</span>
+        <a href="{{ route('wetstock.transfers.index') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left-right me-1"></i> Stock Transfers
         </a>
-        <a href="{{ route('wetstock.supplier-orders.index') }}" class="btn btn-light border shadow-sm rounded-pill btn-sm px-3 d-flex align-items-center">
-            <i class="bi bi-box-arrow-in-down me-2 text-secondary"></i><span class="fw-medium text-dark btn-label">Incoming Stock</span>
+        <a href="{{ route('wetstock.supplier-orders.index') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-box-arrow-in-down me-1"></i> Incoming Stock
         </a>
-        <a href="{{ route('wetstock.deliveries.index') }}" class="btn btn-light border shadow-sm rounded-pill btn-sm px-3 d-flex align-items-center position-relative">
-            <i class="bi bi-truck me-2 text-warning"></i><span class="fw-medium text-dark btn-label">Assign Deliveries</span>
+        <a href="{{ route('wetstock.deliveries.index') }}" class="btn btn-outline-warning btn-sm position-relative">
+            <i class="bi bi-truck me-1"></i> Assign Deliveries
             @if (!empty($unassignedCount) && $unassignedCount > 0)
-                <span class="badge bg-warning text-dark rounded-pill ms-2" style="font-size: 0.68rem;">{{ $unassignedCount }}</span>
+                <span class="badge bg-warning text-dark rounded-pill ms-1">{{ $unassignedCount }}</span>
             @endif
         </a>
         @if (Auth::user()->canEditModule2())
-            <a href="{{ route('wetstock.stock-in.create') }}" class="btn btn-primary-custom rounded-pill btn-sm px-3 shadow-sm d-flex align-items-center">
-                <i class="bi bi-plus-circle me-2"></i><span class="fw-medium btn-label">Log Stock IN</span>
+            <a href="{{ route('wetstock.stock-in.create') }}" class="btn btn-primary-custom btn-sm">
+                <i class="bi bi-plus-circle me-1"></i> Log Stock IN
             </a>
         @endif
     </div>
@@ -162,7 +102,7 @@
                                     </h6>
                                     <div>
                                         @if ($tank->hasContamination())
-                                            <span class="badge {{ $tank->isFullyContaminated() ? 'bg-danger' : 'bg-warning text-dark border' }} me-1" title="{{ number_format($tank->contaminated_liters) }}L contaminated ΓÇö {{ number_format($tank->sellable_available) }}L still sellable">{{ $tank->isFullyContaminated() ? 'FULLY ' : '' }}CONTAMINATED ({{ number_format($tank->contaminated_liters) }}L)</span>
+                                            <span class="badge {{ $tank->isFullyContaminated() ? 'bg-danger' : 'bg-warning text-dark border' }} me-1" title="{{ number_format($tank->contaminated_liters) }}L contaminated — {{ number_format($tank->sellable_available) }}L still sellable">{{ $tank->isFullyContaminated() ? 'FULLY ' : '' }}CONTAMINATED ({{ number_format($tank->contaminated_liters) }}L)</span>
                                         @endif
                                         <span class="badge bg-light text-muted border small">{{ number_format($tank->max_capacity) }}L max</span>
                                     </div>

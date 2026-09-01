@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -195,22 +195,6 @@
 
         .app-sidebar[data-collapsed="1"] .sidebar-nav-link .nav-label {
             display: none;
-        }
-
-        /* Collapsed-state badge: reposition as a small corner dot on the icon
-           instead of sitting inline (which crowds/overlaps the icon when the
-           sidebar has no room for text). */
-        .app-sidebar[data-collapsed="1"] .sidebar-nav-link .badge {
-            position: absolute;
-            top: 4px;
-            right: 10px;
-            margin-left: 0 !important;
-            font-size: 0.6rem;
-            font-weight: 700;
-            padding: 0.15em 0.4em;
-            min-width: 17px;
-            line-height: 1.3;
-            box-shadow: 0 0 0 2px #ffffff;
         }
 
         /* Switch Portal divider + link */
@@ -754,6 +738,9 @@
                     <a class="nav-link d-flex align-items-center" href="{{ route('dashboard') }}">
                         <i class="bi bi-speedometer2 me-2"></i> Dashboard
                     </a>
+                    <a class="nav-link d-flex align-items-center" href="{{ route('reports.index') }}">
+                        <i class="bi bi-bar-chart-line me-2"></i> Reports
+                    </a>
                     @if (Auth::user()->canManageAccounts())
                     <a class="nav-link d-flex align-items-center" href="{{ route('accounts.index') }}">
                         <i class="bi bi-people me-2"></i> Manage Accounts
@@ -764,20 +751,17 @@
                         <i class="bi bi-building me-2"></i> Manage Clients
                     </a>
                     @endif
-                    <a class="nav-link d-flex align-items-center" href="{{ route('reports.index') }}">
-                        <i class="bi bi-bar-chart-line me-2"></i> Reports
+                    @if (Auth::user()->canViewAuditLog())
+                    <a class="nav-link d-flex align-items-center" href="{{ route('audit-logs') }}">
+                        <i class="bi bi-journal-text me-2"></i> Audit Log
                     </a>
+                    @endif
                     @if (Auth::user()->canApproveModule1Modification())
                     <a class="nav-link d-flex align-items-center" href="{{ route('approvals.index') }}">
                         <i class="bi bi-check2-circle me-2"></i> Approvals
                         @if ($__pendingM1Count > 0)
                             <span class="badge rounded-pill ms-1 bg-danger text-white">{{ $__pendingM1Count }}</span>
                         @endif
-                    </a>
-                    @endif
-                    @if (Auth::user()->canViewAuditLog())
-                    <a class="nav-link d-flex align-items-center" href="{{ route('audit-logs') }}">
-                        <i class="bi bi-journal-text me-2"></i> Activity Logs
                     </a>
                     @endif
                 @endif
@@ -859,7 +843,7 @@
                     <span class="nav-label">Wet Stock Report</span>
                 </a>
                 @if (Auth::user()->canApproveModule2Modification())
-                <a href="{{ route('wetstock.approvals.index') }}" class="sidebar-nav-link {{ request()->routeIs('wetstock.approvals.*') ? 'active' : '' }}" title="Approvals ΓÇö Stock Transfers">
+                <a href="{{ route('wetstock.approvals.index') }}" class="sidebar-nav-link {{ request()->routeIs('wetstock.approvals.*') ? 'active' : '' }}" title="Approvals — Stock Transfers">
                     <i class="bi bi-check2-circle"></i>
                     <span class="nav-label">Approvals</span>
                     @if ($__pendingM2Count > 0)
@@ -871,6 +855,10 @@
                 <a href="{{ route('dashboard') }}" class="sidebar-nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}" title="Dashboard">
                     <i class="bi bi-speedometer2"></i>
                     <span class="nav-label">Dashboard</span>
+                </a>
+                <a href="{{ route('reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('reports.*') ? 'active' : '' }}" title="Reports">
+                    <i class="bi bi-bar-chart-line"></i>
+                    <span class="nav-label">Reports</span>
                 </a>
                 @if (Auth::user()->canManageAccounts())
                 <a href="{{ route('accounts.index') }}" class="sidebar-nav-link {{ request()->routeIs('accounts.*') ? 'active' : '' }}" title="Manage Accounts">
@@ -884,23 +872,19 @@
                     <span class="nav-label">Manage Clients</span>
                 </a>
                 @endif
-                <a href="{{ route('reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('reports.*') ? 'active' : '' }}" title="Reports">
-                    <i class="bi bi-bar-chart-line"></i>
-                    <span class="nav-label">Reports</span>
-                </a>
+                 @if (Auth::user()->canViewAuditLog())
+                 <a href="{{ route('audit-logs') }}" class="sidebar-nav-link {{ request()->routeIs('audit-logs') ? 'active' : '' }}" title="Audit Log">
+                     <i class="bi bi-journal-text"></i>
+                     <span class="nav-label">Audit Log</span>
+                 </a>
+                 @endif
                  @if (Auth::user()->canApproveModule1Modification())
-                 <a href="{{ route('approvals.index') }}" class="sidebar-nav-link {{ request()->routeIs('approvals.*') ? 'active' : '' }}" title="Approvals ΓÇö Sales Orders & DRs">
+                 <a href="{{ route('approvals.index') }}" class="sidebar-nav-link {{ request()->routeIs('approvals.*') ? 'active' : '' }}" title="Approvals — Sales Orders & DRs">
                      <i class="bi bi-check2-circle"></i>
                      <span class="nav-label">Approvals</span>
                      @if ($__pendingM1Count > 0)
                          <span class="badge rounded-pill ms-auto bg-danger text-white">{{ $__pendingM1Count }}</span>
                      @endif
-                 </a>
-                 @endif
-                 @if (Auth::user()->canViewAuditLog())
-                 <a href="{{ route('audit-logs') }}" class="sidebar-nav-link {{ request()->routeIs('audit-logs') ? 'active' : '' }}" title="Activity Logs">
-                     <i class="bi bi-journal-text"></i>
-                     <span class="nav-label">Activity Logs</span>
                  </a>
                  @endif
             @endif

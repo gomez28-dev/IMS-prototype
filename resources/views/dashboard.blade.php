@@ -1,116 +1,21 @@
-﻿@extends('layouts.app')
+@extends('layouts.app')
 
 @section('title', 'Dashboard')
 
 @section('content')
-<style>
-    .orders-table {
-        table-layout: fixed;
-        width: 100%;
-    }
-    .orders-table .col-toggle { width: 28px; }
-    .orders-table .col-check { width: 28px; }
-    .orders-table .col-account { width: 20%; }
-    .orders-table .col-location { width: 10%; }
-    .orders-table .col-so { width: 8%; }
-    .orders-table .col-qty { width: 10%; }
-    .orders-table .col-remaining { width: 10%; }
-    .orders-table .col-status { width: 12%; }
-    .orders-table .col-clearance { width: 14%; }
-    .orders-table .col-actions { width: 205px; }
-    .orders-table .col-clearance select {
-        max-width: 100%;
-        font-size: 0.76rem;
-    }
-    .orders-table .actions-cell .btn {
-        font-size: 0.74rem;
-        padding: 0.28rem 0.5rem;
-    }
-    .orders-table thead th {
-        font-size: 0.74rem;
-        font-weight: 600;
-        color: #6b7280;
-        white-space: nowrap;
-        border-bottom: 1px solid #e9ecef;
-    }
-    .orders-table tbody td {
-        font-size: 0.82rem;
-        vertical-align: middle;
-    }
-    .orders-table th,
-    .orders-table td {
-        padding-top: 0.55rem;
-        padding-bottom: 0.55rem;
-        padding-left: 0.5rem;
-        padding-right: 0.5rem;
-    }
-    .orders-table tbody tr.main-row {
-        border-bottom: 1px solid #f1f3f5;
-    }
-    .orders-table tbody tr.main-row:hover {
-        background-color: #fafbfc;
-    }
-    .orders-table .account-cell {
-        max-width: 190px;
-        font-size: 0.8rem;
-        line-height: 1.3;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: normal;
-    }
-    .orders-table .actions-cell {
-        white-space: nowrap;
-    }
-    .orders-search-pill {
-        display: flex;
-        align-items: center;
-        background: #ffffff;
-        border: 1px solid var(--border-color);
-        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-        border-radius: 50rem;
-        padding: 0.4rem 1rem;
-    }
-    .orders-search-pill input {
-        border: none !important;
-        box-shadow: none !important;
-        padding: 0.15rem 0 !important;
-    }
-</style>
 <!-- Header Section -->
-<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-5 gap-3">
     <div>
         <h2 class="fw-bold text-dark mb-1">Orders Dashboard</h2>
         <p class="text-muted small mb-0">Manage customer accounts, sales orders, and delivery statuses.</p>
     </div>
-    <div class="d-flex gap-2 flex-wrap align-items-center">
-        <a href="{{ route('reports.index') }}" class="btn btn-light border shadow-sm rounded-pill btn-sm px-3 d-flex align-items-center">
-            <i class="bi bi-bar-chart-line me-2 text-primary"></i><span class="fw-medium text-dark">Reports</span>
-        </a>
-        @if (Auth::user()->canManageAccounts())
-            <a href="{{ route('accounts.index') }}" class="btn btn-light border shadow-sm rounded-pill btn-sm px-3 d-flex align-items-center">
-                <i class="bi bi-people me-2 text-secondary"></i><span class="fw-medium text-dark">Manage Accounts</span>
-            </a>
-        @endif
+    <div class="row g-2">
         @if (Auth::user()->canEditModule1())
-            <a href="{{ route('clients.index') }}" class="btn btn-light border shadow-sm rounded-pill btn-sm px-3 d-flex align-items-center">
-                <i class="bi bi-building me-2 text-secondary"></i><span class="fw-medium text-dark">Manage Clients</span>
+        <div class="col-12 col-md-auto">
+            <a href="{{ route('order.create') }}" class="btn btn-primary-custom shadow-sm d-flex align-items-center justify-content-center w-100">
+                <i class="bi bi-plus-lg me-2"></i> New Order
             </a>
-        @endif
-        @if (Auth::user()->canApproveModule1Modification())
-            <a href="{{ route('approvals.index') }}" class="btn btn-light border shadow-sm rounded-pill btn-sm px-3 d-flex align-items-center position-relative">
-                <i class="bi bi-check2-circle me-2 text-warning"></i><span class="fw-medium text-dark">Approvals</span>
-                @if (!empty($pendingM1Count) && $pendingM1Count > 0)
-                    <span class="badge bg-danger text-white rounded-pill ms-2" style="font-size: 0.68rem;">{{ $pendingM1Count }}</span>
-                @endif
-            </a>
-        @endif
-        @if (Auth::user()->canEditModule1())
-            <a href="{{ route('order.create') }}" class="btn btn-primary-custom rounded-pill btn-sm px-3 shadow-sm d-flex align-items-center">
-                <i class="bi bi-plus-lg me-2"></i><span class="fw-medium">New Order</span>
-            </a>
+        </div>
         @endif
     </div>
 </div>
@@ -179,15 +84,21 @@
 
 <!-- Search & Filtering -->
 <div class="mb-4">
-    <form method="GET" action="{{ route('dashboard') }}" class="d-flex flex-wrap gap-2 align-items-center">
-        <div class="orders-search-pill flex-grow-1" style="max-width: 480px;">
-            <i class="bi bi-search text-muted me-2"></i>
-            <input type="text" name="search" class="form-control form-control-sm" placeholder="Search by Account or SO#..." value="{{ $searchQuery }}">
+    <form method="GET" action="{{ route('dashboard') }}" class="row g-2 align-items-center">
+        <div class="col-md-6 col-sm-8 col-10">
+            <div class="input-group">
+                <span class="input-group-text bg-white border-end-0">
+                    <i class="bi bi-search text-muted"></i>
+                </span>
+                <input type="text" name="search" class="form-control border-start-0" placeholder="Search by Account or SO#..." value="{{ $searchQuery }}">
+            </div>
         </div>
-        <button type="submit" class="btn btn-primary-custom rounded-pill btn-sm px-3">Search</button>
-        @if ($searchQuery !== '')
-            <a href="{{ route('dashboard', ['clear' => 1]) }}" class="btn btn-outline-secondary rounded-pill btn-sm px-3">Clear</a>
-        @endif
+        <div class="col-auto">
+            <button type="submit" class="btn btn-primary-custom">Search</button>
+            @if ($searchQuery !== '')
+                <a href="{{ route('dashboard', ['clear' => 1]) }}" class="btn btn-secondary-custom">Clear</a>
+            @endif
+        </div>
     </form>
 </div>
 
@@ -217,33 +128,30 @@
     <div class="card-body p-0">
         <!-- Desktop table -->
         <div class="table-responsive d-none d-md-block">
-            <table class="table table-hover align-middle mb-0 orders-table">
+            <table class="table table-custom table-hover align-middle mb-0">
                 <thead>
                     <tr>
-                        <th class="col-toggle" style="width: 30px;"></th>
+                        <th style="width: 40px;"></th>
                         @if (auth()->user()->canClearOrders())
-                        <th class="col-check text-center" style="width: 30px;">
+                        <th style="width: 40px;" class="text-center">
                             <input type="checkbox" id="checkAllDesktop" class="form-check-input order-check-all" title="Select all on this page">
                         </th>
                         @endif
-                        <th class="col-account ps-3">Account</th>
-                        <th class="col-location">Location</th>
-                        <th class="col-so">SO#</th>
-                        <th class="col-qty text-center">Qty Ordered</th>
-                        <th class="col-remaining text-center">Remaining</th>
-                        <th class="col-status text-center">Status</th>
-                        <th class="col-clearance text-center">Clearance</th>
-                        <th class="col-actions text-center">Actions</th>
+                        <th class="ps-4">Account</th>
+                        <th>Location</th>
+                        <th>SO#</th>
+                        <th class="text-center">Qty Ordered</th>
+                        <th class="text-center">Remaining Balance</th>
+                        <th class="text-center">Status</th>
+                        <th class="text-center">Clearance</th>
+                        <th class="text-end pe-4">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     @if ($orders->isNotEmpty())
                         @foreach ($orders as $order)
-                        @php
-                            $atlNumbers = $order->deliveries->pluck('atl_number')->filter()->unique()->values();
-                        @endphp
                         <tr class="main-row {{ $order->status === 'Cancelled' ? 'order-cancelled' : '' }}" style="cursor: pointer;">
-                            <td class="text-center toggle-expand ps-2">
+                            <td class="text-center toggle-expand ps-3">
                                 <i class="bi bi-chevron-down text-secondary fs-6 toggle-icon"></i>
                             </td>
                             @if (auth()->user()->canClearOrders())
@@ -251,7 +159,7 @@
                                 <input type="checkbox" class="form-check-input order-check" value="{{ $order->id }}">
                             </td>
                             @endif
-                            <td class="ps-3 fw-semibold text-dark account-cell" title="{{ $order->account }}">{{ $order->account }}</td>
+                            <td class="ps-4 fw-semibold text-dark">{{ $order->account }}</td>
                             <td>
                                 @if ($order->location === 'San Simon')
                                     <span class="badge" style="background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a;">San Simon</span>
@@ -308,20 +216,20 @@
                                 <span class="badge rounded-pill px-3 py-1 border {{ $badgeClass }}">{{ $cls }}</span>
                                 @endif
                             </td>
-                            <td class="text-center actions-cell">
-                                <div class="d-flex justify-content-center gap-1 flex-nowrap">
-                                    <a href="{{ route('order.deliveries', $order->id) }}" class="btn btn-sm btn-outline-primary rounded-pill px-2 py-1" title="View Deliveries">
+                            <td class="text-end pe-4">
+                                <div class="d-flex justify-content-end gap-2">
+                                    <a href="{{ route('order.deliveries', $order->id) }}" class="btn btn-sm btn-outline-primary rounded-3 px-3 py-1" title="View Deliveries">
                                         <i class="bi bi-truck me-1"></i> Deliveries
                                     </a>
                                     @if (Auth::user()->canEditModule1())
-                                    <a href="{{ route('order.edit', $order->id) }}" class="btn btn-sm btn-outline-secondary rounded-pill px-2 py-1" title="Edit Order">
+                                    <a href="{{ route('order.edit', $order->id) }}" class="btn btn-sm btn-outline-secondary rounded-3 px-3 py-1" title="Edit Order">
                                         <i class="bi bi-pencil"></i>
                                     </a>
                                     @endif
                                     @if (Auth::user()->isAdmin())
                                     <form method="POST" action="{{ route('order.delete', $order->id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this order? This will also delete all associated deliveries.');">
                                         @csrf
-                                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-2 py-1" title="Delete Order">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-3 px-3 py-1" title="Delete Order">
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </form>
@@ -331,31 +239,19 @@
                         </tr>
                         <tr class="expand-row" style="display: none; background-color: #fafafa;">
                             <td colspan="{{ auth()->user()->canClearOrders() ? 9 : 8 }}" class="p-3 border-top-0">
-                                <div class="px-3 py-2">
+                                <div class="px-4 py-2">
                                     <div class="row g-3">
-                                        <div class="col-sm-3">
+                                        <div class="col-sm-4">
                                             <span class="text-muted small d-block mb-1">Order Date</span>
-                                            <span class="fw-medium text-dark">{{ $order->date ? $order->date->format('Y-m-d') : 'ΓÇö' }}</span>
+                                            <span class="fw-medium text-dark">{{ $order->date ? $order->date->format('Y-m-d') : '—' }}</span>
                                         </div>
-                                        <div class="col-sm-3">
+                                        <div class="col-sm-4">
                                             <span class="text-muted small d-block mb-1">PO#</span>
-                                            <span class="fw-medium text-dark">{{ $order->po_number ?: 'ΓÇö' }}</span>
+                                            <span class="fw-medium text-dark">{{ $order->po_number ?: '—' }}</span>
                                         </div>
-                                        <div class="col-sm-3">
+                                        <div class="col-sm-4">
                                             <span class="text-muted small d-block mb-1">Qty Out</span>
                                             <span class="fw-medium text-dark">{{ number_format($order->total_qty_out) }}</span>
-                                        </div>
-                                        <div class="col-sm-3">
-                                            <span class="text-muted small d-block mb-1">ATL#(s)</span>
-                                            @if ($atlNumbers->isNotEmpty())
-                                                <div class="d-flex flex-wrap gap-1">
-                                                    @foreach ($atlNumbers as $atl)
-                                                        <span class="badge bg-light text-dark border">{{ $atl }}</span>
-                                                    @endforeach
-                                                </div>
-                                            @else
-                                                <span class="fw-medium text-muted">ΓÇö</span>
-                                            @endif
                                         </div>
                                     </div>
                                 </div>
@@ -463,19 +359,6 @@
                                 <span class="badge rounded-pill px-3 py-1 border {{ $badgeClass }}">{{ $cls }}</span>
                             @endif
                         </div>
-                        @php
-                            $atlNumbersMobile = $order->deliveries->pluck('atl_number')->filter()->unique()->values();
-                        @endphp
-                        @if ($atlNumbersMobile->isNotEmpty())
-                        <div class="d-flex justify-content-between align-items-start mb-3">
-                            <span class="text-muted small">ATL#(s):</span>
-                            <div class="d-flex flex-wrap gap-1 justify-content-end">
-                                @foreach ($atlNumbersMobile as $atl)
-                                    <span class="badge bg-light text-dark border">{{ $atl }}</span>
-                                @endforeach
-                            </div>
-                        </div>
-                        @endif
                         <div class="d-flex gap-2">
                             <a href="{{ route('order.deliveries', $order->id) }}" class="btn btn-sm btn-outline-primary rounded-3 px-3 py-2 flex-fill text-center">
                                 <i class="bi bi-truck me-1"></i> Deliveries
