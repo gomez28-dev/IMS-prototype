@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('title', 'Incoming Supplier Stock')
 
@@ -56,13 +56,13 @@
                 <thead>
                     <tr>
                         <th>PO #</th>
-                        <th>ATL/D.R. #</th>
+                        <th>ATL/DR #</th>
                         <th>Location</th>
                         <th>Supplier</th>
                         <th class="text-end">Volume</th>
                         <th>Status</th>
                         <th>Remarks</th>
-                        <th>Added By</th>
+                        <th>Created By</th>
                         <th class="text-end">Actions</th>
                     </tr>
                 </thead>
@@ -91,7 +91,7 @@
                                     <div class="mt-1"><span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-2 py-1" title="Pending modification #{{ $pendingReq->id }}: {{ $pendingReq->reason }}"><i class="bi bi-hourglass-split me-1"></i>Pending Approval</span></div>
                                 @endif
                             </td>
-                            <td class="small text-muted">{{ $po->remarks ?: '—' }}</td>
+                            <td class="small text-muted">{{ $po->remarks ?: 'ΓÇö' }}</td>
                             <td class="small text-muted">{{ $po->creator->name ?? 'System' }}</td>
                             <td class="text-end">
                                 @if (Auth::user()->canEditModule2())

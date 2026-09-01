@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('title', $title)
 
@@ -118,6 +118,22 @@
                         </div>
                     </div>
 
+                    {{-- NEW: ATL Number ΓÇö only relevant for PICK-UP deliveries. Shown/hidden by JS
+                         below based on the Delivery Type selection, and required server-side only
+                         when type is PICK-UP (see DeliveryController validation). --}}
+                    <div class="row mb-3 d-none" id="atl-number-row">
+                        <div class="col-md-6">
+                            <label for="atl_number" class="form-label fw-medium text-secondary small">ATL Number</label>
+                            <input type="text" name="atl_number" id="atl_number" class="form-control @error('atl_number') is-invalid @enderror" placeholder="e.g. ATL-1234" value="{{ old('atl_number', $delivery ? $delivery->atl_number : '') }}">
+                            @error('atl_number')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                            <small class="text-muted d-block mt-1" style="font-size: 0.75rem;">
+                                <i class="bi bi-info-circle me-1"></i>Required for Pick-Up deliveries. Must be unique across all deliveries.
+                            </small>
+                        </div>
+                    </div>
+
                     <div class="mb-4">
                         <label for="remarks" class="form-label fw-medium text-secondary small">Additional Notes</label>
                         <textarea name="remarks" id="remarks" class="form-control @error('remarks') is-invalid @enderror" rows="3" placeholder="Optional additional notes...">{{ old('remarks', $delivery ? $delivery->remarks : '') }}</textarea>
@@ -162,6 +178,25 @@
                     }
                 }
             });
+        }
+
+        // NEW: show/hide ATL Number field based on Delivery Type
+        var typeSelect = document.getElementById('type');
+        var atlRow = document.getElementById('atl-number-row');
+        var atlInput = document.getElementById('atl_number');
+
+        function updateAtlVisibility() {
+            if (!typeSelect || !atlRow) return;
+            var isPickup = typeSelect.value === 'PICK-UP';
+            atlRow.classList.toggle('d-none', !isPickup);
+            if (atlInput) {
+                atlInput.required = isPickup;
+            }
+        }
+
+        if (typeSelect) {
+            typeSelect.addEventListener('change', updateAtlVisibility);
+            updateAtlVisibility();
         }
     })();
 </script>

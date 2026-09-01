@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 namespace App\Http\Controllers\WetStock;
 
@@ -12,16 +12,36 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 
 class DeliveryAssignmentController extends Controller
 {
     /**
-     * Display delivery assignments — 3 tabs: Unassigned, Assigned (Pending Fulfillment), and History (Fulfilled).
+     * Display delivery assignments ΓÇö 3 tabs: Unassigned, Assigned (Pending Fulfillment), and History (Fulfilled).
      */
     public function index(Request $request): View
     {
         $activeTab = $request->get('tab', 'unassigned');
+
+        // NEW: search term applies across all three tabs, matching on DR number or ATL number.
+        // Safety: we check whether `atl_number` actually exists on `deliveries` before querying
+        // it, so this can never throw a "column not found" error and break the page ΓÇö it will
+        // just silently search DR number only if the ATL column isn't present under this name.
+        $search = trim((string) $request->get('search', ''));
+        $hasAtlColumn = Schema::hasColumn('deliveries', 'atl_number');
+
+        $applySearch = function ($query) use ($search, $hasAtlColumn) {
+            if ($search !== '') {
+                $query->where(function ($q) use ($search, $hasAtlColumn) {
+                    $q->where('dr_number', 'like', "%{$search}%");
+                    if ($hasAtlColumn) {
+                        $q->orWhere('atl_number', 'like', "%{$search}%");
+                    }
+                });
+            }
+            return $query;
+        };
 
         // 1. Unassigned: Deliveries needing tank allocation
         $unassignedQuery = Delivery::with(['order', 'allocations.tank.warehouse', 'allocations.assignedBy', 'fulfilledBy', 'createdBy', 'modificationRequests.requestedBy', 'modificationRequests.reviewedBy'])
@@ -30,29 +50,32 @@ class DeliveryAssignmentController extends Controller
             ->where(function ($q) {
                 $q->whereDoesntHave('allocations')
                     ->orWhereRaw('(SELECT COALESCE(SUM(quantity), 0) FROM delivery_allocations WHERE delivery_id = deliveries.id) < qty_out');
-            })
-            ->orderBy('delivery_date', 'desc');
+            });
+        $applySearch($unassignedQuery);
+        $unassignedQuery->orderBy('delivery_date', 'desc');
 
         $unassignedCount = (clone $unassignedQuery)->count();
-        $unassignedDeliveries = $unassignedQuery->paginate(15, ['*'], 'unassigned_page');
+        $unassignedDeliveries = $unassignedQuery->paginate(15, ['*'], 'unassigned_page')->appends($request->query());
 
         // 2. Assigned: Fully or partially allocated deliveries still in PENDING status (awaiting fulfillment)
         $assignedQuery = Delivery::with(['order', 'allocations.tank.warehouse', 'allocations.assignedBy', 'fulfilledBy', 'createdBy', 'modificationRequests.requestedBy', 'modificationRequests.reviewedBy'])
             ->where('status', 'PENDING')
             ->whereHas('allocations')
-            ->whereRaw('(SELECT COALESCE(SUM(quantity), 0) FROM delivery_allocations WHERE delivery_id = deliveries.id) >= qty_out')
-            ->orderBy('delivery_date', 'desc');
+            ->whereRaw('(SELECT COALESCE(SUM(quantity), 0) FROM delivery_allocations WHERE delivery_id = deliveries.id) >= qty_out');
+        $applySearch($assignedQuery);
+        $assignedQuery->orderBy('delivery_date', 'desc');
 
         $assignedCount = (clone $assignedQuery)->count();
-        $assignedDeliveries = $assignedQuery->paginate(15, ['*'], 'assigned_page');
+        $assignedDeliveries = $assignedQuery->paginate(15, ['*'], 'assigned_page')->appends($request->query());
 
         // 3. History: Deliveries marked FULFILLED with their tank allocation audit trail
         $historyQuery = Delivery::with(['order', 'allocations.tank.warehouse', 'allocations.assignedBy', 'fulfilledBy', 'createdBy', 'modificationRequests.requestedBy', 'modificationRequests.reviewedBy'])
-            ->where('status', 'FULFILLED')
-            ->orderBy('updated_at', 'desc');
+            ->where('status', 'FULFILLED');
+        $applySearch($historyQuery);
+        $historyQuery->orderBy('updated_at', 'desc');
 
         $historyCount = (clone $historyQuery)->count();
-        $historyDeliveries = $historyQuery->paginate(20, ['*'], 'history_page');
+        $historyDeliveries = $historyQuery->paginate(20, ['*'], 'history_page')->appends($request->query());
 
         $warehouses = Warehouse::with(['activeTanks'])->orderBy('name', 'asc')->get();
 
@@ -65,6 +88,7 @@ class DeliveryAssignmentController extends Controller
             'historyCount' => $historyCount,
             'warehouses' => $warehouses,
             'activeTab' => $activeTab,
+            'search' => $search, // NEW: so the Blade view can repopulate the search box
         ]);
     }
 
@@ -129,7 +153,7 @@ class DeliveryAssignmentController extends Controller
             'admin_id' => Auth::id(),
             'action' => 'UPDATED',
             'description' => "Allocated {$quantity}L of DR #{$delivery->dr_number} ({$delivery->qty_out}L) to tank {$tank->name} ({$tank->warehouse->name})"
-                . ($isFullyAllocated ? ' — DR is now fully allocated and ready for fulfillment in the Assigned tab.' : ''),
+                . ($isFullyAllocated ? ' ΓÇö DR is now fully allocated and ready for fulfillment in the Assigned tab.' : ''),
         ]);
 
         $message = $isFullyAllocated

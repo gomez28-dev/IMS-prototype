@@ -1,9 +1,96 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('title', 'Stock Transfers, Borrows & Returns')
 
 @section('content')
+<style>
+    /* ---- Segmented tab bar (matches Delivery Allocations page) ---- */
+    .nav-tabs-flat {
+        display: flex;
+        background: #fff;
+        border-radius: 1rem;
+        box-shadow: 0 1px 3px rgba(16, 24, 40, 0.06);
+        overflow: hidden;
+        margin-bottom: 1.5rem;
+    }
+    .nav-tabs-flat .tab-item {
+        flex: 1 1 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: .55rem;
+        padding: 1.1rem 1.25rem;
+        color: #6c757d;
+        font-weight: 600;
+        font-size: .95rem;
+        text-decoration: none;
+        border-right: 1px solid #eef0f2;
+        background: #fff;
+        transition: background .15s ease, color .15s ease;
+        white-space: nowrap;
+    }
+    .nav-tabs-flat .tab-item:last-child { border-right: none; }
+    .nav-tabs-flat .tab-item:hover { background: #f8f9fa; color: #495057; }
+    .nav-tabs-flat .tab-item.active { color: #fd7e14; background: #fff6ee; }
+    .nav-tabs-flat .tab-item i { font-size: 1.05rem; }
+    .nav-tabs-flat .tab-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 24px;
+        height: 22px;
+        padding: 0 7px;
+        border-radius: 999px;
+        font-size: .75rem;
+        font-weight: 700;
+        background: #eef0f2;
+        color: #6c757d;
+    }
+    .nav-tabs-flat .tab-item.active .tab-badge { background: #fd7e14; color: #fff; }
+
+    /* ---- Page action buttons, lighter / consistent radius ---- */
+    .btn-page-action {
+        border-radius: .65rem;
+        padding: .55rem 1.1rem;
+        font-weight: 600;
+        font-size: .9rem;
+    }
+
+    /* ---- Summary info cards (replace heavy alert blocks) ---- */
+    .summary-panel {
+        background: #fff;
+        border: 1px solid #eef0f2;
+        border-radius: 1rem;
+        box-shadow: 0 1px 3px rgba(16, 24, 40, 0.06);
+        padding: 1.1rem 1.25rem;
+        margin-bottom: 1.5rem;
+    }
+    .summary-panel .summary-heading {
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+        font-weight: 700;
+        color: #212529;
+        margin-bottom: .75rem;
+    }
+    .summary-stat {
+        background: #f8f9fa;
+        border-radius: .75rem;
+        padding: .75rem 1rem;
+        flex: 1 1 220px;
+    }
+    .summary-stat .stat-value { font-size: 1.15rem; font-weight: 700; font-family: var(--bs-font-monospace, monospace); }
+
+    /* ---- Table / filter cards ---- */
+    .card-flat {
+        border: 1px solid #eef0f2;
+        border-radius: 1rem;
+        box-shadow: 0 1px 3px rgba(16, 24, 40, 0.06);
+    }
+</style>
+
 <div class="container-fluid px-0">
+    {{-- Header --}}
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
         <div>
             <nav aria-label="breadcrumb">
@@ -19,77 +106,74 @@
         </div>
         @if (Auth::user()->canEditModule2())
         <div class="d-flex flex-wrap gap-2">
-            <a href="{{ route('wetstock.transfers.create', ['type' => 'transfer']) }}" class="btn btn-primary-custom shadow-sm d-flex align-items-center">
+            <a href="{{ route('wetstock.transfers.create', ['type' => 'transfer']) }}" class="btn btn-primary-custom btn-page-action d-flex align-items-center">
                 <i class="bi bi-arrow-left-right me-1"></i> Intra-Site Transfer
             </a>
-            <a href="{{ route('wetstock.transfers.create', ['type' => 'borrow']) }}" class="btn btn-secondary-custom shadow-sm d-flex align-items-center">
+            <a href="{{ route('wetstock.transfers.create', ['type' => 'borrow']) }}" class="btn btn-outline-secondary btn-page-action d-flex align-items-center">
                 <i class="bi bi-box-arrow-in-up-right me-1 text-primary"></i> Borrow Stock
             </a>
-            <a href="{{ route('wetstock.transfers.create', ['type' => 'return']) }}" class="btn btn-outline-success d-flex align-items-center fw-semibold">
+            <a href="{{ route('wetstock.transfers.create', ['type' => 'return']) }}" class="btn btn-outline-success btn-page-action d-flex align-items-center fw-semibold">
                 <i class="bi bi-arrow-counterclockwise me-1"></i> Return Stock
             </a>
         </div>
         @endif
     </div>
 
-    {{-- Tabs --}}
-    <ul class="nav nav-pills mb-4 gap-2 bg-white p-2 rounded-4 shadow-sm border">
-        <li class="nav-item">
-            <a class="nav-link rounded-3 {{ $activeType === 'transfer' ? 'active bg-primary text-white fw-semibold' : 'text-dark' }}" href="{{ route('wetstock.transfers.index', ['type' => 'transfer']) }}">
-                <i class="bi bi-arrow-left-right me-1"></i> Intra-Site Transfers
-                @if ($transferCount > 0)
-                    <span class="badge rounded-pill ms-2 {{ $activeType === 'transfer' ? 'bg-white text-primary' : 'bg-light text-dark border' }}">{{ $transferCount }}</span>
-                @endif
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link rounded-3 {{ $activeType === 'borrow' ? 'active bg-primary text-white fw-semibold' : 'text-dark' }}" href="{{ route('wetstock.transfers.index', ['type' => 'borrow']) }}">
-                <i class="bi bi-box-arrow-in-up-right me-1"></i> Cross-Site Borrows
-                @if ($borrowCount > 0)
-                    <span class="badge rounded-pill ms-2 {{ $activeType === 'borrow' ? 'bg-white text-primary' : 'bg-light text-dark border' }}">{{ $borrowCount }}</span>
-                @endif
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link rounded-3 {{ $activeType === 'return' ? 'active bg-primary text-white fw-semibold' : 'text-dark' }}" href="{{ route('wetstock.transfers.index', ['type' => 'return']) }}">
-                <i class="bi bi-arrow-counterclockwise me-1"></i> Cross-Site Returns
-                @if ($returnCount > 0)
-                    <span class="badge rounded-pill ms-2 {{ $activeType === 'return' ? 'bg-white text-primary' : 'bg-light text-dark border' }}">{{ $returnCount }}</span>
-                @endif
-            </a>
-        </li>
-    </ul>
+    {{-- Segmented Tabs (matches Delivery Allocations page style) --}}
+    <div class="nav-tabs-flat">
+        <a class="tab-item {{ $activeType === 'transfer' ? 'active' : '' }}" href="{{ route('wetstock.transfers.index', ['type' => 'transfer']) }}">
+            <i class="bi bi-arrow-left-right"></i>
+            <span>Intra-Site Transfers</span>
+            @if ($transferCount > 0)
+                <span class="tab-badge {{ $activeType === 'transfer' ? 'active' : '' }}">{{ $transferCount }}</span>
+            @endif
+        </a>
+        <a class="tab-item {{ $activeType === 'borrow' ? 'active' : '' }}" href="{{ route('wetstock.transfers.index', ['type' => 'borrow']) }}">
+            <i class="bi bi-box-arrow-in-up-right"></i>
+            <span>Cross-Site Borrows</span>
+            @if ($borrowCount > 0)
+                <span class="tab-badge {{ $activeType === 'borrow' ? 'active' : '' }}">{{ $borrowCount }}</span>
+            @endif
+        </a>
+        <a class="tab-item {{ $activeType === 'return' ? 'active' : '' }}" href="{{ route('wetstock.transfers.index', ['type' => 'return']) }}">
+            <i class="bi bi-arrow-counterclockwise"></i>
+            <span>Cross-Site Returns</span>
+            @if ($returnCount > 0)
+                <span class="tab-badge {{ $activeType === 'return' ? 'active' : '' }}">{{ $returnCount }}</span>
+            @endif
+        </a>
+    </div>
 
-    {{-- Contextual Note Boxes for Borrow & Return --}}
+    {{-- Contextual Summary Panels for Borrow & Return (flat card style, no heavy alert coloring) --}}
     @if ($activeType === 'borrow')
-        <div class="alert alert-info border-0 rounded-4 p-3 mb-4 shadow-sm">
-            <div class="d-flex align-items-center gap-2 mb-2">
-                <i class="bi bi-info-circle-fill fs-5 text-primary"></i>
-                <h6 class="mb-0 fw-bold text-dark">Outstanding Borrowed Fuel Summary (Net Still Owed Back)</h6>
+        <div class="summary-panel">
+            <div class="summary-heading">
+                <i class="bi bi-info-circle-fill text-primary"></i>
+                <span>Outstanding Borrowed Fuel Summary (Net Still Owed Back)</span>
             </div>
-            <p class="mb-2 text-muted small">Tracking net fuel volumes borrowed across sites:</p>
+            <p class="mb-3 text-muted small">Tracking net fuel volumes borrowed across sites:</p>
             <div class="d-flex flex-wrap gap-3">
                 @foreach ($outstandingBalances as $bal)
-                    <div class="bg-white rounded-3 px-3 py-2 border shadow-sm flex-fill">
+                    <div class="summary-stat">
                         <span class="text-muted small d-block">Borrowed from <strong class="text-dark">{{ $bal['warehouse_name'] }}</strong>:</span>
-                        <span class="fw-bold text-primary fs-5 font-monospace">{{ number_format($bal['outstanding']) }} L</span>
-                        <span class="text-muted small d-block">(Gross Borrowed: {{ number_format($bal['borrowed_total']) }}L · Returned: {{ number_format($bal['returned_total']) }}L)</span>
+                        <span class="stat-value text-primary">{{ number_format($bal['outstanding']) }} L</span>
+                        <span class="text-muted small d-block">(Gross Borrowed: {{ number_format($bal['borrowed_total']) }}L ┬╖ Returned: {{ number_format($bal['returned_total']) }}L)</span>
                     </div>
                 @endforeach
             </div>
         </div>
     @elseif ($activeType === 'return')
-        <div class="alert alert-success border-0 rounded-4 p-3 mb-4 shadow-sm">
-            <div class="d-flex align-items-center gap-2 mb-2">
-                <i class="bi bi-arrow-counterclockwise fs-5 text-success"></i>
-                <h6 class="mb-0 fw-bold text-dark">Total Return Stocks Needed per Site</h6>
+        <div class="summary-panel">
+            <div class="summary-heading">
+                <i class="bi bi-arrow-counterclockwise text-success"></i>
+                <span>Total Return Stocks Needed per Site</span>
             </div>
-            <p class="mb-2 text-muted small">Volume remaining to return to each source depot:</p>
+            <p class="mb-3 text-muted small">Volume remaining to return to each source depot:</p>
             <div class="d-flex flex-wrap gap-3">
                 @foreach ($outstandingBalances as $bal)
-                    <div class="bg-white rounded-3 px-3 py-2 border shadow-sm flex-fill">
+                    <div class="summary-stat">
                         <span class="text-muted small d-block">Return Stock for <strong class="text-dark">{{ $bal['warehouse_name'] }}</strong>:</span>
-                        <span class="fw-bold text-success fs-5 font-monospace">{{ number_format($bal['outstanding']) }} L</span>
+                        <span class="stat-value text-success">{{ number_format($bal['outstanding']) }} L</span>
                         <span class="text-muted small d-block">remaining to return</span>
                     </div>
                 @endforeach
@@ -97,8 +181,8 @@
         </div>
     @endif
 
-    <!-- Filters Card -->
-    <div class="card card-custom border-0 shadow-sm mb-4">
+    {{-- Filters Card --}}
+    <div class="card card-flat mb-4">
         <div class="card-body p-3">
             <form method="GET" action="{{ route('wetstock.transfers.index') }}" class="row g-2 align-items-end">
                 <input type="hidden" name="type" value="{{ $activeType }}">
@@ -136,8 +220,8 @@
         </div>
     </div>
 
-    <!-- Transfers Table -->
-    <div class="card card-custom border-0 shadow-sm overflow-hidden">
+    {{-- Transfers Table --}}
+    <div class="card card-flat overflow-hidden">
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
@@ -189,7 +273,7 @@
                                 <i class="bi bi-person me-1"></i>{{ $tx->transferredBy->name ?? 'System' }}
                             </td>
                             <td class="small text-muted text-truncate" style="max-width: 180px;">
-                                {{ $tx->notes ?: '—' }}
+                                {{ $tx->notes ?: 'ΓÇö' }}
                             </td>
                             @if (Auth::user()->canEditModule2())
                             <td class="pe-4 text-end">
@@ -199,7 +283,7 @@
                                 @if ($pendingRequest)
                                     <div class="d-inline-flex align-items-center gap-2">
                                         <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-2 py-1"
-                                              title="Requested by {{ $pendingRequest->requestedBy->name ?? 'User' }} — {{ $pendingRequest->reason }}">
+                                              title="Requested by {{ $pendingRequest->requestedBy->name ?? 'User' }} ΓÇö {{ $pendingRequest->reason }}">
                                             <i class="bi bi-hourglass-split me-1"></i>Pending Approval
                                         </span>
                                         @if (Auth::user()->canApproveModule2Modification())

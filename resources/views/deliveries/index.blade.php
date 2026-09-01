@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('title', 'Deliveries for ' . $order->so_number)
 
@@ -90,6 +90,7 @@
                 <thead>
                     <tr>
                         <th class="ps-4">DR#</th>
+                        <th>ATL#</th>
                         <th>Delivery Date</th>
                         <th class="text-end">Qty Out</th>
                         <th class="text-center">Status</th>
@@ -104,6 +105,7 @@
                         @foreach ($deliveries as $delivery)
                         <tr class="{{ $delivery->status == 'CANCELLED' ? 'delivery-cancelled' : '' }}">
                             <td class="ps-4 fw-semibold">{{ $delivery->dr_number }}</td>
+                            <td class="font-monospace text-muted">{{ $delivery->atl_number ?: 'ΓÇö' }}</td>
                             <td>{{ $delivery->delivery_date ? $delivery->delivery_date->format('Y-m-d') : '' }}</td>
                             <td class="text-end fw-medium">{{ number_format($delivery->qty_out) }}</td>
                             <td class="text-center">
@@ -147,7 +149,7 @@
                         @endforeach
                     @else
                         <tr>
-                            <td colspan="{{ Auth::user()->canEditModule1() ? 6 : 5 }}" class="text-center py-5 text-muted">
+                            <td colspan="{{ Auth::user()->canEditModule1() ? 7 : 6 }}" class="text-center py-5 text-muted">
                                 <i class="bi bi-box-seam fs-1 d-block mb-3 text-secondary"></i>
                                 No deliveries recorded yet for this order.
                             </td>
@@ -164,7 +166,10 @@
                 <div class="card border-0 bg-light mb-3 rounded-4 shadow-sm {{ $delivery->status == 'CANCELLED' ? 'delivery-cancelled' : '' }}">
                     <div class="card-body p-4">
                         <div class="d-flex justify-content-between align-items-start mb-2">
-                            <h5 class="fw-bold text-dark mb-0">{{ $delivery->dr_number }}</h5>
+                            <div>
+                                <h5 class="fw-bold text-dark mb-0">{{ $delivery->dr_number }}</h5>
+                                <span class="text-muted small font-monospace">ATL# {{ $delivery->atl_number ?: 'ΓÇö' }}</span>
+                            </div>
                             <div class="d-flex gap-1">
                                 @if ($delivery->type === 'PICK-UP')
                                     <span class="badge badge-type-pickup rounded-pill px-3 py-1">PICK-UP</span>
