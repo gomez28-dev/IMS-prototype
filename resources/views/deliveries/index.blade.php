@@ -62,11 +62,11 @@
     </div>
 </div>
 
-@if (in_array($order->clearing_status, ['Declined', 'Hold']))
+@if ($order->clearing_status !== 'Approved')
 <div class="alert alert-warning d-flex align-items-center rounded-4 shadow-sm mb-4 p-3 border-0" style="background-color: #fef3c7; color: #92400e;">
     <i class="bi bi-clock-history me-2 fs-5"></i>
     <div>
-        <strong>Waiting for Accounting clearance.</strong> This order's clearance status is <span class="badge rounded-pill px-2 py-0" style="background-color: #d97706; color: #fff;">{{ $order->clearing_status }}</span>. Deliveries cannot be added until the status is set to <strong>Approved</strong> or <strong>Pending</strong>.
+        <strong>Waiting for Accounting clearance.</strong> This order's clearance status is <span class="badge rounded-pill px-2 py-0" style="background-color: #d97706; color: #fff;">{{ $order->clearing_status }}</span>. Deliveries cannot be added until the status is set to <strong>Approved</strong>.
     </div>
 </div>
 @endif
