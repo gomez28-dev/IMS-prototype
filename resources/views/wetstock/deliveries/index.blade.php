@@ -168,7 +168,7 @@
                             <table class="table table-hover align-middle mb-0 wetstock-deliveries-table">
                                 <thead class="bg-light">
                                     <tr>
-                                        <th class="ps-3 py-3">DR#</th>
+                                        <th class="ps-3 py-3">DR# <i class="bi bi-arrow-down text-muted" title="Sorted highest → lowest"></i></th>
                                         <th class="py-3">ATL#</th>
                                         <th class="py-3">Client</th>
                                         <th class="py-3 text-center">Type</th>
@@ -192,7 +192,13 @@
                                                     <span class="text-muted">—</span>
                                                 @endif
                                             </td>
-                                            <td class="client-cell" title="{{ $delivery->order->account ?? '-' }}">{{ $delivery->order->account ?? '-' }}</td>
+                                            <td class="client-cell" title="{{ $delivery->order->account ?? '-' }}">{{ $delivery->order->account ?? '-' }}
+                                                <div class="text-muted small mt-1">
+                                                    <div>PO#: {{ $delivery->order->po_number ?? '—' }}</div>
+                                                    <div>Order: {{ $delivery->order->date ? $delivery->order->date->format('Y-m-d') : '—' }} • Terms: {{ $delivery->order->terms ?: '—' }}</div>
+                                                    <div>ATL#: {{ $delivery->atl_number ?: '—' }} • Qty Out: {{ number_format($delivery->qty_out) }} L</div>
+                                                </div>
+                                            </td>
                                             <td class="text-center">
                                                 @if ($delivery->type === 'PICK-UP')
                                                     <span class="badge badge-type-pickup rounded-pill wetstock-type-badge">PICK-UP</span>
@@ -278,7 +284,7 @@
                             <table class="table table-hover align-middle mb-0 wetstock-deliveries-table">
                                 <thead class="bg-light">
                                     <tr>
-                                        <th class="ps-3 py-3">DR#</th>
+                                        <th class="ps-3 py-3">DR# <i class="bi bi-arrow-down text-muted" title="Sorted highest → lowest"></i></th>
                                         <th class="py-3">ATL#</th>
                                         <th class="py-3">Client</th>
                                         <th class="py-3 text-center">Type</th>
@@ -300,7 +306,13 @@
                                                     <span class="text-muted">—</span>
                                                 @endif
                                             </td>
-                                            <td class="client-cell" title="{{ $delivery->order->account ?? '-' }}">{{ $delivery->order->account ?? '-' }}</td>
+                                            <td class="client-cell" title="{{ $delivery->order->account ?? '-' }}">{{ $delivery->order->account ?? '-' }}
+                                                <div class="text-muted small mt-1">
+                                                    <div>PO#: {{ $delivery->order->po_number ?? '—' }}</div>
+                                                    <div>Order: {{ $delivery->order->date ? $delivery->order->date->format('Y-m-d') : '—' }} • Terms: {{ $delivery->order->terms ?: '—' }}</div>
+                                                    <div>ATL#: {{ $delivery->atl_number ?: '—' }} • Qty Out: {{ number_format($delivery->qty_out) }} L</div>
+                                                </div>
+                                            </td>
                                             <td class="text-center">
                                                 @if ($delivery->type === 'PICK-UP')
                                                     <span class="badge badge-type-pickup rounded-pill wetstock-type-badge">PICK-UP</span>
@@ -374,20 +386,59 @@
 
         {{-- ==================== TAB 3: HISTORY (FULFILLED) ==================== --}}
         @else
+            <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between mb-3">
+                <span class="badge rounded-pill px-3 py-2" style="background-color: #eef2ff !important; color: #4338ca !important;">
+                    <i class="bi bi-calendar3 me-1"></i> Monthly Summary — {{ \Carbon\Carbon::create($historyYear, $historyMonth, 1)->format('F Y') }}
+                    @if ($historyShowAll)
+                        <span class="ms-1 badge bg-dark text-white">All Records</span>
+                    @endif
+                </span>
+                <form method="GET" action="{{ route('wetstock.deliveries.index') }}" class="d-flex gap-2 align-items-center">
+                    <input type="hidden" name="tab" value="history">
+                    @if (!empty($search))
+                        <input type="hidden" name="search" value="{{ $search }}">
+                    @endif
+                    <select name="history_month" class="form-select form-select-sm" style="width:auto;">
+                        @for ($m = 1; $m <= 12; $m++)
+                            <option value="{{ $m }}" {{ $m == $historyMonth ? 'selected' : '' }}>{{ \Carbon\Carbon::create(2000, $m, 1)->format('M') }}</option>
+                        @endfor
+                    </select>
+                    <select name="history_year" class="form-select form-select-sm" style="width:auto;">
+                        @for ($y = (int) $now->format('Y'); $y >= 2024; $y--)
+                            <option value="{{ $y }}" {{ $y == $historyYear ? 'selected' : '' }}>{{ $y }}</option>
+                        @endfor
+                    </select>
+                    <button type="submit" class="btn btn-sm btn-primary-custom">Go</button>
+                    @if (!$historyShowAll)
+                        <a href="{{ route('wetstock.deliveries.index', ['tab' => 'history', 'history_all' => 1]) }}" class="btn btn-sm btn-outline-secondary">Show All</a>
+                    @else
+                        <a href="{{ route('wetstock.deliveries.index', ['tab' => 'history']) }}" class="btn btn-sm btn-outline-secondary">Current Month</a>
+                    @endif
+                </form>
+            </div>
+            @if ($historyMonths->isNotEmpty())
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    <span class="text-muted small">Past months:</span>
+                    @foreach ($historyMonths as $ym)
+                        @php [$yy,$mm] = explode('-', $ym); @endphp
+                        <a href="{{ route('wetstock.deliveries.index', ['tab' => 'history', 'history_year' => $yy, 'history_month' => $mm]) }}" class="badge rounded-pill border text-decoration-none {{ $yy == $historyYear && $mm == $historyMonth ? 'bg-primary text-white' : 'bg-light text-dark' }}">{{ \Carbon\Carbon::create($yy, $mm, 1)->format('M Y') }}</a>
+                    @endforeach
+                </div>
+            @endif
             <div class="card card-custom p-3 border-0 shadow-sm">
                 <div class="card-body p-0">
                     @if ($historyDeliveries->isEmpty())
                         <div class="text-center py-5">
                             <i class="bi bi-clock-history display-4 text-muted mb-3 d-block"></i>
-                            <h5 class="fw-bold text-dark">No Fulfilled Deliveries Yet</h5>
-                            <p class="text-muted">Completed deliveries will appear here in the history log.</p>
+                            <h5 class="fw-bold text-dark">No Fulfilled Deliveries for {{ \Carbon\Carbon::create($historyYear, $historyMonth, 1)->format('F Y') }}</h5>
+                            <p class="text-muted">Try another month or <a href="{{ route('wetstock.deliveries.index', ['tab' => 'history', 'history_all' => 1]) }}">show all records</a>.</p>
                         </div>
                     @else
                         <div class="table-responsive">
                             <table class="table table-hover align-middle mb-0 wetstock-deliveries-table">
                                 <thead class="bg-light">
                                     <tr>
-                                        <th class="ps-3 py-3">DR#</th>
+                                        <th class="ps-3 py-3">DR# <i class="bi bi-arrow-down text-muted" title="Sorted highest → lowest"></i></th>
                                         <th class="py-3">ATL#</th>
                                         <th class="py-3">Client</th>
                                         <th class="py-3 text-center">Type</th>
@@ -412,7 +463,13 @@
                                                     <span class="text-muted">—</span>
                                                 @endif
                                             </td>
-                                            <td class="client-cell" title="{{ $delivery->order->account ?? '-' }}">{{ $delivery->order->account ?? '-' }}</td>
+                                            <td class="client-cell" title="{{ $delivery->order->account ?? '-' }}">{{ $delivery->order->account ?? '-' }}
+                                                <div class="text-muted small mt-1">
+                                                    <div>PO#: {{ $delivery->order->po_number ?? '—' }}</div>
+                                                    <div>Order: {{ $delivery->order->date ? $delivery->order->date->format('Y-m-d') : '—' }} • Terms: {{ $delivery->order->terms ?: '—' }}</div>
+                                                    <div>Qty Out: {{ number_format($delivery->qty_out) }} L</div>
+                                                </div>
+                                            </td>
                                             <td class="text-center">
                                                 @if ($delivery->type === 'PICK-UP')
                                                     <span class="badge badge-type-pickup rounded-pill wetstock-type-badge">PICK-UP</span>
@@ -445,7 +502,7 @@
                                                 @endif
                                             </td>
                                             <td class="text-muted small">
-                                                {{ $delivery->updated_at ? $delivery->updated_at->timezone('Asia/Manila')->format('M d, Y h:i A') : '—' }}
+                                                {{ $delivery->fulfilled_at ? $delivery->fulfilled_at->timezone('Asia/Manila')->format('M d, Y h:i A') : ($delivery->updated_at ? $delivery->updated_at->timezone('Asia/Manila')->format('M d, Y h:i A') : '—') }}
                                             </td>
                                             @if (Auth::user()->canMarkFulfilled())
                                                 <td class="pe-3 text-end">
@@ -464,7 +521,7 @@
                         </div>
 
                         <div class="p-3">
-                            {{ $historyDeliveries->appends(['tab' => 'history', 'search' => $search ?? null])->links() }}
+                            {{ $historyDeliveries->appends(['tab' => 'history', 'search' => $search ?? null, 'history_month' => $historyMonth, 'history_year' => $historyYear, 'history_all' => $historyShowAll ? 1 : null])->links() }}
                         </div>
                     @endif
                 </div>

@@ -23,6 +23,12 @@ class DeliveryAssignmentController extends Controller
     {
         $activeTab = $request->get('tab', 'unassigned');
         $search = trim((string) $request->get('search', ''));
+        $now = now('Asia/Manila');
+        $historyMonth = $request->get('history_month');
+        $historyYear = $request->get('history_year');
+        $historyShowAll = $request->boolean('history_all');
+        $filterMonth = $historyMonth ? (int) $historyMonth : (int) $now->format('m');
+        $filterYear = $historyYear ? (int) $historyYear : (int) $now->format('Y');
 
         // 1. Unassigned: Deliveries needing tank allocation
         $unassignedQuery = Delivery::with(['order', 'allocations.tank.warehouse', 'allocations.assignedBy', 'fulfilledBy', 'createdBy', 'modificationRequests.requestedBy', 'modificationRequests.reviewedBy'])
@@ -38,6 +44,7 @@ class DeliveryAssignmentController extends Controller
                 $q->whereDoesntHave('allocations')
                     ->orWhereRaw('(SELECT COALESCE(SUM(quantity), 0) FROM delivery_allocations WHERE delivery_id = deliveries.id) < qty_out');
             })
+            ->orderByRaw('CAST(dr_number AS UNSIGNED) DESC')
             ->orderBy('delivery_date', 'desc');
 
         $unassignedCount = (clone $unassignedQuery)->count();
@@ -54,12 +61,13 @@ class DeliveryAssignmentController extends Controller
             ->where('status', 'PENDING')
             ->whereHas('allocations')
             ->whereRaw('(SELECT COALESCE(SUM(quantity), 0) FROM delivery_allocations WHERE delivery_id = deliveries.id) >= qty_out')
+            ->orderByRaw('CAST(dr_number AS UNSIGNED) DESC')
             ->orderBy('delivery_date', 'desc');
 
         $assignedCount = (clone $assignedQuery)->count();
         $assignedDeliveries = $assignedQuery->paginate(15, ['*'], 'assigned_page');
 
-        // 3. History: Deliveries marked FULFILLED with their tank allocation audit trail
+        // 3. History: Deliveries marked FULFILLED with their tank allocation audit trail (monthly reset)
         $historyQuery = Delivery::with(['order', 'allocations.tank.warehouse', 'allocations.assignedBy', 'fulfilledBy', 'createdBy', 'modificationRequests.requestedBy', 'modificationRequests.reviewedBy'])
             ->when($search !== '', function ($q) use ($search) {
                 $q->where(function ($sub) use ($search) {
@@ -67,11 +75,24 @@ class DeliveryAssignmentController extends Controller
                         ->orWhere('atl_number', 'like', "%{$search}%");
                 });
             })
-            ->where('status', 'FULFILLED')
-            ->orderBy('updated_at', 'desc');
+            ->where('status', 'FULFILLED');
+        if (!$historyShowAll) {
+            $historyQuery->where(function ($q) use ($filterYear, $filterMonth) {
+                $q->whereYear('fulfilled_at', $filterYear)->whereMonth('fulfilled_at', $filterMonth)
+                  ->orWhere(function ($sub) use ($filterYear, $filterMonth) {
+                      $sub->whereNull('fulfilled_at')->whereYear('updated_at', $filterYear)->whereMonth('updated_at', $filterMonth);
+                  });
+            });
+        }
+        $historyQuery->orderByRaw('CAST(dr_number AS UNSIGNED) DESC')
+            ->orderByDesc('fulfilled_at')
+            ->orderByDesc('updated_at');
 
         $historyCount = (clone $historyQuery)->count();
         $historyDeliveries = $historyQuery->paginate(20, ['*'], 'history_page');
+        $historyMonths = Delivery::where('status', 'FULFILLED')
+            ->selectRaw("COALESCE(DATE_FORMAT(fulfilled_at, '%Y-%m'), DATE_FORMAT(updated_at, '%Y-%m')) as ym")
+            ->distinct()->orderByDesc('ym')->pluck('ym')->filter()->values();
 
         $warehouses = Warehouse::with(['activeTanks'])->orderBy('name', 'asc')->get();
 
@@ -85,6 +106,11 @@ class DeliveryAssignmentController extends Controller
             'warehouses' => $warehouses,
             'activeTab' => $activeTab,
             'search' => $search,
+            'historyMonth' => $filterMonth,
+            'historyYear' => $filterYear,
+            'historyShowAll' => $historyShowAll,
+            'historyMonths' => $historyMonths,
+            'now' => $now,
         ]);
     }
 
@@ -178,7 +204,7 @@ class DeliveryAssignmentController extends Controller
         }
 
         DB::transaction(function () use ($delivery) {
-            $delivery->update(['status' => 'FULFILLED', 'fulfilled_by' => Auth::id()]);
+            $delivery->update(['status' => 'FULFILLED', 'fulfilled_by' => Auth::id(), 'fulfilled_at' => now('Asia/Manila')]);
 
             AuditLog::create([
                 'admin_id' => Auth::id(),
@@ -205,7 +231,7 @@ class DeliveryAssignmentController extends Controller
         }
 
         DB::transaction(function () use ($delivery) {
-            $delivery->update(['status' => 'PENDING']);
+            $delivery->update(['status' => 'PENDING', 'fulfilled_at' => null]);
 
             AuditLog::create([
                 'admin_id' => Auth::id(),

@@ -24,11 +24,13 @@ class Delivery extends Model
         'remarks',
         'assigned_by',
         'fulfilled_by',
+        'fulfilled_at',
         'created_by',
     ];
 
     protected $casts = [
         'delivery_date' => 'datetime',
+        'fulfilled_at' => 'datetime',
         'revised_at' => 'datetime',
         'qty_out' => 'integer',
         'type' => 'string',

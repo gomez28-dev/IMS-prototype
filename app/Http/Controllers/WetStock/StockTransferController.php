@@ -27,6 +27,13 @@ class StockTransferController extends Controller
             $activeType = 'transfer';
         }
 
+        $now = now('Asia/Manila');
+        $filterMonth = $request->get('filter_month');
+        $filterYear = $request->get('filter_year');
+        $showAll = $request->boolean('show_all');
+        $filterMonthInt = $filterMonth ? (int) $filterMonth : (int) $now->format('m');
+        $filterYearInt = $filterYear ? (int) $filterYear : (int) $now->format('Y');
+
         $baseQuery = StockTransfer::with([
             'sourceTank.warehouse',
             'destinationTank.warehouse',
@@ -35,6 +42,12 @@ class StockTransferController extends Controller
             'transferredBy',
             'modificationRequests' => fn ($q) => $q->where('status', 'PENDING')->with('requestedBy:id,name'),
         ])->orderBy('transfer_date', 'desc')->orderBy('created_at', 'desc');
+
+        // Monthly reset: default to current month unless user filters by date or requests all
+        $hasCustomDateRange = $request->filled('from') || $request->filled('to');
+        if (!$showAll && !$hasCustomDateRange) {
+            $baseQuery->whereYear('transfer_date', $filterYearInt)->whereMonth('transfer_date', $filterMonthInt);
+        }
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -69,6 +82,8 @@ class StockTransferController extends Controller
         $transfers = (clone $baseQuery)->where('type', $activeType)->paginate(20)->withQueryString();
         $warehouses = Warehouse::orderBy('name', 'asc')->get();
         $outstandingBalances = StockTransfer::getOutstandingBalances();
+        $availableMonths = StockTransfer::selectRaw("DATE_FORMAT(transfer_date, '%Y-%m') as ym")
+            ->distinct()->orderByDesc('ym')->pluck('ym')->filter()->values();
 
         return view('wetstock.transfers.index', [
             'transfers' => $transfers,
@@ -82,6 +97,11 @@ class StockTransferController extends Controller
             'searchQuery' => $request->search,
             'from' => $request->from,
             'to' => $request->to,
+            'filterMonth' => $filterMonthInt,
+            'filterYear' => $filterYearInt,
+            'showAll' => $showAll,
+            'availableMonths' => $availableMonths,
+            'now' => $now,
         ]);
     }
 

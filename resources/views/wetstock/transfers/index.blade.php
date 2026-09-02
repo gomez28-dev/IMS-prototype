@@ -145,11 +145,59 @@
             </div>
         @endif
 
+        <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between mb-3">
+            <span class="badge rounded-pill px-3 py-2" style="background-color: #eef2ff !important; color: #4338ca !important;">
+                <i class="bi bi-calendar3 me-1"></i> Monthly — {{ \Carbon\Carbon::create($filterYear, $filterMonth, 1)->format('F Y') }}
+                @if ($showAll)
+                    <span class="ms-1 badge bg-dark text-white">All Records</span>
+                @endif
+            </span>
+            <form method="GET" action="{{ route('wetstock.transfers.index') }}" class="d-flex gap-2 align-items-center">
+                <input type="hidden" name="type" value="{{ $activeType }}">
+                @if ($searchQuery)
+                    <input type="hidden" name="search" value="{{ $searchQuery }}">
+                @endif
+                @if ($currentWarehouse)
+                    <input type="hidden" name="warehouse_id" value="{{ $currentWarehouse }}">
+                @endif
+                <select name="filter_month" class="form-select form-select-sm" style="width:auto;">
+                    @for ($m = 1; $m <= 12; $m++)
+                        <option value="{{ $m }}" {{ $m == $filterMonth ? 'selected' : '' }}>{{ \Carbon\Carbon::create(2000, $m, 1)->format('M') }}</option>
+                    @endfor
+                </select>
+                <select name="filter_year" class="form-select form-select-sm" style="width:auto;">
+                    @for ($y = (int) $now->format('Y'); $y >= 2024; $y--)
+                        <option value="{{ $y }}" {{ $y == $filterYear ? 'selected' : '' }}>{{ $y }}</option>
+                    @endfor
+                </select>
+                <button type="submit" class="btn btn-sm btn-primary-custom">Go</button>
+                @if (!$showAll)
+                    <a href="{{ route('wetstock.transfers.index', ['type' => $activeType, 'show_all' => 1]) }}" class="btn btn-sm btn-outline-secondary">Show All</a>
+                @else
+                    <a href="{{ route('wetstock.transfers.index', ['type' => $activeType]) }}" class="btn btn-sm btn-outline-secondary">Current Month</a>
+                @endif
+            </form>
+        </div>
+        @if ($availableMonths->isNotEmpty())
+            <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
+                <span class="text-muted small">Past months:</span>
+                @foreach ($availableMonths as $ym)
+                    @php [$yy,$mm] = explode('-', $ym); @endphp
+                    <a href="{{ route('wetstock.transfers.index', ['type' => $activeType, 'filter_year' => $yy, 'filter_month' => $mm]) }}" class="badge rounded-pill border text-decoration-none {{ $yy == $filterYear && $mm == $filterMonth ? 'bg-primary text-white' : 'bg-light text-dark' }}">{{ \Carbon\Carbon::create($yy, $mm, 1)->format('M Y') }}</a>
+                @endforeach
+            </div>
+        @endif
+
         <!-- Filters Card -->
         <div class="card card-custom border-0 shadow-sm mb-4">
             <div class="card-body p-3">
                 <form method="GET" action="{{ route('wetstock.transfers.index') }}" class="row g-2 align-items-end">
                     <input type="hidden" name="type" value="{{ $activeType }}">
+                    <input type="hidden" name="filter_month" value="{{ $filterMonth }}">
+                    <input type="hidden" name="filter_year" value="{{ $filterYear }}">
+                    @if ($showAll)
+                        <input type="hidden" name="show_all" value="1">
+                    @endif
                     <div class="col-md-3">
                         <label class="form-label small text-muted mb-1">Search</label>
                         <div class="input-group input-group-sm">
@@ -177,7 +225,7 @@
                     <div class="col-md-2 d-flex gap-2">
                         <button type="submit" class="btn btn-sm btn-primary-custom w-100">Filter</button>
                         @if ($searchQuery || $currentWarehouse || $from || $to)
-                            <a href="{{ route('wetstock.transfers.index', ['type' => $activeType]) }}" class="btn btn-sm btn-outline-secondary" title="Reset Filters"><i class="bi bi-x-lg"></i></a>
+                            <a href="{{ route('wetstock.transfers.index', ['type' => $activeType, 'filter_month' => $filterMonth, 'filter_year' => $filterYear]) }}" class="btn btn-sm btn-outline-secondary" title="Reset Filters"><i class="bi bi-x-lg"></i></a>
                         @endif
                     </div>
                 </form>
