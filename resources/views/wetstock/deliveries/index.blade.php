@@ -34,6 +34,9 @@
     }
     .wetstock-deliveries-table .client-cell {
         max-width: 170px;
+        min-width: 130px;
+    }
+    .wetstock-deliveries-table .client-name {
         font-size: 0.76rem;
         line-height: 1.3;
         display: -webkit-box;
@@ -42,6 +45,7 @@
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: normal;
+        word-break: break-word;
     }
     .wetstock-type-badge {
         font-size: 0.66rem;
@@ -192,7 +196,9 @@
                                                     <span class="text-muted">—</span>
                                                 @endif
                                             </td>
-                                            <td class="client-cell" title="{{ $delivery->order->account ?? '-' }}">{{ $delivery->order->account ?? '-' }}</td>
+                                            <td class="client-cell" title="{{ $delivery->order->account ?? '-' }}">
+                                                <div class="client-name">{{ $delivery->order->account ?? '-' }}</div>
+                                            </td>
                                             <td class="text-center">
                                                 @if ($delivery->type === 'PICK-UP')
                                                     <span class="badge badge-type-pickup rounded-pill wetstock-type-badge">PICK-UP</span>
@@ -300,7 +306,9 @@
                                                     <span class="text-muted">—</span>
                                                 @endif
                                             </td>
-                                            <td class="client-cell" title="{{ $delivery->order->account ?? '-' }}">{{ $delivery->order->account ?? '-' }}</td>
+                                            <td class="client-cell" title="{{ $delivery->order->account ?? '-' }}">
+                                                <div class="client-name">{{ $delivery->order->account ?? '-' }}</div>
+                                            </td>
                                             <td class="text-center">
                                                 @if ($delivery->type === 'PICK-UP')
                                                     <span class="badge badge-type-pickup rounded-pill wetstock-type-badge">PICK-UP</span>
@@ -451,7 +459,9 @@
                                                     <span class="text-muted">—</span>
                                                 @endif
                                             </td>
-                                            <td class="client-cell" title="{{ $delivery->order->account ?? '-' }}">{{ $delivery->order->account ?? '-' }}</td>
+                                            <td class="client-cell" title="{{ $delivery->order->account ?? '-' }}">
+                                                <div class="client-name">{{ $delivery->order->account ?? '-' }}</div>
+                                            </td>
                                             <td class="text-center">
                                                 @if ($delivery->type === 'PICK-UP')
                                                     <span class="badge badge-type-pickup rounded-pill wetstock-type-badge">PICK-UP</span>
