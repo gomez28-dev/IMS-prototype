@@ -158,6 +158,7 @@ Route::middleware('auth')->group(function () {
             Route::get('/supplier-orders/{supplierOrder}/edit', [WetStock\SupplierOrderController::class, 'edit'])->name('supplier-orders.edit');
             Route::post('/supplier-orders/{supplierOrder}/edit', [WetStock\SupplierOrderController::class, 'update'])->name('supplier-orders.update');
             Route::post('/supplier-orders/{supplierOrder}/complete', [WetStock\SupplierOrderController::class, 'complete'])->name('supplier-orders.complete');
+            Route::post('/supplier-orders/{supplierOrder}/delete', [WetStock\SupplierOrderController::class, 'destroy'])->name('supplier-orders.destroy');
         });
 
         // Wet Stock Reports & Snapshots

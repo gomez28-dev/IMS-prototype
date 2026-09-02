@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('title', 'Incoming Supplier Stock')
 
@@ -91,7 +91,7 @@
                                     <div class="mt-1"><span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-2 py-1" title="Pending modification #{{ $pendingReq->id }}: {{ $pendingReq->reason }}"><i class="bi bi-hourglass-split me-1"></i>Pending Approval</span></div>
                                 @endif
                             </td>
-                            <td class="small text-muted">{{ $po->remarks ?: '—' }}</td>
+                            <td class="small text-muted">{{ $po->remarks ?: 'â€”' }}</td>
                             <td class="small text-muted">{{ $po->creator->name ?? 'System' }}</td>
                             <td class="text-end">
                                 @if (Auth::user()->canEditModule2())
@@ -119,9 +119,15 @@
                                             <span class="text-muted small"><i class="bi bi-lock me-1"></i>Awaiting Approval</span>
                                         @endif
                                     @else
-                                        <a href="{{ route('wetstock.supplier-orders.edit', $po->id) }}" class="btn btn-sm btn-outline-primary" title="Edit PO">
+                                        <a href="{{ route('wetstock.supplier-orders.edit', $po->id) }}" class="btn btn-sm btn-outline-primary me-1" title="Edit PO">
                                             <i class="bi bi-pencil"></i>
                                         </a>
+                                        <form action="{{ route('wetstock.supplier-orders.destroy', $po->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete PO #{{ $po->po_number }}? This will permanently remove this incoming stock record and cannot be undone.');">
+                                            @csrf
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete PO">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
                                     @endif
                                 @endif
                             </td>

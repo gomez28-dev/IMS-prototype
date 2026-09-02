@@ -187,4 +187,29 @@ class SupplierOrderController extends Controller
         return redirect()->back()
             ->with('success', "Supplier Order PO #{$supplierOrder->po_number} marked as COMPLETED.");
     }
+
+    public function destroy(SupplierOrder $supplierOrder): RedirectResponse
+    {
+        $existingPending = $supplierOrder->modificationRequests()->where('status', 'PENDING')->first();
+        if ($existingPending) {
+            return redirect()->route('wetstock.supplier-orders.index')
+                ->with('warning', "PO #{$supplierOrder->po_number} has a Pending Modification Request (#{$existingPending->id}) and cannot be deleted until it is resolved.");
+        }
+
+        $poNumber = $supplierOrder->po_number;
+        $supplierName = $supplierOrder->supplier_name;
+        $liters = $supplierOrder->liters;
+        $status = $supplierOrder->status;
+
+        $supplierOrder->delete();
+
+        AuditLog::create([
+            'admin_id' => Auth::id(),
+            'action' => 'DELETED',
+            'description' => "Deleted Incoming Supplier Stock PO #{$poNumber} ({$supplierName}, " . number_format($liters) . "L, Status: {$status})",
+        ]);
+
+        return redirect()->route('wetstock.supplier-orders.index')
+            ->with('success', "Incoming Supplier Order PO #{$poNumber} has been deleted.");
+    }
 }
