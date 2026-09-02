@@ -18,9 +18,14 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd domains/doyengroupofcompanies.com/public_html/ims
-            git pull origin main
+            echo "=== PRE-GIT STATUS ===" && git status || true
+            echo "=== PRE-GIT LOG ===" && git log --oneline -3 || true
+            git fetch --all
+            git reset --hard origin/main
+            echo "=== POST-RESET LOG ===" && git log --oneline -3 || true
             composer2 install --no-dev --optimize-autoloader
             php artisan migrate --force
             php artisan config:clear
             php artisan view:clear
             php artisan cache:clear || true
+            echo "=== VERIFY FILES ===" && ls -la database/migrations/*fulfilled* 2>&1 | head -5; grep -n "CAST\|Monthly Summary" resources/views/wetstock/deliveries/index.blade.php 2>&1 | head -5 || true
