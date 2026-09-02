@@ -168,6 +168,7 @@
                             <table class="table table-hover align-middle mb-0 wetstock-deliveries-table">
                                 <thead class="bg-light">
                                     <tr>
+                                        <th style="width: 40px;"></th>
                                         <th class="ps-3 py-3">DR# <i class="bi bi-arrow-down text-muted" title="Sorted highest → lowest"></i></th>
                                         <th class="py-3">ATL#</th>
                                         <th class="py-3">Client</th>
@@ -183,7 +184,8 @@
                                 </thead>
                                 <tbody>
                                     @foreach ($unassignedDeliveries as $delivery)
-                                        <tr>
+                                        <tr class="main-row" style="cursor: pointer;">
+                                            <td class="text-center toggle-expand ps-3"><i class="bi bi-chevron-down text-secondary fs-6 toggle-icon"></i></td>
                                             <td class="ps-3 fw-semibold text-dark">{{ $delivery->dr_number }}</td>
                                             <td class="small">
                                                 @if (!empty($delivery->atl_number))
@@ -192,13 +194,7 @@
                                                     <span class="text-muted">—</span>
                                                 @endif
                                             </td>
-                                            <td class="client-cell" title="{{ $delivery->order->account ?? '-' }}">{{ $delivery->order->account ?? '-' }}
-                                                <div class="text-muted small mt-1">
-                                                    <div>PO#: {{ $delivery->order->po_number ?? '—' }}</div>
-                                                    <div>Order: {{ $delivery->order->date ? $delivery->order->date->format('Y-m-d') : '—' }} • Terms: {{ $delivery->order->terms ?: '—' }}</div>
-                                                    <div>ATL#: {{ $delivery->atl_number ?: '—' }} • Qty Out: {{ number_format($delivery->qty_out) }} L</div>
-                                                </div>
-                                            </td>
+                                            <td class="client-cell" title="{{ $delivery->order->account ?? '-' }}">{{ $delivery->order->account ?? '-' }}</td>
                                             <td class="text-center">
                                                 @if ($delivery->type === 'PICK-UP')
                                                     <span class="badge badge-type-pickup rounded-pill wetstock-type-badge">PICK-UP</span>
@@ -257,6 +253,20 @@
                                                 </td>
                                             @endif
                                         </tr>
+                                        <tr class="expand-row" style="display: none; background-color: #fafafa;">
+                                            <td colspan="{{ Auth::user()->canEditModule2() ? 10 : 9 }}" class="p-3 border-top-0">
+                                                <div class="px-4 py-2">
+                                                    <div class="row g-3">
+                                                        <div class="col-sm-2"><span class="text-muted small d-block mb-1">Order Date</span><span class="fw-medium text-dark">{{ $delivery->order->date ? $delivery->order->date->format('Y-m-d') : '—' }}</span></div>
+                                                        <div class="col-sm-2"><span class="text-muted small d-block mb-1">PO#</span><span class="fw-medium text-dark">{{ $delivery->order->po_number ?: '—' }}</span></div>
+                                                        <div class="col-sm-2"><span class="text-muted small d-block mb-1">ATL#</span><span class="fw-medium text-dark">{{ $delivery->atl_number ?: '—' }}</span></div>
+                                                        <div class="col-sm-2"><span class="text-muted small d-block mb-1">Qty Out</span><span class="fw-medium text-dark">{{ number_format($delivery->qty_out) }} L</span></div>
+                                                        <div class="col-sm-2"><span class="text-muted small d-block mb-1">Terms</span><span class="fw-medium text-dark">{{ $delivery->order->terms ?: '—' }}</span></div>
+                                                        <div class="col-sm-2"><span class="text-muted small d-block mb-1">Location</span><span class="fw-medium text-dark">{{ $delivery->order->location ?? '—' }}</span></div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
                                     @endforeach
                                 </tbody>
                             </table>
@@ -284,6 +294,7 @@
                             <table class="table table-hover align-middle mb-0 wetstock-deliveries-table">
                                 <thead class="bg-light">
                                     <tr>
+                                        <th style="width: 40px;"></th>
                                         <th class="ps-3 py-3">DR# <i class="bi bi-arrow-down text-muted" title="Sorted highest → lowest"></i></th>
                                         <th class="py-3">ATL#</th>
                                         <th class="py-3">Client</th>
@@ -297,7 +308,8 @@
                                 </thead>
                                 <tbody>
                                     @foreach ($assignedDeliveries as $delivery)
-                                        <tr>
+                                        <tr class="main-row" style="cursor: pointer;">
+                                            <td class="text-center toggle-expand ps-3"><i class="bi bi-chevron-down text-secondary fs-6 toggle-icon"></i></td>
                                             <td class="ps-3 fw-semibold text-dark">{{ $delivery->dr_number }}</td>
                                             <td class="small">
                                                 @if (!empty($delivery->atl_number))
@@ -306,13 +318,7 @@
                                                     <span class="text-muted">—</span>
                                                 @endif
                                             </td>
-                                            <td class="client-cell" title="{{ $delivery->order->account ?? '-' }}">{{ $delivery->order->account ?? '-' }}
-                                                <div class="text-muted small mt-1">
-                                                    <div>PO#: {{ $delivery->order->po_number ?? '—' }}</div>
-                                                    <div>Order: {{ $delivery->order->date ? $delivery->order->date->format('Y-m-d') : '—' }} • Terms: {{ $delivery->order->terms ?: '—' }}</div>
-                                                    <div>ATL#: {{ $delivery->atl_number ?: '—' }} • Qty Out: {{ number_format($delivery->qty_out) }} L</div>
-                                                </div>
-                                            </td>
+                                            <td class="client-cell" title="{{ $delivery->order->account ?? '-' }}">{{ $delivery->order->account ?? '-' }}</td>
                                             <td class="text-center">
                                                 @if ($delivery->type === 'PICK-UP')
                                                     <span class="badge badge-type-pickup rounded-pill wetstock-type-badge">PICK-UP</span>
@@ -370,6 +376,20 @@
                                                 @else
                                                     <span class="text-muted small"><i class="bi bi-lock me-1"></i>Awaiting Ops Mgr</span>
                                                 @endif
+                                            </td>
+                                        </tr>
+                                        <tr class="expand-row" style="display: none; background-color: #fafafa;">
+                                            <td colspan="10" class="p-3 border-top-0">
+                                                <div class="px-4 py-2">
+                                                    <div class="row g-3">
+                                                        <div class="col-sm-2"><span class="text-muted small d-block mb-1">Order Date</span><span class="fw-medium text-dark">{{ $delivery->order->date ? $delivery->order->date->format('Y-m-d') : '—' }}</span></div>
+                                                        <div class="col-sm-2"><span class="text-muted small d-block mb-1">PO#</span><span class="fw-medium text-dark">{{ $delivery->order->po_number ?: '—' }}</span></div>
+                                                        <div class="col-sm-2"><span class="text-muted small d-block mb-1">ATL#</span><span class="fw-medium text-dark">{{ $delivery->atl_number ?: '—' }}</span></div>
+                                                        <div class="col-sm-2"><span class="text-muted small d-block mb-1">Qty Out</span><span class="fw-medium text-dark">{{ number_format($delivery->qty_out) }} L</span></div>
+                                                        <div class="col-sm-2"><span class="text-muted small d-block mb-1">Terms</span><span class="fw-medium text-dark">{{ $delivery->order->terms ?: '—' }}</span></div>
+                                                        <div class="col-sm-2"><span class="text-muted small d-block mb-1">Location</span><span class="fw-medium text-dark">{{ $delivery->order->location ?? '—' }}</span></div>
+                                                    </div>
+                                                </div>
                                             </td>
                                         </tr>
                                     @endforeach
@@ -438,6 +458,7 @@
                             <table class="table table-hover align-middle mb-0 wetstock-deliveries-table">
                                 <thead class="bg-light">
                                     <tr>
+                                        <th style="width: 40px;"></th>
                                         <th class="ps-3 py-3">DR# <i class="bi bi-arrow-down text-muted" title="Sorted highest → lowest"></i></th>
                                         <th class="py-3">ATL#</th>
                                         <th class="py-3">Client</th>
@@ -454,7 +475,8 @@
                                 </thead>
                                 <tbody>
                                     @foreach ($historyDeliveries as $delivery)
-                                        <tr>
+                                        <tr class="main-row" style="cursor: pointer;">
+                                            <td class="text-center toggle-expand ps-3"><i class="bi bi-chevron-down text-secondary fs-6 toggle-icon"></i></td>
                                             <td class="ps-3 fw-semibold text-dark">{{ $delivery->dr_number }}</td>
                                             <td class="small">
                                                 @if (!empty($delivery->atl_number))
@@ -463,13 +485,7 @@
                                                     <span class="text-muted">—</span>
                                                 @endif
                                             </td>
-                                            <td class="client-cell" title="{{ $delivery->order->account ?? '-' }}">{{ $delivery->order->account ?? '-' }}
-                                                <div class="text-muted small mt-1">
-                                                    <div>PO#: {{ $delivery->order->po_number ?? '—' }}</div>
-                                                    <div>Order: {{ $delivery->order->date ? $delivery->order->date->format('Y-m-d') : '—' }} • Terms: {{ $delivery->order->terms ?: '—' }}</div>
-                                                    <div>Qty Out: {{ number_format($delivery->qty_out) }} L</div>
-                                                </div>
-                                            </td>
+                                            <td class="client-cell" title="{{ $delivery->order->account ?? '-' }}">{{ $delivery->order->account ?? '-' }}</td>
                                             <td class="text-center">
                                                 @if ($delivery->type === 'PICK-UP')
                                                     <span class="badge badge-type-pickup rounded-pill wetstock-type-badge">PICK-UP</span>
@@ -515,6 +531,20 @@
                                                 </td>
                                             @endif
                                         </tr>
+                                        <tr class="expand-row" style="display: none; background-color: #fafafa;">
+                                            <td colspan="{{ Auth::user()->canMarkFulfilled() ? 11 : 10 }}" class="p-3 border-top-0">
+                                                <div class="px-4 py-2">
+                                                    <div class="row g-3">
+                                                        <div class="col-sm-2"><span class="text-muted small d-block mb-1">Order Date</span><span class="fw-medium text-dark">{{ $delivery->order->date ? $delivery->order->date->format('Y-m-d') : '—' }}</span></div>
+                                                        <div class="col-sm-2"><span class="text-muted small d-block mb-1">PO#</span><span class="fw-medium text-dark">{{ $delivery->order->po_number ?: '—' }}</span></div>
+                                                        <div class="col-sm-2"><span class="text-muted small d-block mb-1">ATL#</span><span class="fw-medium text-dark">{{ $delivery->atl_number ?: '—' }}</span></div>
+                                                        <div class="col-sm-2"><span class="text-muted small d-block mb-1">Qty Out</span><span class="fw-medium text-dark">{{ number_format($delivery->qty_out) }} L</span></div>
+                                                        <div class="col-sm-2"><span class="text-muted small d-block mb-1">Terms</span><span class="fw-medium text-dark">{{ $delivery->order->terms ?: '—' }}</span></div>
+                                                        <div class="col-sm-2"><span class="text-muted small d-block mb-1">Location</span><span class="fw-medium text-dark">{{ $delivery->order->location ?? '—' }}</span></div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
                                     @endforeach
                                 </tbody>
                             </table>
@@ -529,4 +559,34 @@
         @endif
     </div>
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const mainRows = document.querySelectorAll('tr.main-row');
+    mainRows.forEach(row => {
+        row.addEventListener('click', function (e) {
+            if (e.target.closest('a, button, select, input, form, label')) {
+                return;
+            }
+            const nextRow = this.nextElementSibling;
+            if (nextRow && nextRow.classList.contains('expand-row')) {
+                const icon = this.querySelector('.toggle-icon');
+                const isCollapsed = window.getComputedStyle(nextRow).display === 'none';
+                if (isCollapsed) {
+                    nextRow.style.display = 'table-row';
+                    if (icon) {
+                        icon.classList.remove('bi-chevron-down');
+                        icon.classList.add('bi-chevron-up');
+                    }
+                } else {
+                    nextRow.style.display = 'none';
+                    if (icon) {
+                        icon.classList.remove('bi-chevron-up');
+                        icon.classList.add('bi-chevron-down');
+                    }
+                }
+            }
+        });
+    });
+});
+</script>
 @endsection
