@@ -6,8 +6,8 @@
 <div class="row justify-content-center">
     <div class="col-md-8 col-lg-6">
         <div class="mb-3">
-            <a href="{{ route('dashboard') }}" class="text-decoration-none text-secondary small">
-                <i class="bi bi-arrow-left me-1"></i> Back to Dashboard
+            <a href="{{ $returnTo ?? route('dashboard') }}" class="text-decoration-none text-secondary small">
+                <i class="bi bi-arrow-left me-1"></i> Back
             </a>
         </div>
         <div class="card card-custom p-4 border-0">
@@ -18,6 +18,7 @@
                 
                 <form method="POST" action="{{ $order ? route('order.update', $order->id) : route('order.store') }}" novalidate>
                     @csrf
+                    <input type="hidden" name="return_to" value="{{ old('return_to', $returnTo ?? route('dashboard')) }}">
                     
                     <div class="mb-3">
                         <label for="account" class="form-label fw-medium text-secondary small">Account</label>
@@ -97,7 +98,7 @@
                     </div>
 
                     <div class="d-flex justify-content-end gap-2">
-                        <a href="{{ route('dashboard') }}" class="btn btn-light border">Cancel</a>
+                        <a href="{{ $returnTo ?? route('dashboard') }}" class="btn btn-light border">Cancel</a>
                         <button type="submit" class="btn btn-primary-custom">Save Order</button>
                     </div>
                 </form>

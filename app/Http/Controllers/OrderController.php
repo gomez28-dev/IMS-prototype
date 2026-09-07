@@ -15,6 +15,20 @@ use Illuminate\View\View;
 class OrderController extends Controller
 {
     /**
+     * Redirect back to wherever the user actually came from (e.g. Reports with its
+     * filters intact), falling back to the Dashboard if none was captured or if the
+     * given value isn't actually a page on this site (basic open-redirect guard).
+     */
+    private function redirectToOrigin(?string $returnTo): RedirectResponse
+    {
+        if ($returnTo && str_starts_with($returnTo, url('/'))) {
+            return redirect($returnTo);
+        }
+
+        return redirect()->route('dashboard');
+    }
+
+    /**
      * Show the form for creating a new order.
      */
     public function create(): View
@@ -27,6 +41,7 @@ class OrderController extends Controller
             'title' => 'New Order',
             'order' => null,
             'clients' => Client::orderBy('name', 'asc')->get(),
+            'returnTo' => url()->previous(),
         ]);
     }
 
@@ -60,7 +75,7 @@ class OrderController extends Controller
             'description' => "Created order #{$order->id} - {$order->account} (SO# {$order->so_number})",
         ]);
 
-        return redirect()->route('dashboard')
+        return $this->redirectToOrigin($request->input('return_to'))
             ->with('success', 'Order created successfully.');
     }
 
@@ -77,6 +92,7 @@ class OrderController extends Controller
             'title' => 'Edit Order',
             'order' => $order,
             'clients' => Client::orderBy('name', 'asc')->get(),
+            'returnTo' => url()->previous(),
         ]);
     }
 
@@ -105,6 +121,8 @@ class OrderController extends Controller
             'modification_reason' => ['nullable', 'string', 'max:1000'],
         ]);
 
+        $returnTo = $request->input('return_to');
+
         // Diff changes against existing model attributes
         $changes = [];
         $comparableFields = ['account', 'date', 'qty_ordered', 'so_number', 'po_number', 'location', 'status', 'terms'];
@@ -125,7 +143,7 @@ class OrderController extends Controller
         }
 
         if (empty($changes)) {
-            return redirect()->route('dashboard')
+            return $this->redirectToOrigin($returnTo)
                 ->with('info', "No changes detected on SO# {$order->so_number}.");
         }
 
@@ -144,12 +162,16 @@ class OrderController extends Controller
             'description' => "Submitted Modification Request #{$modRequest->id} for SO# {$order->so_number} (" . count($changes) . " field(s) changed)",
         ]);
 
-        return redirect()->route('dashboard')
+        return $this->redirectToOrigin($returnTo)
             ->with('success', "Modification request for SO# {$order->so_number} submitted to the Approvals Queue for HOD / Administrator review.");
     }
 
     /**
      * Remove the specified order from storage.
+     *
+     * Uses back() rather than a hardcoded route, since this is always a same-page
+     * form submission (e.g. from the Reports table) — the referer header at the
+     * moment of this POST genuinely is the page the button was clicked from.
      */
     public function destroy(Order $order): RedirectResponse
     {
@@ -165,8 +187,7 @@ class OrderController extends Controller
 
         $order->delete();
 
-        return redirect()->route('dashboard')
-            ->with('success', 'Order deleted successfully.');
+        return back()->with('success', 'Order deleted successfully.');
     }
 
     public function updateClearance(Request $request, Order $order): RedirectResponse
