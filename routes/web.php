@@ -116,6 +116,7 @@ Route::middleware('auth')->group(function () {
             Route::post('/stock-in', [WetStock\StockInController::class, 'store'])->name('stock-in.store');
             Route::get('/stock-in/{stockIn}/edit', [WetStock\StockInController::class, 'edit'])->name('stock-in.edit');
             Route::post('/stock-in/{stockIn}/edit', [WetStock\StockInController::class, 'update'])->name('stock-in.update');
+            Route::post('/stock-in/{stockIn}/revert', [WetStock\StockInController::class, 'revert'])->name('stock-in.revert');
         });
         // Delete — Portal Administrator only
         Route::middleware('role:admin')->group(function () {

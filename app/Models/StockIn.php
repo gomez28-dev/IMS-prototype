@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class StockIn extends Model
 {
@@ -16,6 +17,7 @@ class StockIn extends Model
         'admin_id',
         'quantity',
         'date',
+        'reverses_id',
     ];
 
     protected $casts = [
@@ -32,5 +34,20 @@ class StockIn extends Model
     public function admin(): BelongsTo
     {
         return $this->belongsTo(Admin::class, 'admin_id');
+    }
+
+    public function original(): BelongsTo
+    {
+        return $this->belongsTo(StockIn::class, 'reverses_id');
+    }
+
+    public function reversal(): HasOne
+    {
+        return $this->hasOne(StockIn::class, 'reverses_id');
+    }
+
+    public function isReversal(): bool
+    {
+        return $this->reverses_id !== null;
     }
 }
