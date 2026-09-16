@@ -126,6 +126,10 @@ Route::middleware('auth')->group(function () {
             Route::get('/transfers/{transfer}/edit', [WetStock\StockTransferController::class, 'edit'])->name('transfers.edit');
             Route::post('/transfers/{transfer}/edit', [WetStock\StockTransferController::class, 'update'])->name('transfers.update');
         });
+        // Delete — Portal Administrator only
+        Route::middleware('role:admin')->group(function () {
+            Route::post('/transfers/{transfer}/delete', [WetStock\StockTransferController::class, 'destroy'])->name('transfers.destroy');
+        });
 
         // Delivery Assignment & Fulfillment
         Route::get('/deliveries', [WetStock\DeliveryAssignmentController::class, 'index'])->name('deliveries.index');
@@ -170,5 +174,10 @@ Route::middleware('auth')->group(function () {
             Route::post('/reports/snapshot', [WetStock\ReportController::class, 'storeSnapshot'])->name('reports.snapshot');
         });
     });
+
+    // Push subscription stub (real Web Push lands later; prevents 500 from layout snippet)
+    Route::post('/push/subscribe', function () {
+        return response()->noContent();
+    })->name('push.subscribe');
 
 });

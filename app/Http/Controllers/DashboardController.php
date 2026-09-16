@@ -34,17 +34,45 @@ class DashboardController extends Controller
         $page = (int) $request->input('page', session('dashboard_page', 1));
         $now = now('Asia/Manila');
 
-        $query = Order::query()->activeOrCurrentMonth($now);
+        // Active tab: one of the 5 order-status buckets. These are mutually
+        // exclusive and exhaustive — every order lands in exactly one (a
+        // Cancelled order always lands in "cancelled" regardless of whatever
+        // clearing_status it happens to carry).
+        $activeTab = $request->input('tab', 'pending');
+        $validTabs = ['pending', 'hold', 'approved', 'declined', 'cancelled'];
+        if (!in_array($activeTab, $validTabs, true)) {
+            $activeTab = 'pending';
+        }
+
+        $baseQuery = Order::query()->activeOrCurrentMonth($now);
 
         if ($searchQuery !== '') {
-            $query->where(function ($q) use ($searchQuery) {
+            $baseQuery->where(function ($q) use ($searchQuery) {
                 $q->where('account', 'like', "%{$searchQuery}%")
                   ->orWhere('so_number', 'like', "%{$searchQuery}%");
             });
         }
 
-        // Summary cards count active current-month + carry-over orders (excluding cancelled)
-        $statsQuery = (clone $query)->where('status', '!=', 'Cancelled');
+        // Tab counts, computed from the same base/search scope before the
+        // tab-specific filter is applied, so switching tabs updates correctly.
+        $pendingCount = (clone $baseQuery)->where('status', '!=', 'Cancelled')->where('clearing_status', 'Pending')->count();
+        $holdCount = (clone $baseQuery)->where('status', '!=', 'Cancelled')->where('clearing_status', 'Hold')->count();
+        $approvedCount = (clone $baseQuery)->where('status', '!=', 'Cancelled')->where('clearing_status', 'Approved')->count();
+        $declinedCount = (clone $baseQuery)->where('status', '!=', 'Cancelled')->where('clearing_status', 'Declined')->count();
+        $cancelledCount = (clone $baseQuery)->where('status', 'Cancelled')->count();
+
+        $query = clone $baseQuery;
+        match ($activeTab) {
+            'pending' => $query->where('status', '!=', 'Cancelled')->where('clearing_status', 'Pending'),
+            'hold' => $query->where('status', '!=', 'Cancelled')->where('clearing_status', 'Hold'),
+            'approved' => $query->where('status', '!=', 'Cancelled')->where('clearing_status', 'Approved'),
+            'declined' => $query->where('status', '!=', 'Cancelled')->where('clearing_status', 'Declined'),
+            'cancelled' => $query->where('status', 'Cancelled'),
+        };
+
+        // Summary cards count active current-month + carry-over orders (excluding cancelled) —
+        // this stays an overall KPI view independent of whichever tab is active.
+        $statsQuery = (clone $baseQuery)->where('status', '!=', 'Cancelled');
 
         $totalOrders = (clone $statsQuery)->count();
         $totalQtyOrdered = (clone $statsQuery)->get()->sum(fn($o) => $o->effective_qty_ordered);
@@ -53,8 +81,11 @@ class DashboardController extends Controller
 
         $orders = $query->orderBy('so_number', 'desc')
             ->paginate(10, ['*'], 'page', $page)
-            ->appends(['search' => $searchQuery]);
+            ->appends(['search' => $searchQuery, 'tab' => $activeTab]);
 
-        return view('dashboard', compact('orders', 'searchQuery', 'totalOrders', 'totalQtyOrdered', 'totalQtyDelivered', 'totalRemaining', 'now'));
+        return view('dashboard', compact(
+            'orders', 'searchQuery', 'totalOrders', 'totalQtyOrdered', 'totalQtyDelivered', 'totalRemaining', 'now',
+            'activeTab', 'pendingCount', 'holdCount', 'approvedCount', 'declinedCount', 'cancelledCount'
+        ));
     }
 }

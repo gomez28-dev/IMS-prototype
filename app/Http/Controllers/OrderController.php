@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\ModificationRequest;
 use App\Models\Order;
+use App\Services\PushNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
@@ -58,6 +59,9 @@ class OrderController extends Controller
             'account' => ['required', 'string', 'max:128'],
             'date' => ['required', 'date'],
             'qty_ordered' => ['required', 'integer', 'min:0'],
+            // Column is NOT NULL with a 0.00 default, so an omitted/blank price
+            // is valid and simply means "no price entered yet" — coerced below.
+            'price' => ['nullable', 'numeric', 'min:0', 'max:999999999.99'],
             'so_number' => ['required', 'string', 'max:64',
                 Rule::unique('orders', 'so_number')->where(fn($q) => $q->where('location', $request->location)),
             ],
@@ -67,6 +71,9 @@ class OrderController extends Controller
             'terms' => ['nullable', 'string', 'max:64'],
         ]);
 
+        $validated['price'] = $validated['price'] ?? 0;
+        $validated['created_by'] = Auth::id();
+
         $order = Order::create($validated);
 
         AuditLog::create([
@@ -74,6 +81,15 @@ class OrderController extends Controller
             'action' => 'CREATED',
             'description' => "Created order #{$order->id} - {$order->account} (SO# {$order->so_number})",
         ]);
+
+        // Notify Accounting that a new sales order needs clearance review.
+        // Wrapped so a push-delivery hiccup never blocks order creation itself.
+        app(PushNotificationService::class)->sendToRole(
+            'accounting',
+            'New Sales Order Submitted',
+            "SO# {$order->so_number} — {$order->account} ({$order->location}) needs clearance approval.",
+            ['url' => route('dashboard')]
+        );
 
         return $this->redirectToOrigin($request->input('return_to'))
             ->with('success', 'Order created successfully.');
@@ -109,6 +125,7 @@ class OrderController extends Controller
             'account' => ['required', 'string', 'max:128'],
             'date' => ['required', 'date'],
             'qty_ordered' => ['required', 'integer', 'min:0'],
+            'price' => ['nullable', 'numeric', 'min:0', 'max:999999999.99'],
             'so_number' => ['required', 'string', 'max:64',
                 Rule::unique('orders', 'so_number')
                     ->where(fn($q) => $q->where('location', $request->location))
@@ -121,11 +138,13 @@ class OrderController extends Controller
             'modification_reason' => ['nullable', 'string', 'max:1000'],
         ]);
 
+        $validated['price'] = $validated['price'] ?? 0;
+
         $returnTo = $request->input('return_to');
 
         // Diff changes against existing model attributes
         $changes = [];
-        $comparableFields = ['account', 'date', 'qty_ordered', 'so_number', 'po_number', 'location', 'status', 'terms'];
+        $comparableFields = ['account', 'date', 'qty_ordered', 'price', 'so_number', 'po_number', 'location', 'status', 'terms'];
 
         foreach ($comparableFields as $field) {
             $oldVal = $order->{$field};
@@ -208,6 +227,8 @@ class OrderController extends Controller
             'description' => "Updated clearance status for order #{$order->id} ({$order->account}) to {$validated['clearing_status']}",
         ]);
 
+        $this->notifySalesOfClearanceChange($order, $validated['clearing_status']);
+
         return redirect()->back()
             ->with('success', 'Clearance status updated successfully.');
     }
@@ -227,6 +248,10 @@ class OrderController extends Controller
             'clearing_status' => ['required', 'string', 'in:Pending,Declined,Hold,Approved'],
         ]);
 
+        // Fetch the affected orders BEFORE updating, so we still know each
+        // one's creator and SO# for the individual notifications below.
+        $affectedOrders = Order::whereIn('id', $validated['order_ids'])->get();
+
         $count = Order::whereIn('id', $validated['order_ids'])
             ->update(['clearing_status' => $validated['clearing_status']]);
 
@@ -240,7 +265,62 @@ class OrderController extends Controller
             'description' => "Bulk updated clearance status to {$validated['clearing_status']} for {$count} order(s): #" . implode(', #', $validated['order_ids']),
         ]);
 
+        $this->notifySalesOfBulkClearanceChange($affectedOrders, $validated['clearing_status']);
+
         return redirect()->back()
             ->with('success', "Clearance status set to {$validated['clearing_status']} for {$count} order(s).");
+    }
+
+    /**
+     * Notify the order's original creator (if known) plus every Sales-role
+     * user that a single order's clearance status has changed.
+     */
+    private function notifySalesOfClearanceChange(Order $order, string $newStatus): void
+    {
+        $pushService = app(PushNotificationService::class);
+        $title = 'Order Clearance Updated';
+        $body = "SO# {$order->so_number} — {$order->account} was marked {$newStatus} by Accounting.";
+        $data = ['url' => route('dashboard')];
+
+        // The specific salesperson who created this order.
+        if ($order->created_by) {
+            $pushService->sendToAdmin($order->created_by, $title, $body, $data);
+        }
+
+        // Every Sales-role user, regardless of who created it.
+        $pushService->sendToRole('sales', $title, $body, $data);
+    }
+
+    /**
+     * Same as above, but for a bulk clearance update covering several orders
+     * at once — each affected order's creator gets a personal notice, and
+     * all Sales users get a single summary notice (rather than one push per
+     * order, which would be noisy for a large batch).
+     */
+    private function notifySalesOfBulkClearanceChange($affectedOrders, string $newStatus): void
+    {
+        $pushService = app(PushNotificationService::class);
+        $data = ['url' => route('dashboard')];
+
+        // Individual notice per creator, for their own order(s) in this batch.
+        foreach ($affectedOrders as $order) {
+            if ($order->created_by) {
+                $pushService->sendToAdmin(
+                    $order->created_by,
+                    'Order Clearance Updated',
+                    "SO# {$order->so_number} — {$order->account} was marked {$newStatus} by Accounting.",
+                    $data
+                );
+            }
+        }
+
+        // One aggregate notice to all Sales users for the whole batch.
+        $count = $affectedOrders->count();
+        $pushService->sendToRole(
+            'sales',
+            'Orders Clearance Updated',
+            "{$count} order(s) were marked {$newStatus} by Accounting.",
+            $data
+        );
     }
 }

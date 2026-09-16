@@ -1,4 +1,3 @@
-﻿
 @extends('layouts.app')
 
 @section('title', 'Stock Transfers, Borrows & Returns')
@@ -121,7 +120,7 @@
                         <div class="bg-white rounded-3 px-3 py-2 border shadow-sm flex-fill">
                             <span class="text-muted small d-block">Borrowed from <strong class="text-dark">{{ $bal['warehouse_name'] }}</strong>:</span>
                             <span class="fw-bold text-primary fs-5 font-monospace">{{ number_format($bal['outstanding']) }} L</span>
-                            <span class="text-muted small d-block">(Gross Borrowed: {{ number_format($bal['borrowed_total']) }}L Â· Returned: {{ number_format($bal['returned_total']) }}L)</span>
+                            <span class="text-muted small d-block">(Gross Borrowed: {{ number_format($bal['borrowed_total']) }}L · Returned: {{ number_format($bal['returned_total']) }}L)</span>
                         </div>
                     @endforeach
                 </div>
@@ -254,7 +253,7 @@
                                     <th class="py-3 text-end">Volume</th>
                                     <th class="py-3">Operator</th>
                                     <th class="py-3">Notes</th>
-                                    @if (Auth::user()->canEditModule2())
+                                    @if (Auth::user()->canEditModule2() || Auth::user()->isAdmin())
                                         <th class="pe-3 py-3 text-end">Action</th>
                                     @endif
                                 </tr>
@@ -292,43 +291,55 @@
                                         <i class="bi bi-person me-1"></i>{{ $tx->transferredBy->name ?? 'System' }}
                                     </td>
                                     <td class="notes-cell text-muted text-truncate">
-                                        {{ $tx->notes ?: 'â€”' }}
+                                        {{ $tx->notes ?: '—' }}
                                     </td>
-                                    @if (Auth::user()->canEditModule2())
+                                    @if (Auth::user()->canEditModule2() || Auth::user()->isAdmin())
                                     <td class="pe-3 text-end">
-                                        @php
-                                            $pendingRequest = $tx->modificationRequests->first();
-                                        @endphp
-                                        @if ($pendingRequest)
-                                            <div class="d-inline-flex align-items-center gap-2">
-                                                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-2 py-1"
-                                                      title="Requested by {{ $pendingRequest->requestedBy->name ?? 'User' }} â€” {{ $pendingRequest->reason }}">
-                                                    <i class="bi bi-hourglass-split me-1"></i>Pending Approval
-                                                </span>
-                                                @if (Auth::user()->canApproveModule2Modification())
-                                                    <form method="POST" action="{{ route('approvals.approve', $pendingRequest->id) }}" class="d-inline"
-                                                          onsubmit="return confirm('Approve Modification Request #{{ $pendingRequest->id }} for {{ $tx->transfer_number }}? This will immediately update the live inventory record.');">
-                                                        @csrf
-                                                        <button type="submit" class="btn btn-sm btn-success rounded-3 px-2 py-1" title="Approve & Apply">
-                                                            <i class="bi bi-check-lg"></i>
-                                                        </button>
-                                                    </form>
-                                                    <form method="POST" action="{{ route('approvals.reject', $pendingRequest->id) }}" class="d-inline"
-                                                          onsubmit="return confirm('Reject Modification Request #{{ $pendingRequest->id }} for {{ $tx->transfer_number }}?');">
-                                                        @csrf
-                                                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-3 px-2 py-1" title="Reject Request">
-                                                            <i class="bi bi-x-lg"></i>
-                                                        </button>
-                                                    </form>
+                                        <div class="d-inline-flex align-items-center gap-2">
+                                            @if (Auth::user()->canEditModule2())
+                                                @php
+                                                    $pendingRequest = $tx->modificationRequests->first();
+                                                @endphp
+                                                @if ($pendingRequest)
+                                                    <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-2 py-1"
+                                                          title="Requested by {{ $pendingRequest->requestedBy->name ?? 'User' }} — {{ $pendingRequest->reason }}">
+                                                        <i class="bi bi-hourglass-split me-1"></i>Pending Approval
+                                                    </span>
+                                                    @if (Auth::user()->canApproveModule2Modification())
+                                                        <form method="POST" action="{{ route('approvals.approve', $pendingRequest->id) }}" class="d-inline"
+                                                              onsubmit="return confirm('Approve Modification Request #{{ $pendingRequest->id }} for {{ $tx->transfer_number }}? This will immediately update the live inventory record.');">
+                                                            @csrf
+                                                            <button type="submit" class="btn btn-sm btn-success rounded-3 px-2 py-1" title="Approve & Apply">
+                                                                <i class="bi bi-check-lg"></i>
+                                                            </button>
+                                                        </form>
+                                                        <form method="POST" action="{{ route('approvals.reject', $pendingRequest->id) }}" class="d-inline"
+                                                              onsubmit="return confirm('Reject Modification Request #{{ $pendingRequest->id }} for {{ $tx->transfer_number }}?');">
+                                                            @csrf
+                                                            <button type="submit" class="btn btn-sm btn-outline-danger rounded-3 px-2 py-1" title="Reject Request">
+                                                                <i class="bi bi-x-lg"></i>
+                                                            </button>
+                                                        </form>
+                                                    @else
+                                                        <span class="text-muted small" title="Only Operations Admin, Operations Manager, or Portal Admin can approve"><i class="bi bi-lock me-1"></i>Awaiting Approval</span>
+                                                    @endif
                                                 @else
-                                                    <span class="text-muted small" title="Only Operations Admin, Operations Manager, or Portal Admin can approve"><i class="bi bi-lock me-1"></i>Awaiting Approval</span>
+                                                    <a href="{{ route('wetstock.transfers.edit', $tx->id) }}" class="btn btn-sm btn-outline-secondary rounded-3 px-2 py-1" title="Request Modification">
+                                                        <i class="bi bi-pencil me-1"></i> Modify
+                                                    </a>
                                                 @endif
-                                            </div>
-                                        @else
-                                            <a href="{{ route('wetstock.transfers.edit', $tx->id) }}" class="btn btn-sm btn-outline-secondary rounded-3 px-2 py-1" title="Request Modification">
-                                                <i class="bi bi-pencil me-1"></i> Modify
-                                            </a>
-                                        @endif
+                                            @endif
+
+                                            {{-- Delete — Portal Administrator only --}}
+                                            @if (Auth::user()->isAdmin())
+                                                <form method="POST" action="{{ route('wetstock.transfers.destroy', $tx->id) }}" class="d-inline js-preserve-scroll" onsubmit="return confirm('Permanently delete transfer #{{ $tx->transfer_number }} ({{ number_format($tx->quantity) }}L)?\n\nThis cannot be undone.');">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-3 px-2 py-1" title="Delete Transfer (Portal Administrator only)">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </form>
+                                            @endif
+                                        </div>
                                     </td>
                                     @endif
                                 </tr>
@@ -345,4 +356,29 @@
         </div>
     </div>
 </div>
+
+<script>
+    // ========================================================================
+    // Preserve scroll position after deleting a transfer.
+    // Without this, the full-page redirect after a delete always lands the
+    // browser at the top — jarring when you were scrolled far down a long
+    // list. This remembers your scroll position right before the delete
+    // form submits, then restores it once the page reloads.
+    // ========================================================================
+    (function () {
+        var scrollKey = 'scrollPos:' + window.location.pathname;
+
+        document.querySelectorAll('form.js-preserve-scroll').forEach(function (form) {
+            form.addEventListener('submit', function () {
+                sessionStorage.setItem(scrollKey, window.scrollY);
+            });
+        });
+
+        var saved = sessionStorage.getItem(scrollKey);
+        if (saved !== null) {
+            window.scrollTo(0, parseInt(saved, 10));
+            sessionStorage.removeItem(scrollKey);
+        }
+    })();
+</script>
 @endsection

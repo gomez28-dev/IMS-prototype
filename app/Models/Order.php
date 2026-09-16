@@ -5,6 +5,7 @@ namespace App\Models;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
@@ -16,6 +17,7 @@ class Order extends Model
         'account',
         'date',
         'qty_ordered',
+        'price',
         'so_number',
         'po_number',
         'clearing_status',
@@ -23,12 +25,14 @@ class Order extends Model
         'revised_at',
         'terms',
         'location',
+        'created_by',
     ];
 
     protected $casts = [
         'date' => 'datetime',
         'revised_at' => 'datetime',
         'qty_ordered' => 'integer',
+        'price' => 'decimal:2',
         'location' => 'string',
     ];
 
@@ -43,6 +47,15 @@ class Order extends Model
     public function modificationRequests(): MorphMany
     {
         return $this->morphMany(ModificationRequest::class, 'requestable');
+    }
+
+    /**
+     * The admin who originally created this order (nullable — historical
+     * orders created before this field existed won't have one).
+     */
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(Admin::class, 'created_by');
     }
 
     /**
@@ -201,5 +214,15 @@ class Order extends Model
     public function getRemainingBalanceAttribute(): int
     {
         return $this->effective_qty_ordered - $this->total_qty_out;
+    }
+
+    /**
+     * Get total order value (price per liter x effective quantity ordered).
+     * Price defaults to 0.00 (column is not nullable), so this is always a
+     * number — 0.00 simply means no price has been entered yet.
+     */
+    public function getTotalValueAttribute(): float
+    {
+        return round((float) $this->price * $this->effective_qty_ordered, 2);
     }
 }

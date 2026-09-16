@@ -340,4 +340,39 @@ class StockTransferController extends Controller
         return redirect()->route('wetstock.transfers.index', ['type' => $transfer->type])
             ->with('success', "Modification request for Transfer #{$transfer->transfer_number} submitted to the Approvals Queue for Operations Manager review.");
     }
+
+    /**
+     * Permanently delete a stock transfer record.
+     * Portal Administrator only — enforced both by route middleware
+     * (role:admin) and here as a defense-in-depth check.
+     *
+     * Note: this deletes the transfer record itself but does not attempt
+     * to reverse or recompute any tank quantities. If your StorageTank
+     * balances are derived live from StockTransfer records, deleting is
+     * self-correcting. If balances are instead stored/cached on the tank
+     * itself, a manual correction may be needed after deletion.
+     */
+    public function destroy(StockTransfer $transfer): RedirectResponse
+    {
+        if (!Auth::user()->isAdmin()) {
+            abort(403);
+        }
+
+        $transferNumber = $transfer->transfer_number;
+        $type = $transfer->type;
+        $sourceName = $transfer->sourceTank->name ?? '—';
+        $destinationName = $transfer->destinationTank->name ?? '—';
+        $quantity = $transfer->quantity;
+
+        AuditLog::create([
+            'admin_id' => Auth::id(),
+            'action' => 'DELETED',
+            'description' => "Deleted [" . strtoupper($type) . "] record #{$transferNumber}: " . number_format($quantity) . "L from {$sourceName} to {$destinationName}",
+        ]);
+
+        $transfer->delete();
+
+        return redirect()->route('wetstock.transfers.index', ['type' => $type])
+            ->with('success', ucfirst($type) . " record {$transferNumber} was permanently deleted.");
+    }
 }

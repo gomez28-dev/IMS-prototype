@@ -3,6 +3,12 @@
 @section('title', 'Dashboard')
 
 @section('content')
+<style>
+    #ordersTable thead th {
+        vertical-align: middle !important;
+        text-align: center !important;
+    }
+</style>
 <!-- Header Section -->
 <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-5 gap-3">
     <div>
@@ -85,6 +91,7 @@
 <!-- Search & Filtering -->
 <div class="mb-4">
     <form method="GET" action="{{ route('dashboard') }}" class="row g-2 align-items-center">
+        <input type="hidden" name="tab" value="{{ $activeTab }}">
         <div class="col-md-6 col-sm-8 col-10">
             <div class="input-group">
                 <span class="input-group-text bg-white border-end-0">
@@ -101,6 +108,55 @@
         </div>
     </form>
 </div>
+
+<!-- Order Status Tabs -->
+<ul class="nav nav-tabs nav-fill border-bottom mb-4" id="orderTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <a class="nav-link d-flex align-items-center justify-content-center gap-2 py-2 small fw-medium {{ $activeTab === 'pending' ? 'active text-primary' : 'text-secondary' }}" href="{{ route('dashboard', ['tab' => 'pending', 'search' => $searchQuery ?: null]) }}">
+            <i class="bi bi-hourglass-split text-warning"></i>
+            <span>Pending</span>
+            @if ($pendingCount > 0)
+                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill" style="font-size: 0.7rem;">{{ $pendingCount }}</span>
+            @endif
+        </a>
+    </li>
+    <li class="nav-item" role="presentation">
+        <a class="nav-link d-flex align-items-center justify-content-center gap-2 py-2 small fw-medium {{ $activeTab === 'hold' ? 'active text-primary' : 'text-secondary' }}" href="{{ route('dashboard', ['tab' => 'hold', 'search' => $searchQuery ?: null]) }}">
+            <i class="bi bi-pause-circle text-warning"></i>
+            <span>Hold</span>
+            @if ($holdCount > 0)
+                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill" style="font-size: 0.7rem;">{{ $holdCount }}</span>
+            @endif
+        </a>
+    </li>
+    <li class="nav-item" role="presentation">
+        <a class="nav-link d-flex align-items-center justify-content-center gap-2 py-2 small fw-medium {{ $activeTab === 'approved' ? 'active text-primary' : 'text-secondary' }}" href="{{ route('dashboard', ['tab' => 'approved', 'search' => $searchQuery ?: null]) }}">
+            <i class="bi bi-check2-circle text-success"></i>
+            <span>Approved</span>
+            @if ($approvedCount > 0)
+                <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill" style="font-size: 0.7rem;">{{ $approvedCount }}</span>
+            @endif
+        </a>
+    </li>
+    <li class="nav-item" role="presentation">
+        <a class="nav-link d-flex align-items-center justify-content-center gap-2 py-2 small fw-medium {{ $activeTab === 'declined' ? 'active text-primary' : 'text-secondary' }}" href="{{ route('dashboard', ['tab' => 'declined', 'search' => $searchQuery ?: null]) }}">
+            <i class="bi bi-x-circle text-danger"></i>
+            <span>Declined</span>
+            @if ($declinedCount > 0)
+                <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill" style="font-size: 0.7rem;">{{ $declinedCount }}</span>
+            @endif
+        </a>
+    </li>
+    <li class="nav-item" role="presentation">
+        <a class="nav-link d-flex align-items-center justify-content-center gap-2 py-2 small fw-medium {{ $activeTab === 'cancelled' ? 'active text-primary' : 'text-secondary' }}" href="{{ route('dashboard', ['tab' => 'cancelled', 'search' => $searchQuery ?: null]) }}">
+            <i class="bi bi-slash-circle text-secondary"></i>
+            <span>Cancelled</span>
+            @if ($cancelledCount > 0)
+                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle rounded-pill" style="font-size: 0.7rem;">{{ $cancelledCount }}</span>
+            @endif
+        </a>
+    </li>
+</ul>
 
 <!-- Bulk Clearance Toolbar -->
 @if (auth()->user()->canClearOrders())
@@ -128,28 +184,34 @@
     <div class="card-body p-0">
         <!-- Desktop table -->
         <div class="table-responsive d-none d-md-block">
-            <table class="table table-custom table-hover align-middle mb-0">
+            <table id="ordersTable" class="table table-custom table-hover align-middle mb-0">
                 <thead>
                     <tr>
                         <th style="width: 40px;"></th>
                         @if (auth()->user()->canClearOrders())
-                        <th style="width: 40px;" class="text-center">
+                        <th style="width: 40px;">
                             <input type="checkbox" id="checkAllDesktop" class="form-check-input order-check-all" title="Select all on this page">
                         </th>
                         @endif
                         <th class="ps-4">Account</th>
                         <th>Location</th>
                         <th>SO#</th>
-                        <th class="text-center">Qty Ordered</th>
-                        <th class="text-center">Remaining Balance</th>
-                        <th class="text-center">Status</th>
-                        <th class="text-center">Clearance</th>
-                        <th class="text-end pe-4">Actions</th>
+                        <th>Qty Ordered</th>
+                        <th>Price</th>
+                        <th>Terms</th>
+                        <th>Status</th>
+                        <th>Clearance</th>
+                        <th class="pe-4">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     @if ($orders->isNotEmpty())
+                        @php $colCount = auth()->user()->canClearOrders() ? 11 : 10; @endphp
                         @foreach ($orders as $order)
+                        @php
+                            $drList = $order->deliveries->pluck('dr_number')->filter()->unique()->values();
+                            $atlList = $order->deliveries->pluck('atl_number')->filter()->unique()->values();
+                        @endphp
                         <tr class="main-row {{ $order->status === 'Cancelled' ? 'order-cancelled' : '' }}" style="cursor: pointer;">
                             <td class="text-center toggle-expand ps-3">
                                 <i class="bi bi-chevron-down text-secondary fs-6 toggle-icon"></i>
@@ -176,17 +238,14 @@
                                 @endif
                             </td>
                             <td class="text-center fw-medium">{{ number_format($order->effective_qty_ordered) }}</td>
-                            <td class="text-center">
-                                @if ($order->remaining_balance == 0)
-                                    <span class="badge badge-balance-zero rounded-pill">
-                                        <i class="bi bi-check-circle-fill me-1"></i> 0
-                                    </span>
+                            <td class="text-end fw-medium">
+                                @if ($order->price > 0)
+                                    ₱{{ number_format($order->price, 2) }}
                                 @else
-                                    <span class="badge badge-balance-positive rounded-pill">
-                                        <i class="bi bi-clock-history me-1"></i> {{ number_format($order->remaining_balance) }}
-                                    </span>
+                                    <span class="text-muted">—</span>
                                 @endif
                             </td>
+                            <td class="text-muted small">{{ $order->terms ?: '—' }}</td>
                             <td class="text-center">
                                 <span class="badge rounded-pill px-3 py-1 {{ $order->computed_status_badge_class }}">
                                     {{ $order->computed_status }}
@@ -238,35 +297,44 @@
                             </td>
                         </tr>
                         <tr class="expand-row" style="display: none; background-color: #fafafa;">
-                            <td colspan="{{ auth()->user()->canClearOrders() ? 9 : 8 }}" class="p-3 border-top-0">
+                            <td colspan="{{ $colCount }}" class="p-3 border-top-0">
                                 <div class="px-4 py-2">
-                                    <div class="row g-3">
-                                        <div class="col-sm-2">
-                                            <span class="text-muted small d-block mb-1">Order Date</span>
-                                            <span class="fw-medium text-dark">{{ $order->date ? $order->date->format('Y-m-d') : '—' }}</span>
+                                    <div class="row g-2 align-items-stretch">
+                                        <div class="col-6 col-md-2">
+                                            <div class="p-2 rounded-3 bg-white border h-100 text-center">
+                                                <span class="text-muted small d-block mb-1">Order Date</span>
+                                                <span class="fw-medium text-dark">{{ $order->date ? $order->date->format('Y-m-d') : '—' }}</span>
+                                            </div>
                                         </div>
-                                        <div class="col-sm-2">
-                                            <span class="text-muted small d-block mb-1">PO#</span>
-                                            <span class="fw-medium text-dark">{{ $order->po_number ?: '—' }}</span>
+                                        <div class="col-6 col-md-2">
+                                            <div class="p-2 rounded-3 bg-white border h-100 text-center">
+                                                <span class="text-muted small d-block mb-1">PO#</span>
+                                                <span class="fw-medium text-dark">{{ $order->po_number ?: '—' }}</span>
+                                            </div>
                                         </div>
-                                        <div class="col-sm-2">
-                                            <span class="text-muted small d-block mb-1">ATL#</span>
-                                            @php
-                                                $atlList = $order->deliveries->pluck('atl_number')->filter()->unique()->values();
-                                            @endphp
-                                            <span class="fw-medium text-dark" title="{{ $atlList->implode(', ') }}">{{ $atlList->isNotEmpty() ? $atlList->implode(', ') : '—' }}</span>
+                                        <div class="col-6 col-md-2">
+                                            <div class="p-2 rounded-3 bg-white border h-100 text-center">
+                                                <span class="text-muted small d-block mb-1">DR#</span>
+                                                <span class="fw-medium text-dark" title="{{ $drList->implode(', ') }}">{{ $drList->isNotEmpty() ? $drList->implode(', ') : '—' }}</span>
+                                            </div>
                                         </div>
-                                        <div class="col-sm-2">
-                                            <span class="text-muted small d-block mb-1">Qty Out</span>
-                                            <span class="fw-medium text-dark">{{ number_format($order->total_qty_out) }}</span>
+                                        <div class="col-6 col-md-2">
+                                            <div class="p-2 rounded-3 bg-white border h-100 text-center">
+                                                <span class="text-muted small d-block mb-1">ATL#</span>
+                                                <span class="fw-medium text-dark" title="{{ $atlList->implode(', ') }}">{{ $atlList->isNotEmpty() ? $atlList->implode(', ') : '—' }}</span>
+                                            </div>
                                         </div>
-                                        <div class="col-sm-2">
-                                            <span class="text-muted small d-block mb-1">Terms</span>
-                                            <span class="fw-medium text-dark">{{ $order->terms ?: '—' }}</span>
+                                        <div class="col-6 col-md-2">
+                                            <div class="p-2 rounded-3 bg-white border h-100 text-center">
+                                                <span class="text-muted small d-block mb-1">Qty. Out</span>
+                                                <span class="fw-medium text-dark">{{ number_format($order->total_qty_out) }}</span>
+                                            </div>
                                         </div>
-                                        <div class="col-sm-2">
-                                            <span class="text-muted small d-block mb-1">Status</span>
-                                            <span class="badge rounded-pill px-2 py-1 {{ $order->computed_status_badge_class }}">{{ $order->computed_status }}</span>
+                                        <div class="col-6 col-md-2">
+                                            <div class="p-2 rounded-3 bg-white border h-100 text-center">
+                                                <span class="text-muted small d-block mb-1">Remaining Balance</span>
+                                                <span class="fw-medium text-dark">{{ number_format($order->remaining_balance) }}</span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -275,9 +343,9 @@
                         @endforeach
                     @else
                         <tr>
-                            <td colspan="{{ auth()->user()->canClearOrders() ? 9 : 8 }}" class="text-center py-5 text-muted">
+                            <td colspan="{{ auth()->user()->canClearOrders() ? 11 : 10 }}" class="text-center py-5 text-muted">
                                 <i class="bi bi-inbox fs-1 d-block mb-3 text-secondary"></i>
-                                No orders found. Click "New Order" to create one.
+                                No orders found in this view.
                             </td>
                         </tr>
                     @endif
@@ -323,6 +391,14 @@
                             </div>
                             <div class="col-6 text-end">
                                 <span class="fw-medium">Qty Ordered:</span> {{ number_format($order->effective_qty_ordered) }}
+                            </div>
+                        </div>
+                        <div class="row mb-3 small text-muted">
+                            <div class="col-6">
+                                <span class="fw-medium">Price:</span> {{ $order->price > 0 ? '₱' . number_format($order->price, 2) : '—' }}
+                            </div>
+                            <div class="col-6 text-end">
+                                <span class="fw-medium">Terms:</span> {{ $order->terms ?: '—' }}
                             </div>
                         </div>
                         <div class="d-flex justify-content-between align-items-center mb-3">
@@ -398,7 +474,7 @@
             @else
                 <div class="text-center py-5 text-muted">
                     <i class="bi bi-inbox fs-1 d-block mb-3 text-secondary"></i>
-                    No orders found. Click "New Order" to create one.
+                    No orders found in this view.
                 </div>
             @endif
         </div>
