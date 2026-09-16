@@ -168,4 +168,28 @@ class StockInController extends Controller
         return redirect()->route('wetstock.stock-in.index')
             ->with('success', "Corrected {$tank->name} Stock IN quantity from " . number_format($oldQuantity) . "L to " . number_format($newQuantity) . "L.");
     }
+
+    public function destroy(StockIn $stockIn): RedirectResponse
+    {
+        if (!auth()->user()->isAdmin()) {
+            abort(403);
+        }
+
+        $stockIn->load('tank.warehouse');
+        $tankName = $stockIn->tank->name ?? '—';
+        $warehouseName = $stockIn->tank->warehouse->name ?? '—';
+        $quantity = (int) $stockIn->quantity;
+        $date = $stockIn->date ? $stockIn->date->format('Y-m-d') : '—';
+
+        AuditLog::create([
+            'admin_id' => auth()->id(),
+            'action' => 'DELETED',
+            'description' => "Stock IN: Deleted " . number_format($quantity) . "L entry for {$tankName} ({$warehouseName}) dated {$date}",
+        ]);
+
+        $stockIn->delete();
+
+        return redirect()->route('wetstock.stock-in.index')
+            ->with('success', "Deleted Stock IN entry (" . number_format($quantity) . "L into {$tankName}) permanently.");
+    }
 }

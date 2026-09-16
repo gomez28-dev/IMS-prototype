@@ -117,6 +117,10 @@ Route::middleware('auth')->group(function () {
             Route::get('/stock-in/{stockIn}/edit', [WetStock\StockInController::class, 'edit'])->name('stock-in.edit');
             Route::post('/stock-in/{stockIn}/edit', [WetStock\StockInController::class, 'update'])->name('stock-in.update');
         });
+        // Delete — Portal Administrator only
+        Route::middleware('role:admin')->group(function () {
+            Route::post('/stock-in/{stockIn}/delete', [WetStock\StockInController::class, 'destroy'])->name('stock-in.destroy');
+        });
 
         // Stock Transfers (Depot <-> Tanker)
         Route::get('/transfers', [WetStock\StockTransferController::class, 'index'])->name('transfers.index');

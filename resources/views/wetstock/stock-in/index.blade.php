@@ -77,6 +77,14 @@
                                                 <a href="{{ route('wetstock.stock-in.edit', $stockIn->id) }}" class="btn btn-sm btn-outline-primary" title="Correct quantity">
                                                     <i class="bi bi-pencil"></i>
                                                 </a>
+                                                @if (Auth::user()->isAdmin())
+                                                    <form method="POST" action="{{ route('wetstock.stock-in.destroy', $stockIn->id) }}" class="d-inline" onsubmit="return confirm('Permanently delete this Stock IN entry (+{{ number_format($stockIn->quantity) }} L into {{ $stockIn->tank->name ?? 'tank' }})? This cannot be undone.');">
+                                                        @csrf
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete entry">
+                                                            <i class="bi bi-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                @endif
                                             </td>
                                         @endif
                                     </tr>
