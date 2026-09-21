@@ -69,12 +69,24 @@
                         @enderror
                     </div>
 
-                    <div class="mb-4">
-                        <label for="qty_ordered" class="form-label fw-medium text-secondary small">Qty Ordered</label>
-                        <input type="number" name="qty_ordered" id="qty_ordered" class="form-control @error('qty_ordered') is-invalid @enderror" placeholder="e.g. 1000" value="{{ old('qty_ordered', $order ? $order->qty_ordered : '') }}" required>
-                        @error('qty_ordered')
-                            <div class="invalid-feedback">{{ $message }}</div>
-                        @enderror
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <label for="qty_ordered" class="form-label fw-medium text-secondary small">Qty Ordered</label>
+                            <input type="number" name="qty_ordered" id="qty_ordered" class="form-control @error('qty_ordered') is-invalid @enderror" placeholder="e.g. 1000" value="{{ old('qty_ordered', $order ? $order->qty_ordered : '') }}" required>
+                            @error('qty_ordered')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="col-md-6">
+                            <label for="price" class="form-label fw-medium text-secondary small">Price</label>
+                            <div class="input-group">
+                                <span class="input-group-text">₱</span>
+                                <input type="number" step="0.01" min="0" name="price" id="price" class="form-control @error('price') is-invalid @enderror" placeholder="0.00" value="{{ old('price', $order ? number_format((float) $order->price, 2, '.', '') : '') }}">
+                                @error('price')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+                        </div>
                     </div>
 
                     <div class="row mb-4">
