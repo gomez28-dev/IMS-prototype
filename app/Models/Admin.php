@@ -39,6 +39,7 @@ class Admin extends Authenticatable
         'ops_wh' => 'Operations Warehouse',
         'ops_log' => 'Operations Logistics',
         'accounting' => 'Accounting',
+        'purchasing' => 'Purchasing (Rica Esaga)',
         'hod' => 'Head of Department',
         'vp' => 'Vice President',
     ];
@@ -53,6 +54,7 @@ class Admin extends Authenticatable
     public function isViewer(): bool { return $this->role === 'viewer'; }
     public function isAudit(): bool { return $this->role === 'audit'; }
     public function isSales(): bool { return $this->role === 'sales'; }
+    public function isPurchasing(): bool { return $this->role === 'purchasing'; }
     public function isOpsAdmin(): bool { return $this->role === 'ops_admin'; }
     public function isOpsMgr(): bool { return $this->role === 'ops_mgr'; }
     public function isOpsWh(): bool { return $this->role === 'ops_wh'; }
@@ -60,6 +62,21 @@ class Admin extends Authenticatable
     public function isAccounting(): bool { return $this->role === 'accounting'; }
     public function isHod(): bool { return $this->role === 'hod'; }
     public function isVp(): bool { return $this->role === 'vp'; }
+
+    public function canAccessStockOrders(): bool
+    {
+        return in_array($this->role, ['admin', 'purchasing', 'vp', 'audit', 'viewer']);
+    }
+
+    public function canEditStockOrders(): bool
+    {
+        return in_array($this->role, ['admin', 'purchasing']);
+    }
+
+    public function canApproveStockOrders(): bool
+    {
+        return in_array($this->role, ['admin', 'vp']);
+    }
 
     // Permission Helpers
     public function canMarkFulfilled(): bool
@@ -125,6 +142,7 @@ class Admin extends Authenticatable
             'ops_wh' => 'badge-role-ops-wh',
             'ops_log' => 'badge-role-ops-log',
             'accounting' => 'badge-role-accounting',
+            'purchasing' => 'badge-role-purchasing',
             'hod' => 'badge-role-hod',
             'vp' => 'badge-role-vp',
             default => 'badge-role-viewer',

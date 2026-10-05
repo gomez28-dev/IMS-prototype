@@ -20,6 +20,11 @@
         <a href="{{ route('wetstock.supplier-orders.index') }}" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-box-arrow-in-down me-1"></i> Incoming Stock
         </a>
+        @if (Auth::user()->canEditModule2())
+            <a href="{{ route('wetstock.stock-requests.create') }}" class="btn btn-outline-success btn-sm">
+                <i class="bi bi-cart-plus me-1"></i> Request Replenishment
+            </a>
+        @endif
         <a href="{{ route('wetstock.deliveries.index') }}" class="btn btn-outline-warning btn-sm position-relative">
             <i class="bi bi-truck me-1"></i> Assign Deliveries
             @if (!empty($unassignedCount) && $unassignedCount > 0)
@@ -87,7 +92,27 @@
                     @foreach ($warehouse->activeTanks as $tank)
                         @php
                             $percentageUsed = $tank->max_capacity > 0 ? min(100, round(($tank->stock_available / $tank->max_capacity) * 100)) : 0;
-                            $barColor = $percentageUsed > 85 ? 'bg-danger' : ($percentageUsed > 60 ? 'bg-warning' : 'bg-success');
+                            if ($percentageUsed < 15) {
+                                $bandBadge = 'bg-danger text-white';
+                                $bandLabel = 'Critical Low';
+                                $barColor = 'bg-danger';
+                            } elseif ($percentageUsed < 30) {
+                                $bandBadge = 'bg-warning text-dark border';
+                                $bandLabel = 'Low Stock';
+                                $barColor = 'bg-warning';
+                            } elseif ($percentageUsed < 70) {
+                                $bandBadge = 'bg-info text-dark';
+                                $bandLabel = 'Normal';
+                                $barColor = 'bg-info';
+                            } elseif ($percentageUsed <= 90) {
+                                $bandBadge = 'bg-success text-white';
+                                $bandLabel = 'Optimal';
+                                $barColor = 'bg-success';
+                            } else {
+                                $bandBadge = 'bg-dark text-white';
+                                $bandLabel = 'Near Capacity';
+                                $barColor = 'bg-dark';
+                            }
                         @endphp
                         <div class="col-md-6 col-lg-4">
                             <div class="card h-100 border shadow-sm rounded-3 {{ $tank->hasContamination() ? ($tank->isFullyContaminated() ? 'border-danger' : 'border-warning') : '' }}">
@@ -101,6 +126,7 @@
                                         {{ $tank->name }}
                                     </h6>
                                     <div>
+                                        <span class="badge {{ $bandBadge }} me-1" style="font-size: 0.65rem;">{{ $bandLabel }}</span>
                                         @if ($tank->hasContamination())
                                             <span class="badge {{ $tank->isFullyContaminated() ? 'bg-danger' : 'bg-warning text-dark border' }} me-1" title="{{ number_format($tank->contaminated_liters) }}L contaminated — {{ number_format($tank->sellable_available) }}L still sellable">{{ $tank->isFullyContaminated() ? 'FULLY ' : '' }}CONTAMINATED ({{ number_format($tank->contaminated_liters) }}L)</span>
                                         @endif
@@ -117,6 +143,13 @@
                                         <div class="progress" style="height: 8px;">
                                             <div class="progress-bar {{ $barColor }}" role="progressbar" style="width: {{ $percentageUsed }}%;" aria-valuenow="{{ $percentageUsed }}" aria-valuemin="0" aria-valuemax="100"></div>
                                         </div>
+                                        @if ($percentageUsed < 30 && Auth::user()->canEditModule2())
+                                            <div class="mt-2 text-end">
+                                                <a href="{{ route('wetstock.stock-requests.create') }}" class="badge bg-danger-subtle text-danger border border-danger-subtle text-decoration-none py-1 px-2">
+                                                    <i class="bi bi-cart-plus me-1"></i> Low Stock Alert: Request Replenishment
+                                                </a>
+                                            </div>
+                                        @endif
                                     </div>
 
                                     <!-- 2-Card Stock Metrics without Total Out -->

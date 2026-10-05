@@ -15,6 +15,7 @@ class StockIn extends Model
     protected $fillable = [
         'storage_tank_id',
         'admin_id',
+        'purchase_order_delivery_id',
         'quantity',
         'date',
         'reverses_id',
@@ -34,6 +35,11 @@ class StockIn extends Model
     public function admin(): BelongsTo
     {
         return $this->belongsTo(Admin::class, 'admin_id');
+    }
+
+    public function purchaseOrderDelivery(): BelongsTo
+    {
+        return $this->belongsTo(PurchaseOrderDelivery::class, 'purchase_order_delivery_id');
     }
 
     public function original(): BelongsTo

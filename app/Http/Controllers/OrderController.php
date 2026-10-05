@@ -68,9 +68,14 @@ class OrderController extends Controller
             'po_number' => ['nullable', 'string', 'max:64', 'unique:orders,po_number'],
             'location' => ['required', 'string', 'in:Valenzuela,San Simon'],
             'status' => ['required', 'string', 'in:Active,Cancelled'],
+            'fulfillment_type' => ['nullable', 'string', 'in:DELIVERY,DEPOT_PICKUP,FUEL_TRADE'],
+            'order_category' => ['nullable', 'string', 'in:CLIENT_ORDER,BUY_BACK'],
+            'client_atl_number' => ['nullable', 'string', 'max:64'],
             'terms' => ['nullable', 'string', 'max:64'],
         ]);
 
+        $validated['fulfillment_type'] = $validated['fulfillment_type'] ?? 'DELIVERY';
+        $validated['order_category'] = $validated['order_category'] ?? 'CLIENT_ORDER';
         $validated['price'] = $validated['price'] ?? 0;
         $validated['created_by'] = Auth::id();
 
@@ -134,17 +139,22 @@ class OrderController extends Controller
             'po_number' => ['nullable', 'string', 'max:64', 'unique:orders,po_number,' . $order->id],
             'location' => ['required', 'string', 'in:Valenzuela,San Simon'],
             'status' => ['required', 'string', 'in:Active,Cancelled'],
+            'fulfillment_type' => ['nullable', 'string', 'in:DELIVERY,DEPOT_PICKUP,FUEL_TRADE'],
+            'order_category' => ['nullable', 'string', 'in:CLIENT_ORDER,BUY_BACK'],
+            'client_atl_number' => ['nullable', 'string', 'max:64'],
             'terms' => ['nullable', 'string', 'max:64'],
             'modification_reason' => ['nullable', 'string', 'max:1000'],
         ]);
 
+        $validated['fulfillment_type'] = $validated['fulfillment_type'] ?? 'DELIVERY';
+        $validated['order_category'] = $validated['order_category'] ?? 'CLIENT_ORDER';
         $validated['price'] = $validated['price'] ?? 0;
 
         $returnTo = $request->input('return_to');
 
         // Diff changes against existing model attributes
         $changes = [];
-        $comparableFields = ['account', 'date', 'qty_ordered', 'price', 'so_number', 'po_number', 'location', 'status', 'terms'];
+        $comparableFields = ['account', 'date', 'qty_ordered', 'price', 'so_number', 'po_number', 'location', 'status', 'fulfillment_type', 'order_category', 'client_atl_number', 'terms'];
 
         foreach ($comparableFields as $field) {
             $oldVal = $order->{$field};

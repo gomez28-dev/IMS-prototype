@@ -21,7 +21,7 @@
                     <input type="hidden" name="return_to" value="{{ old('return_to', $returnTo ?? route('dashboard')) }}">
                     
                     <div class="mb-3">
-                        <label for="account" class="form-label fw-medium text-secondary small">Account</label>
+                        <label for="account" class="form-label fw-medium text-secondary small">Account <span class="text-danger">*</span></label>
                         <select name="account" id="account" class="form-control form-select @error('account') is-invalid @enderror" required>
                             <option value="" disabled {{ old('account', $order ? $order->account : '') === '' ? 'selected' : '' }}>Select a client account...</option>
                             @foreach ($clients as $client)
@@ -34,7 +34,7 @@
                     </div>
 
                     <div class="mb-3">
-                        <label for="location" class="form-label fw-medium text-secondary small">Location</label>
+                        <label for="location" class="form-label fw-medium text-secondary small">Location <span class="text-danger">*</span></label>
                         <select name="location" id="location" class="form-control form-select @error('location') is-invalid @enderror" required>
                             <option value="Valenzuela" {{ old('location', $order ? $order->location : 'Valenzuela') === 'Valenzuela' ? 'selected' : '' }}>Valenzuela</option>
                             <option value="San Simon" {{ old('location', $order ? $order->location : '') === 'San Simon' ? 'selected' : '' }}>San Simon</option>
@@ -46,14 +46,46 @@
 
                     <div class="row mb-3">
                         <div class="col-md-6">
-                            <label for="so_number" class="form-label fw-medium text-secondary small">SO Number</label>
+                            <label for="fulfillment_type" class="form-label fw-medium text-secondary small">Fulfillment Type <span class="text-danger">*</span></label>
+                            <select name="fulfillment_type" id="fulfillment_type" class="form-control form-select @error('fulfillment_type') is-invalid @enderror" required>
+                                <option value="DELIVERY" {{ old('fulfillment_type', $order ? $order->fulfillment_type : 'DELIVERY') === 'DELIVERY' ? 'selected' : '' }}>Delivery (Small/Big Tanker)</option>
+                                <option value="DEPOT_PICKUP" {{ old('fulfillment_type', $order ? $order->fulfillment_type : '') === 'DEPOT_PICKUP' ? 'selected' : '' }}>Pick Up at Doyen Depot</option>
+                                <option value="FUEL_TRADE" {{ old('fulfillment_type', $order ? $order->fulfillment_type : '') === 'FUEL_TRADE' ? 'selected' : '' }}>Fuel Trade: Pick Up at Supplier</option>
+                            </select>
+                            @error('fulfillment_type')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="col-md-6">
+                            <label for="order_category" class="form-label fw-medium text-secondary small">Order Category <span class="text-danger">*</span></label>
+                            <select name="order_category" id="order_category" class="form-control form-select @error('order_category') is-invalid @enderror" required>
+                                <option value="CLIENT_ORDER" {{ old('order_category', $order ? $order->order_category : 'CLIENT_ORDER') === 'CLIENT_ORDER' ? 'selected' : '' }}>Client Order</option>
+                                <option value="BUY_BACK" {{ old('order_category', $order ? $order->order_category : '') === 'BUY_BACK' ? 'selected' : '' }}>Buy Back</option>
+                            </select>
+                            @error('order_category')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="client_atl_number" class="form-label fw-medium text-secondary small">Client ATL Number (Optional / If Client provides ATL)</label>
+                        <input type="text" name="client_atl_number" id="client_atl_number" class="form-control @error('client_atl_number') is-invalid @enderror" placeholder="e.g. ATL-CLIENT-12345" value="{{ old('client_atl_number', $order ? $order->client_atl_number : '') }}">
+                        @error('client_atl_number')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="so_number" class="form-label fw-medium text-secondary small">SO Number <span class="text-danger">*</span></label>
                             <input type="text" name="so_number" id="so_number" class="form-control @error('so_number') is-invalid @enderror" placeholder="e.g. SO-12345" value="{{ old('so_number', $order ? $order->so_number : '') }}" required>
                             @error('so_number')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
                         <div class="col-md-6">
-                            <label for="date" class="form-label fw-medium text-secondary small">Order Date</label>
+                            <label for="date" class="form-label fw-medium text-secondary small">Order Date <span class="text-danger">*</span></label>
                             <input type="date" name="date" id="date" class="form-control @error('date') is-invalid @enderror" value="{{ old('date', $order && $order->date ? $order->date->format('Y-m-d') : '') }}" required>
                             @error('date')
                                 <div class="invalid-feedback">{{ $message }}</div>
@@ -71,7 +103,7 @@
 
                     <div class="row mb-4">
                         <div class="col-md-6">
-                            <label for="qty_ordered" class="form-label fw-medium text-secondary small">Qty Ordered</label>
+                            <label for="qty_ordered" class="form-label fw-medium text-secondary small">Qty Ordered <span class="text-danger">*</span></label>
                             <input type="number" name="qty_ordered" id="qty_ordered" class="form-control @error('qty_ordered') is-invalid @enderror" placeholder="e.g. 1000" value="{{ old('qty_ordered', $order ? $order->qty_ordered : '') }}" required>
                             @error('qty_ordered')
                                 <div class="invalid-feedback">{{ $message }}</div>
@@ -91,7 +123,7 @@
 
                     <div class="row mb-4">
                         <div class="col-md-6">
-                            <label for="status" class="form-label fw-medium text-secondary small">Status</label>
+                            <label for="status" class="form-label fw-medium text-secondary small">Status <span class="text-danger">*</span></label>
                             <select name="status" id="status" class="form-control form-select @error('status') is-invalid @enderror" required>
                                 <option value="Active" {{ old('status', $order ? $order->status : 'Active') === 'Active' ? 'selected' : '' }}>Active</option>
                                 <option value="Cancelled" {{ old('status', $order ? $order->status : '') === 'Cancelled' ? 'selected' : '' }}>Cancelled</option>

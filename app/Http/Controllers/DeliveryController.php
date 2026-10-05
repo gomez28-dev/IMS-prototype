@@ -18,6 +18,7 @@ class DeliveryController extends Controller
      */
     public function index(Order $order, Request $request): View
     {
+        $order->load(['linkedPurchaseOrder.deliveries.preparer', 'linkedPurchaseOrder.deliveries.approver']);
         $deliveries = $order->deliveries()->orderBy('delivery_date', 'asc')->get();
 
         // Store report filter params in session for back navigation

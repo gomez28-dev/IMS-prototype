@@ -168,6 +168,12 @@ Route::middleware('auth')->group(function () {
             Route::post('/supplier-orders/{supplierOrder}/edit', [WetStock\SupplierOrderController::class, 'update'])->name('supplier-orders.update');
             Route::post('/supplier-orders/{supplierOrder}/complete', [WetStock\SupplierOrderController::class, 'complete'])->name('supplier-orders.complete');
             Route::post('/supplier-orders/{supplierOrder}/delete', [WetStock\SupplierOrderController::class, 'destroy'])->name('supplier-orders.destroy');
+
+            // Module 2 Front-Door Stock Requests & Tank Receiving Hand-off
+            Route::get('/stock-requests', [WetStock\StockRequestController::class, 'index'])->name('stock-requests.index');
+            Route::get('/stock-requests/create', [WetStock\StockRequestController::class, 'create'])->name('stock-requests.create');
+            Route::post('/stock-requests', [WetStock\StockRequestController::class, 'store'])->name('stock-requests.store');
+            Route::post('/deliveries/{delivery}/receive-stock', [WetStock\StockRequestController::class, 'receiveDelivery'])->name('deliveries.receive-stock');
         });
 
         // Wet Stock Reports & Snapshots
@@ -178,6 +184,28 @@ Route::middleware('auth')->group(function () {
         Route::middleware('role:admin,ops_admin,ops_mgr,ops_wh,ops_log,hod,vp')->group(function () {
             Route::post('/reports/snapshot', [WetStock\ReportController::class, 'storeSnapshot'])->name('reports.snapshot');
         });
+    });
+
+    // Module 3: Stock Orders & ATL Issuance (Gated to admin, purchasing, vp, audit, viewer)
+    Route::prefix('stock-orders')->name('stock-orders.')->middleware('role:admin,purchasing,vp,audit,viewer')->group(function () {
+        Route::get('/', [WetStock\StockOrderController::class, 'index'])->name('index');
+        Route::get('/dashboard', [WetStock\StockOrderController::class, 'dashboard'])->name('dashboard');
+        Route::get('/create-supplier-po', [WetStock\StockOrderController::class, 'createSupplierPo'])->name('create-supplier-po');
+        Route::post('/store-supplier-po', [WetStock\StockOrderController::class, 'storeSupplierPo'])->name('store-supplier-po');
+        Route::get('/fuel-trade/{order}/create-po', [WetStock\StockOrderController::class, 'createFromSalesOrder'])->name('create-fuel-trade-po');
+        Route::post('/fuel-trade/{order}/store-po', [WetStock\StockOrderController::class, 'storeFuelTradePo'])->name('store-fuel-trade-po');
+        Route::post('/deliveries/{delivery}/complete-fuel-trade', [WetStock\StockOrderController::class, 'completeFuelTrade'])->name('complete-fuel-trade');
+        Route::post('/deliveries/{delivery}/update-docs', [WetStock\StockOrderController::class, 'updateDeliveryDocs'])->name('update-docs');
+        Route::get('/{purchaseOrder}/prepare', [WetStock\StockOrderController::class, 'editRequest'])->name('edit-request');
+        Route::post('/{purchaseOrder}/prepare', [WetStock\StockOrderController::class, 'updateRequest'])->name('update-request');
+        Route::get('/approvals', [WetStock\StockOrderController::class, 'approvals'])->name('approvals');
+        Route::post('/{purchaseOrder}/approve', [WetStock\StockOrderController::class, 'approve'])->name('approve');
+        Route::post('/{purchaseOrder}/reject', [WetStock\StockOrderController::class, 'reject'])->name('reject');
+        Route::get('/deliveries', [WetStock\StockOrderController::class, 'deliveries'])->name('deliveries');
+        Route::post('/deliveries/{delivery}/dispatch', [WetStock\StockOrderController::class, 'dispatchDelivery'])->name('dispatch-delivery');
+        Route::get('/deliveries/{delivery}/pdf', [WetStock\StockOrderController::class, 'downloadAtlPdf'])->name('pdf');
+        Route::get('/deliveries/{delivery}/atl-pdf', [WetStock\StockOrderController::class, 'downloadAtlPdf'])->name('atl-pdf');
+        Route::get('/{purchaseOrder}', [WetStock\StockOrderController::class, 'show'])->name('show');
     });
 
     // Push subscription stub (real Web Push lands later; prevents 500 from layout snippet)

@@ -22,6 +22,10 @@ class Order extends Model
         'po_number',
         'clearing_status',
         'status',
+        'fulfillment_type',
+        'order_category',
+        'client_atl_number',
+        'linked_purchase_order_id',
         'revised_at',
         'terms',
         'location',
@@ -47,6 +51,59 @@ class Order extends Model
     public function modificationRequests(): MorphMany
     {
         return $this->morphMany(ModificationRequest::class, 'requestable');
+    }
+
+    public function linkedPurchaseOrder(): BelongsTo
+    {
+        return $this->belongsTo(PurchaseOrder::class, 'linked_purchase_order_id');
+    }
+
+    public function isFuelTrade(): bool
+    {
+        return $this->fulfillment_type === 'FUEL_TRADE';
+    }
+
+    public function isDepotPickup(): bool
+    {
+        return $this->fulfillment_type === 'DEPOT_PICKUP';
+    }
+
+    public function isBuyBack(): bool
+    {
+        return $this->order_category === 'BUY_BACK';
+    }
+
+    /**
+     * Get UI-formatted SO identifier.
+     * If Fuel Trade, automatically tags as FT-{number} (e.g. SO-0042 -> FT-0042).
+     */
+    public function getFormattedSoNumberAttribute(): string
+    {
+        if (!$this->so_number) {
+            return '—';
+        }
+
+        if ($this->isFuelTrade()) {
+            if (preg_match('/^SO-(.+)$/i', $this->so_number, $matches)) {
+                return 'FT-' . $matches[1];
+            }
+            if (!str_starts_with(strtoupper($this->so_number), 'FT-')) {
+                return 'FT-' . $this->so_number;
+            }
+            return $this->so_number;
+        }
+
+        return $this->so_number;
+    }
+
+    /**
+     * Security gate: An ATL can only be issued if Fuel Trade order is Approved by Accounting and not cancelled.
+     */
+    public function canBeIssuedAtl(): bool
+    {
+        return $this->isFuelTrade()
+            && $this->clearing_status === 'Approved'
+            && $this->status !== 'Cancelled';
     }
 
     /**
@@ -155,6 +212,16 @@ class Order extends Model
             return 0;
         }
 
+        if ($this->isFuelTrade() && $this->linkedPurchaseOrder) {
+            $poDelivQty = (int) $this->linkedPurchaseOrder->deliveries()
+                ->where('status', 'Completed')
+                ->tap(fn ($q) => $this->scopePoDeliveriesToSo($q))
+                ->sum('qty_to_receive');
+            if ($poDelivQty > 0) {
+                return $poDelivQty;
+            }
+        }
+
         if ($this->relationLoaded('deliveries')) {
             return (int) $this->deliveries->where('status', 'FULFILLED')->sum('qty_out');
         }
@@ -165,12 +232,45 @@ class Order extends Model
     }
 
     /**
+     * Restrict the query to the purchase-order delivery rows that belong to
+     * THIS sales order, not the PO's whole completed/committed total.
+     * Untagged rows count only when the PO's linked_order_id is this order.
+     */
+    private function scopePoDeliveriesToSo($query): void
+    {
+        $po = $this->linkedPurchaseOrder;
+        $candidates = array_values(array_unique(array_filter([
+            $this->so_number,
+            $this->formatted_so_number,
+        ])));
+
+        $query->where(function ($q) use ($po, $candidates) {
+            if (!empty($candidates)) {
+                $q->whereIn('so_number', $candidates);
+            }
+            if ($po && $po->linked_order_id === $this->id) {
+                $q->orWhereNull('so_number');
+            }
+        });
+    }
+
+    /**
      * Get total quantity committed against the order (PENDING + FULFILLED).
      */
     public function getCommittedQtyOutAttribute(): int
     {
         if (!$this->exists) {
             return 0;
+        }
+
+        if ($this->isFuelTrade() && $this->linkedPurchaseOrder) {
+            $poDelivQty = (int) $this->linkedPurchaseOrder->deliveries()
+                ->whereIn('status', ['Pending', 'Active', 'Completed'])
+                ->tap(fn ($q) => $this->scopePoDeliveriesToSo($q))
+                ->sum('qty_to_receive');
+            if ($poDelivQty > 0) {
+                return $poDelivQty;
+            }
         }
 
         if ($this->relationLoaded('deliveries')) {

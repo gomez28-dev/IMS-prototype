@@ -230,7 +230,13 @@
                                 @endif
                             </td>
                             <td>
-                                <span class="badge {{ $order->status === 'Cancelled' ? 'bg-danger text-white' : 'bg-light text-dark border' }}">{{ $order->so_number }}</span>
+                                @if ($order->isFuelTrade())
+                                    <span class="badge" style="background-color: #fef08a; color: #854d0e; border: 1px solid #facc15;" title="Fuel Trade (Refinery Direct Pick-up)">
+                                        <i class="bi bi-fuel-pump me-1"></i>{{ $order->formatted_so_number }}
+                                    </span>
+                                @else
+                                    <span class="badge {{ $order->status === 'Cancelled' ? 'bg-danger text-white' : 'bg-light text-dark border' }}">{{ $order->formatted_so_number }}</span>
+                                @endif
                                 @if ($order->isCarryOver($now))
                                     <span class="badge bg-secondary-subtle text-secondary border rounded-pill ms-1" style="font-size: 0.65rem;" title="Unfulfilled order from previous month">
                                         <i class="bi bi-arrow-return-right me-1"></i>Carry-Over
@@ -308,20 +314,31 @@
                                         </div>
                                         <div class="col-6 col-md-2">
                                             <div class="p-2 rounded-3 bg-white border h-100 text-center">
-                                                <span class="text-muted small d-block mb-1">PO#</span>
-                                                <span class="fw-medium text-dark">{{ $order->po_number ?: '—' }}</span>
+                                                <span class="text-muted small d-block mb-1">{{ $order->isFuelTrade() ? 'Supplier PO#' : 'PO#' }}</span>
+                                                <span class="fw-medium text-dark">{{ $order->isFuelTrade() && $order->linkedPurchaseOrder ? $order->linkedPurchaseOrder->po_number : ($order->po_number ?: '—') }}</span>
                                             </div>
                                         </div>
                                         <div class="col-6 col-md-2">
                                             <div class="p-2 rounded-3 bg-white border h-100 text-center">
-                                                <span class="text-muted small d-block mb-1">DR#</span>
-                                                <span class="fw-medium text-dark" title="{{ $drList->implode(', ') }}">{{ $drList->isNotEmpty() ? $drList->implode(', ') : '—' }}</span>
+                                                <span class="text-muted small d-block mb-1">{{ $order->isFuelTrade() ? 'Pick Up Date' : 'DR#' }}</span>
+                                                @if ($order->isFuelTrade())
+                                                    <span class="fw-medium text-dark">{{ $order->linkedPurchaseOrder?->deliveries?->first()?->receiving_date ? $order->linkedPurchaseOrder->deliveries->first()->receiving_date->format('Y-m-d') : '—' }}</span>
+                                                @else
+                                                    <span class="fw-medium text-dark" title="{{ $drList->implode(', ') }}">{{ $drList->isNotEmpty() ? $drList->implode(', ') : '—' }}</span>
+                                                @endif
                                             </div>
                                         </div>
                                         <div class="col-6 col-md-2">
                                             <div class="p-2 rounded-3 bg-white border h-100 text-center">
                                                 <span class="text-muted small d-block mb-1">ATL#</span>
-                                                <span class="fw-medium text-dark" title="{{ $atlList->implode(', ') }}">{{ $atlList->isNotEmpty() ? $atlList->implode(', ') : '—' }}</span>
+                                                @if ($order->isFuelTrade())
+                                                    @php
+                                                        $ftAtl = $order->linkedPurchaseOrder?->deliveries?->first()?->atl_number ?: ($order->client_atl_number ?: '—');
+                                                    @endphp
+                                                    <span class="fw-medium text-dark">{{ $ftAtl }}</span>
+                                                @else
+                                                    <span class="fw-medium text-dark" title="{{ $atlList->implode(', ') }}">{{ $atlList->isNotEmpty() ? $atlList->implode(', ') : '—' }}</span>
+                                                @endif
                                             </div>
                                         </div>
                                         <div class="col-6 col-md-2">
@@ -382,7 +399,13 @@
                             @endif
                             </h5>
                             @endif
-                            <span class="badge {{ $order->status === 'Cancelled' ? 'bg-danger text-white' : 'bg-light text-dark border' }}">{{ $order->so_number }}</span>
+                            @if ($order->isFuelTrade())
+                                <span class="badge" style="background-color: #fef08a; color: #854d0e; border: 1px solid #facc15;" title="Fuel Trade">
+                                    <i class="bi bi-fuel-pump me-1"></i>{{ $order->formatted_so_number }}
+                                </span>
+                            @else
+                                <span class="badge {{ $order->status === 'Cancelled' ? 'bg-danger text-white' : 'bg-light text-dark border' }}">{{ $order->formatted_so_number }}</span>
+                            @endif
                         </div>
                         <p class="text-muted small mb-1"><span class="fw-medium">PO#:</span> {{ $order->po_number }}</p>
                         <div class="row mb-3 small text-muted">

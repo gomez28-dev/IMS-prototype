@@ -712,6 +712,10 @@
                 ->where('requestable_type', \App\Models\StockTransfer::class)
                 ->count()
             : 0;
+
+        $__pendingPoApprovalsCount = Auth::user()->canApproveStockOrders()
+            ? \App\Models\PurchaseOrder::where('request_status', 'RECEIVED')->count()
+            : 0;
     @endphp
     {{-- ============ MOBILE SIDEBAR DRAWER (< 992px, preserved) ============ --}}
     <div class="sidebar-drawer d-lg-none" id="sidebarDrawer">
@@ -750,6 +754,24 @@
                             @endif
                         </a>
                     @endif
+                @elseif (request()->is('stock-orders*'))
+                    <a class="nav-link d-flex align-items-center" href="{{ route('stock-orders.dashboard') }}">
+                        <i class="bi bi-speedometer2 me-2"></i> Dashboard
+                    </a>
+                    <a class="nav-link d-flex align-items-center" href="{{ route('stock-orders.index') }}">
+                        <i class="bi bi-file-earmark-text me-2"></i> All Orders
+                    </a>
+                    @if (Auth::user()->canApproveStockOrders())
+                        <a class="nav-link d-flex align-items-center" href="{{ route('stock-orders.approvals') }}">
+                            <i class="bi bi-check2-circle me-2"></i> Approvals
+                            @if ($__pendingPoApprovalsCount > 0)
+                                <span class="badge rounded-pill ms-1 bg-danger text-white">{{ $__pendingPoApprovalsCount }}</span>
+                            @endif
+                        </a>
+                    @endif
+                    <a class="nav-link d-flex align-items-center" href="{{ route('stock-orders.deliveries') }}">
+                        <i class="bi bi-truck me-2"></i> Deliveries & ATLs
+                    </a>
                 @elseif (!request()->routeIs('portal'))
                     <a class="nav-link d-flex align-items-center" href="{{ route('dashboard') }}">
                         <i class="bi bi-speedometer2 me-2"></i> Dashboard
@@ -823,6 +845,8 @@
         <div class="sidebar-section-label">
             @if (request()->is('wetstock*'))
                 Wet Stock
+            @elseif (request()->is('stock-orders*'))
+                Stock Orders (Module 3)
             @else
                 Sales Documentation
             @endif
@@ -867,6 +891,28 @@
                     @endif
                 </a>
                 @endif
+            @elseif (request()->is('stock-orders*'))
+                <a href="{{ route('stock-orders.dashboard') }}" class="sidebar-nav-link {{ request()->routeIs('stock-orders.dashboard') ? 'active' : '' }}" title="Dashboard">
+                    <i class="bi bi-speedometer2"></i>
+                    <span class="nav-label">Dashboard</span>
+                </a>
+                <a href="{{ route('stock-orders.index') }}" class="sidebar-nav-link {{ request()->routeIs('stock-orders.index') || request()->routeIs('stock-orders.create*') || request()->routeIs('stock-orders.edit*') ? 'active' : '' }}" title="All Orders">
+                    <i class="bi bi-file-earmark-text"></i>
+                    <span class="nav-label">All Orders</span>
+                </a>
+                @if (Auth::user()->canApproveStockOrders())
+                <a href="{{ route('stock-orders.approvals') }}" class="sidebar-nav-link {{ request()->routeIs('stock-orders.approvals') ? 'active' : '' }}" title="Approvals">
+                    <i class="bi bi-check2-circle"></i>
+                    <span class="nav-label">Approvals</span>
+                    @if ($__pendingPoApprovalsCount > 0)
+                        <span class="badge rounded-pill ms-auto bg-danger text-white">{{ $__pendingPoApprovalsCount }}</span>
+                    @endif
+                </a>
+                @endif
+                <a href="{{ route('stock-orders.deliveries') }}" class="sidebar-nav-link {{ request()->routeIs('stock-orders.deliveries') ? 'active' : '' }}" title="Deliveries & ATLs">
+                    <i class="bi bi-truck"></i>
+                    <span class="nav-label">Deliveries & ATLs</span>
+                </a>
             @else
                 <a href="{{ route('dashboard') }}" class="sidebar-nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}" title="Dashboard">
                     <i class="bi bi-speedometer2"></i>
@@ -1013,6 +1059,8 @@
                         <span class="topbar-portal-label">
                             @if (request()->is('wetstock*'))
                                 Wet Stock
+                            @elseif (request()->is('stock-orders*'))
+                                Stock Orders
                             @else
                                 Sales Documentation
                             @endif

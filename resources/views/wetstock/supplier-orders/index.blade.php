@@ -1,4 +1,4 @@
-﻿@extends('layouts.app')
+@extends('layouts.app')
 
 @section('title', 'Incoming Supplier Stock')
 
@@ -8,13 +8,19 @@
         <h2 class="fw-bold text-dark mb-1">Incoming Supplier Stock</h2>
         <p class="text-muted small mb-0">Track purchase orders from fuel suppliers (Unlifted Pickups & Pending Depot Deliveries).</p>
     </div>
-    @if (Auth::user()->canEditModule2())
-    <div>
-        <a href="{{ route('wetstock.supplier-orders.create') }}" class="btn btn-primary-custom shadow-sm d-flex align-items-center">
-            <i class="bi bi-plus-circle me-2"></i> Add Incoming Supplier Stock
+    <div class="d-flex gap-2">
+        <a href="{{ route('wetstock.stock-requests.index') }}" class="btn btn-secondary-custom d-flex align-items-center">
+            <i class="bi bi-arrow-down-left-square me-2"></i> Depot Inbound Deliveries
         </a>
+        @if (Auth::user()->canEditModule2())
+        <a href="{{ route('wetstock.stock-requests.create') }}" class="btn btn-outline-primary d-flex align-items-center">
+            <i class="bi bi-cart-plus me-2"></i> Request Replenishment
+        </a>
+        <a href="{{ route('wetstock.supplier-orders.create') }}" class="btn btn-primary-custom shadow-sm d-flex align-items-center">
+            <i class="bi bi-plus-circle me-2"></i> Add Incoming Stock
+        </a>
+        @endif
     </div>
-    @endif
 </div>
 
 <!-- Filters -->
