@@ -29,6 +29,16 @@ class PurchaseOrder extends Model
         'approved_at',
         'revised_at',
         'remarks',
+        'supplier_id',
+        'attention',
+        'terms',
+        'po_date',
+        'total_amount',
+        'vatable_sales_amount',
+        'vat_amount',
+        'less_w_tax',
+        'net_payable_amount',
+        'prepared_by',
     ];
 
     protected $casts = [
@@ -38,7 +48,23 @@ class PurchaseOrder extends Model
         'requested_products' => 'array',
         'approved_at' => 'datetime',
         'revised_at' => 'datetime',
+        'po_date' => 'date',
+        'total_amount' => 'decimal:2',
+        'vatable_sales_amount' => 'decimal:2',
+        'vat_amount' => 'decimal:2',
+        'less_w_tax' => 'decimal:2',
+        'net_payable_amount' => 'decimal:2',
     ];
+
+    public function supplier(): BelongsTo
+    {
+        return $this->belongsTo(Supplier::class, 'supplier_id');
+    }
+
+    public function preparer(): BelongsTo
+    {
+        return $this->belongsTo(Admin::class, 'prepared_by');
+    }
 
     public function warehouse(): BelongsTo
     {

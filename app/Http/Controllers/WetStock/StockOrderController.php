@@ -13,11 +13,13 @@ use App\Models\PurchaseOrderDelivery;
 use App\Models\PurchaseOrderItem;
 use App\Models\StockIn;
 use App\Models\StorageTank;
+use App\Models\Supplier;
 use App\Models\Warehouse;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class StockOrderController extends Controller
@@ -99,7 +101,11 @@ class StockOrderController extends Controller
         }
 
         $warehouses = Warehouse::orderBy('name')->get();
-        return view('wetstock.stock-orders.create-po', compact('warehouses'));
+
+        // Only active suppliers are offered; deactivated ones stay on old POs.
+        $suppliers = Supplier::active()->orderBy('company_name')->orderBy('location')->get();
+
+        return view('wetstock.stock-orders.create-po', compact('warehouses', 'suppliers'));
     }
 
     public function storeSupplierPo(Request $request): RedirectResponse
@@ -110,11 +116,20 @@ class StockOrderController extends Controller
 
         $validated = $request->validate([
             'po_number' => ['required', 'string', 'max:64', 'unique:purchase_orders,po_number'],
-            'supplier_name' => ['required', 'string', 'max:128'],
+            // Only active suppliers are selectable; deactivated ones remain on
+            // existing Purchase Orders but cannot be chosen for new ones.
+            'supplier_id' => ['required', Rule::exists('suppliers', 'id')->where('is_active', true)],
             'po_type' => ['required', 'in:STANDARD_REPLENISHMENT,BUY_BACK'],
             'date_needed' => ['nullable', 'date'],
             'warehouse_id' => ['nullable', 'exists:warehouses,id'],
             'remarks' => ['nullable', 'string', 'max:1000'],
+            'attention' => ['nullable', 'string', 'max:128'],
+            'terms' => ['nullable', 'string', 'max:128'],
+            'po_date' => ['nullable', 'date'],
+            'vatable_sales_amount' => ['nullable', 'numeric', 'min:0'],
+            'vat_amount' => ['nullable', 'numeric', 'min:0'],
+            'less_w_tax' => ['nullable', 'numeric', 'min:0'],
+            'net_payable_amount' => ['nullable', 'numeric', 'min:0'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product' => ['required', 'string', 'in:Diesel,Premium,Unleaded'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
@@ -123,12 +138,36 @@ class StockOrderController extends Controller
 
         $totalQty = (int) collect($validated['items'])->sum('quantity');
 
+        // Line total is derived from the item rows so the stored totals never
+        // drift from what was actually ordered. The browser computes the same
+        // figure for display only; the server always recalculates it.
+        $lineTotal = round(collect($validated['items'])->sum(
+            fn ($i) => (int) $i['quantity'] * (float) ($i['unit_price'] ?? 0)
+        ), 2);
+
+        // supplier_name stays as a legacy mirror of the chosen supplier, so
+        // existing screens that read it keep working.
+        $supplier = Supplier::find($validated['supplier_id']);
+        $supplierName = $supplier->company_name;
+
+        $netPayable = $validated['net_payable_amount'] ?? $lineTotal;
+
         $po = PurchaseOrder::create([
             'po_number' => $validated['po_number'],
             'po_type' => $validated['po_type'],
-            'supplier_name' => $validated['supplier_name'],
+            'supplier_id' => $supplier?->id,
+            'supplier_name' => $supplierName,
+            'attention' => $validated['attention'] ?? $supplier?->attention,
+            'terms' => $validated['terms'] ?? null,
+            'po_date' => $validated['po_date'] ?? now()->format('Y-m-d'),
             'warehouse_id' => $validated['warehouse_id'] ?? null,
             'qty_ordered' => $totalQty,
+            'total_amount' => $lineTotal,
+            'vatable_sales_amount' => $validated['vatable_sales_amount'] ?? 0,
+            'vat_amount' => $validated['vat_amount'] ?? 0,
+            'less_w_tax' => $validated['less_w_tax'] ?? 0,
+            'net_payable_amount' => $netPayable,
+            'prepared_by' => Auth::id(),
             'request_status' => 'CONFIRMED', // Supplier contract active
             'status' => 'Pending',
             'requested_by' => Auth::id(),

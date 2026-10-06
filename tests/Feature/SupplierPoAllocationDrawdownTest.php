@@ -40,9 +40,15 @@ class SupplierPoAllocationDrawdownTest extends TestCase
 
     public function test_purchasing_can_create_independent_supplier_po_with_multiple_products(): void
     {
+        // Purchase Orders pick their supplier from the supplier registry.
+        $supplier = \App\Models\Supplier::create([
+            'company_name' => 'Petron Bataan Refinery',
+            'location' => 'Limay Terminal',
+        ]);
+
         $payload = [
             'po_number' => 'PO-BULK-' . rand(1000, 9999),
-            'supplier_name' => 'Petron Bataan Refinery',
+            'supplier_id' => $supplier->id,
             'po_type' => 'STANDARD_REPLENISHMENT',
             'date_needed' => now()->addDays(5)->format('Y-m-d'),
             'remarks' => 'Bulk refinery order for next week',
