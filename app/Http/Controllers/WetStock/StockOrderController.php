@@ -7,6 +7,7 @@ use App\Models\Admin;
 use App\Models\AtlAllocation;
 use App\Models\AuditLog;
 use App\Models\Client;
+use App\Models\Delivery;
 use App\Models\Order;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderDelivery;
@@ -560,7 +561,18 @@ class StockOrderController extends Controller
         }
 
         $tankId = $validated['storage_tank_id'] ?? $delivery->storage_tank_id;
+
+        // Fuel Trade and Buy Back pick-ups are lifted straight to the client at
+        // the supplier, so they never stock into a tank. Tank auto-stocking
+        // belongs to Doyen Stocks replenishment, which arrives via the wet
+        // stock receive flow instead.
         $isTankerPickup = in_array($delivery->delivery_channel, ['SUPPLIER_DOYEN_PICKUP', 'BUY_BACK_DOYEN_PICKUP']);
+        $stocksFromSupplier = $delivery->atl_category === PurchaseOrderDelivery::CATEGORY_FUEL_TRADE
+            || $delivery->atl_category === PurchaseOrderDelivery::CATEGORY_BUY_BACK;
+
+        if ($stocksFromSupplier && $isTankerPickup) {
+            $isTankerPickup = false;
+        }
 
         if ($isTankerPickup && $tankId) {
             $tank = StorageTank::with('warehouse')->findOrFail($tankId);
@@ -590,6 +602,13 @@ class StockOrderController extends Controller
         }
 
         $updateData['status'] = 'Completed';
+
+        // Record the lift on the ATL itself, so the ATL screens can report
+        // Lifted/Received without inferring it from the old status column.
+        $updateData['lift_status'] = PurchaseOrderDelivery::LIFT_LIFTED;
+        $updateData['lifted_at'] = now();
+        $updateData['lifted_by'] = Auth::id();
+
         $delivery->update($updateData);
 
         $po = $delivery->purchaseOrder;
@@ -600,6 +619,7 @@ class StockOrderController extends Controller
             ]);
 
             if ($po->linkedOrder) {
+                $this->recordLiftInModule1($delivery, $po->linkedOrder);
                 $po->linkedOrder->update(['status' => 'Fulfilled']);
             }
         }
@@ -934,6 +954,43 @@ class StockOrderController extends Controller
         ]);
 
         return back()->with('success', "Delivery marked as FOR DELIVERY. Hauler and destination notified.");
+    }
+
+    /**
+     * Reflect a lifted ATL into Module 1.
+     *
+     * Module 1 derives remaining balance from its Delivery rows, so setting
+     * Order.status alone moves nothing. A Fuel Trade order additionally reads
+     * its completed ATLs, but Buy Back pick-ups do not, so the Module 1
+     * delivery row is written for both. It is keyed on the ATL so a repeated
+     * lift updates the same row instead of double counting.
+     */
+    private function recordLiftInModule1(PurchaseOrderDelivery $delivery, Order $order): void
+    {
+        $atlNumber = $delivery->atl_number ?: $delivery->client_atl_number;
+
+        $existing = Delivery::where('order_id', $order->id)
+            ->where('atl_number', $atlNumber)
+            ->first();
+
+        $payload = [
+            'order_id' => $order->id,
+            'storage_tank_id' => $delivery->storage_tank_id,
+            'dr_number' => $delivery->dr_number ?: ($atlNumber ?: 'ATL-' . $delivery->id),
+            'atl_number' => $atlNumber,
+            'delivery_date' => $delivery->receiving_date ?: now(),
+            'qty_out' => (int) $delivery->qty_to_receive,
+            'status' => 'FULFILLED',
+            'fulfilled_by' => Auth::id(),
+            'fulfilled_at' => now(),
+            'created_by' => Auth::id(),
+        ];
+
+        if ($existing) {
+            $existing->update($payload);
+        } else {
+            Delivery::create($payload);
+        }
     }
 
     public function deliveries(): View
