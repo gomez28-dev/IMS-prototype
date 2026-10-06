@@ -195,6 +195,16 @@ class StockOrderController extends Controller
         ]);
     }
 
+    /**
+     * What this Sales Order requires, per product (see Order::productRequirements).
+     *
+     * @return array<string, int>
+     */
+    private function salesOrderProductRequirements(Order $order, string $fallbackProduct): array
+    {
+        return $order->productRequirements($fallbackProduct);
+    }
+
     public function storeFuelTradePo(Request $request, Order $order): RedirectResponse
     {
         if (!Auth::user()->canEditStockOrders()) {
@@ -206,7 +216,7 @@ class StockOrderController extends Controller
                 ->with('error', "Cannot issue ATL: Sales Order {$order->formatted_so_number} has not been cleared by Accounting (Status: {$order->clearing_status}).");
         }
 
-        $product = $request->input('product', 'Diesel');
+        $defaultProduct = $request->input('product', 'Diesel');
 
         // Drawdown engine submission (multi-PO or single-PO drawdown)
         if ($request->has('drawdowns') && is_array($request->input('drawdowns'))) {
@@ -228,30 +238,66 @@ class StockOrderController extends Controller
                 'additional_remarks' => ['nullable', 'string', 'max:500'],
                 'drawdowns' => ['required', 'array', 'min:1'],
                 'drawdowns.*.purchase_order_id' => ['required', 'exists:purchase_orders,id'],
+                'drawdowns.*.product' => ['nullable', 'string', 'in:Diesel,Premium,Unleaded'],
                 'drawdowns.*.quantity' => ['required', 'integer', 'min:1'],
             ]);
 
-            $totalDrawn = (int) collect($validated['drawdowns'])->sum('quantity');
+            // What this Sales Order requires, per product. Orders created before
+            // multi-product lines existed have no lines, so they fall back to a
+            // single requirement equal to the order's whole ordered volume.
+            $requirements = $this->salesOrderProductRequirements($order, $defaultProduct);
 
-            // 1. Verify total drawn volume matches Sales Order ordered volume
-            if ($totalDrawn !== (int) $order->qty_ordered) {
-                return back()->withInput()->withErrors([
-                    'drawdowns' => "Total drawn volume (" . number_format($totalDrawn) . " L) must exactly match Sales Order ordered volume (" . number_format($order->qty_ordered) . " L).",
-                ]);
-            }
+            // Each allocation row carries its own product.
+            $drawdowns = collect($validated['drawdowns'])->map(fn (array $dd): array => [
+                'purchase_order_id' => (int) $dd['purchase_order_id'],
+                'product' => $dd['product'] ?? $defaultProduct,
+                'quantity' => (int) $dd['quantity'],
+            ]);
 
-            // 2. Verify each PO has sufficient remaining balance for this product
-            foreach ($validated['drawdowns'] as $dd) {
-                $targetPo = PurchaseOrder::find($dd['purchase_order_id']);
-                $avail = $targetPo->getAvailableBalanceForProduct($product);
-                if ($dd['quantity'] > $avail) {
+            $drawnByProduct = $drawdowns
+                ->groupBy('product')
+                ->map(fn ($rows) => (int) $rows->sum('quantity'));
+
+            // 1a. Refuse any product the Sales Order never asked for.
+            foreach ($drawnByProduct as $drawnProduct => $drawnQty) {
+                if (!array_key_exists($drawnProduct, $requirements)) {
                     return back()->withInput()->withErrors([
-                        'drawdowns' => "Insufficient balance on Supplier PO #{$targetPo->po_number}. Available: " . number_format($avail) . " L, Requested: " . number_format($dd['quantity']) . " L.",
+                        'drawdowns' => "This Sales Order does not require {$drawnProduct}. Required: "
+                            . implode(', ', array_keys($requirements)) . '.',
                     ]);
                 }
             }
 
-            $primaryPoId = $validated['drawdowns'][0]['purchase_order_id'];
+            // 1b. Per product, the volume drawn must exactly match the requirement.
+            foreach ($requirements as $requiredProduct => $requiredQty) {
+                $drawnQty = (int) ($drawnByProduct[$requiredProduct] ?? 0);
+                if ($drawnQty !== $requiredQty) {
+                    return back()->withInput()->withErrors([
+                        'drawdowns' => "Total drawn volume for {$requiredProduct} ("
+                            . number_format($drawnQty) . " L) must exactly match the Sales Order requirement ("
+                            . number_format($requiredQty) . " L).",
+                    ]);
+                }
+            }
+
+            // 2. Verify each PO has sufficient remaining balance for that product
+            foreach ($drawdowns as $dd) {
+                $targetPo = PurchaseOrder::find($dd['purchase_order_id']);
+                $avail = $targetPo->getAvailableBalanceForProduct($dd['product']);
+                if ($dd['quantity'] > $avail) {
+                    return back()->withInput()->withErrors([
+                        'drawdowns' => "Insufficient {$dd['product']} balance on Supplier PO #{$targetPo->po_number}. Available: "
+                            . number_format($avail) . " L, Requested: " . number_format($dd['quantity']) . " L.",
+                    ]);
+                }
+            }
+
+            $primaryPoId = $drawdowns->first()['purchase_order_id'];
+            $totalDrawn = (int) $drawdowns->sum('quantity');
+
+            // The ATL row keeps a summary: total liters, and the products it covers.
+            // Per-product quantities live on the allocations below.
+            $productSummary = $drawdowns->pluck('product')->unique()->implode(' + ');
 
             $delivery = PurchaseOrderDelivery::create([
                 'purchase_order_id' => $primaryPoId,
@@ -266,7 +312,7 @@ class StockOrderController extends Controller
                 'supplier_so_number' => $validated['supplier_so_number'] ?? null,
                 'supplier_dr_number' => $validated['supplier_dr_number'] ?? null,
                 'scanned_doc_url' => $validated['scanned_doc_url'] ?? null,
-                'product' => $product,
+                'product' => $productSummary,
                 'qty_to_receive' => $totalDrawn,
                 'receiving_date' => $validated['receiving_date'],
                 'driver_name' => $validated['driver_name'] ?? null,
@@ -277,15 +323,15 @@ class StockOrderController extends Controller
                 'prepared_by' => Auth::id(),
             ]);
 
-            foreach ($validated['drawdowns'] as $dd) {
+            foreach ($drawdowns as $dd) {
                 $targetPo = PurchaseOrder::find($dd['purchase_order_id']);
-                $item = $targetPo->items()->where('product', $product)->first();
+                $item = $targetPo->items()->where('product', $dd['product'])->first();
 
                 AtlAllocation::create([
                     'purchase_order_delivery_id' => $delivery->id,
                     'purchase_order_id' => $targetPo->id,
                     'purchase_order_item_id' => $item?->id,
-                    'product' => $product,
+                    'product' => $dd['product'],
                     'quantity' => $dd['quantity'],
                 ]);
             }
@@ -295,7 +341,7 @@ class StockOrderController extends Controller
             AuditLog::create([
                 'admin_id' => Auth::id(),
                 'action' => 'created',
-                'description' => "Purchasing issued ATL #{$delivery->atl_number} for SO {$order->formatted_so_number}, drawn from " . count($validated['drawdowns']) . " PO(s).",
+                'description' => "Purchasing issued ATL #{$delivery->atl_number} for SO {$order->formatted_so_number}, drawn from " . count($validated['drawdowns']) . " PO(s) covering {$productSummary}.",
             ]);
 
             return redirect()->route('stock-orders.index')

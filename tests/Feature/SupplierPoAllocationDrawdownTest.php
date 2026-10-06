@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Admin;
 use App\Models\Client;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderDelivery;
 use App\Models\PurchaseOrderItem;
@@ -296,5 +297,216 @@ class SupplierPoAllocationDrawdownTest extends TestCase
             ->post(route('stock-orders.store-fuel-trade-po', $order->id), $payload);
 
         $response->assertSessionHasErrors();
+    }
+
+    /**
+     * A Fuel Trade SO can carry several product lines (order_items), so the
+     * ATL must draw each product separately instead of one flat total.
+     */
+    public function test_multi_product_fuel_trade_order_draws_each_product_separately(): void
+    {
+        $po = PurchaseOrder::create([
+            'po_number' => 'PO-MULTIPROD-' . rand(1000, 9999),
+            'po_type' => 'STANDARD_REPLENISHMENT',
+            'supplier_name' => 'Petron Bataan',
+            'qty_ordered' => 60000,
+            'request_status' => 'CONFIRMED',
+            'status' => 'Pending',
+        ]);
+        PurchaseOrderItem::create([
+            'purchase_order_id' => $po->id,
+            'product' => 'Diesel',
+            'quantity_ordered' => 40000,
+        ]);
+        PurchaseOrderItem::create([
+            'purchase_order_id' => $po->id,
+            'product' => 'Premium',
+            'quantity_ordered' => 20000,
+        ]);
+
+        // SO with two product lines: Diesel 5,000 + Premium 3,000 (8,000 total)
+        $order = Order::create([
+            'account' => $this->client->name,
+            'location' => 'Valenzuela',
+            'so_number' => 'SO-FT-MP-' . uniqid(),
+            'date' => now(),
+            'qty_ordered' => 8000,
+            'price' => 52.00,
+            'status' => 'Active',
+            'clearing_status' => 'Approved',
+            'fulfillment_type' => 'FUEL_TRADE',
+            'order_category' => 'CLIENT_ORDER',
+        ]);
+        OrderItem::create([
+            'order_id' => $order->id,
+            'product_type' => 'D',
+            'qty' => 5000,
+            'price' => 50.00,
+        ]);
+        OrderItem::create([
+            'order_id' => $order->id,
+            'product_type' => 'P',
+            'qty' => 3000,
+            'price' => 55.00,
+        ]);
+
+        $payload = [
+            'receiving_date' => now()->addDays(2)->format('Y-m-d'),
+            'driver_name' => 'Driver',
+            'plate_number' => 'ABC-2222',
+            'atl_type' => 'DITC_ATL',
+            'atl_number' => 'ATL-MP-01',
+            'drawdowns' => [
+                ['purchase_order_id' => $po->id, 'product' => 'Diesel', 'quantity' => 5000],
+                ['purchase_order_id' => $po->id, 'product' => 'Premium', 'quantity' => 3000],
+            ],
+        ];
+
+        $response = $this->actingAs($this->purchasingUser)
+            ->post(route('stock-orders.store-fuel-trade-po', $order->id), $payload);
+
+        $response->assertRedirect(route('stock-orders.index'));
+        $response->assertSessionHas('success');
+
+        $delivery = PurchaseOrderDelivery::where('atl_number', 'ATL-MP-01')->first();
+        $this->assertNotNull($delivery);
+
+        // The ATL row keeps a summary: total liters across all products.
+        $this->assertEquals(8000, $delivery->qty_to_receive);
+
+        // Per-product quantities live on the allocations.
+        $this->assertCount(2, $delivery->allocations);
+        $drawn = $delivery->allocations->pluck('quantity', 'product')->all();
+        $this->assertEquals(5000, $drawn['Diesel']);
+        $this->assertEquals(3000, $drawn['Premium']);
+
+        // Both products came off the same PO.
+        $this->assertEquals(35000, $po->fresh()->getAvailableBalanceForProduct('Diesel'));
+        $this->assertEquals(17000, $po->fresh()->getAvailableBalanceForProduct('Premium'));
+    }
+
+    public function test_multi_product_fuel_trade_rejects_wrong_product_mix(): void
+    {
+        $po = PurchaseOrder::create([
+            'po_number' => 'PO-MPBAD-' . rand(1000, 9999),
+            'po_type' => 'STANDARD_REPLENISHMENT',
+            'supplier_name' => 'Petron Bataan',
+            'qty_ordered' => 60000,
+            'request_status' => 'CONFIRMED',
+            'status' => 'Pending',
+        ]);
+        PurchaseOrderItem::create([
+            'purchase_order_id' => $po->id,
+            'product' => 'Diesel',
+            'quantity_ordered' => 40000,
+        ]);
+        PurchaseOrderItem::create([
+            'purchase_order_id' => $po->id,
+            'product' => 'Premium',
+            'quantity_ordered' => 20000,
+        ]);
+
+        $order = Order::create([
+            'account' => $this->client->name,
+            'location' => 'Valenzuela',
+            'so_number' => 'SO-FT-MPBAD-' . uniqid(),
+            'date' => now(),
+            'qty_ordered' => 8000,
+            'price' => 52.00,
+            'status' => 'Active',
+            'clearing_status' => 'Approved',
+            'fulfillment_type' => 'FUEL_TRADE',
+            'order_category' => 'CLIENT_ORDER',
+        ]);
+        OrderItem::create([
+            'order_id' => $order->id,
+            'product_type' => 'D',
+            'qty' => 5000,
+            'price' => 50.00,
+        ]);
+        OrderItem::create([
+            'order_id' => $order->id,
+            'product_type' => 'P',
+            'qty' => 3000,
+            'price' => 55.00,
+        ]);
+
+        // Total is right (8,000) but split across the wrong products.
+        $payload = [
+            'receiving_date' => now()->addDays(2)->format('Y-m-d'),
+            'driver_name' => 'Driver',
+            'plate_number' => 'ABC-3333',
+            'atl_type' => 'DITC_ATL',
+            'atl_number' => 'ATL-MPBAD-01',
+            'drawdowns' => [
+                ['purchase_order_id' => $po->id, 'product' => 'Diesel', 'quantity' => 8000],
+            ],
+        ];
+
+        $response = $this->actingAs($this->purchasingUser)
+            ->post(route('stock-orders.store-fuel-trade-po', $order->id), $payload);
+
+        $response->assertSessionHasErrors();
+        $this->assertNull(PurchaseOrderDelivery::where('atl_number', 'ATL-MPBAD-01')->first());
+    }
+
+    public function test_cannot_draw_a_product_the_sales_order_does_not_require(): void
+    {
+        $po = PurchaseOrder::create([
+            'po_number' => 'PO-MPXTRA-' . rand(1000, 9999),
+            'po_type' => 'STANDARD_REPLENISHMENT',
+            'supplier_name' => 'Petron Bataan',
+            'qty_ordered' => 30000,
+            'request_status' => 'CONFIRMED',
+            'status' => 'Pending',
+        ]);
+        PurchaseOrderItem::create([
+            'purchase_order_id' => $po->id,
+            'product' => 'Diesel',
+            'quantity_ordered' => 20000,
+        ]);
+        PurchaseOrderItem::create([
+            'purchase_order_id' => $po->id,
+            'product' => 'Unleaded',
+            'quantity_ordered' => 10000,
+        ]);
+
+        // SO requires Diesel only.
+        $order = Order::create([
+            'account' => $this->client->name,
+            'location' => 'Valenzuela',
+            'so_number' => 'SO-FT-MPX-' . uniqid(),
+            'date' => now(),
+            'qty_ordered' => 5000,
+            'price' => 52.00,
+            'status' => 'Active',
+            'clearing_status' => 'Approved',
+            'fulfillment_type' => 'FUEL_TRADE',
+            'order_category' => 'CLIENT_ORDER',
+        ]);
+        OrderItem::create([
+            'order_id' => $order->id,
+            'product_type' => 'D',
+            'qty' => 5000,
+            'price' => 50.00,
+        ]);
+
+        // Total matches (5,000) but the product does not.
+        $payload = [
+            'receiving_date' => now()->addDays(2)->format('Y-m-d'),
+            'driver_name' => 'Driver',
+            'plate_number' => 'ABC-4444',
+            'atl_type' => 'DITC_ATL',
+            'atl_number' => 'ATL-MPX-01',
+            'drawdowns' => [
+                ['purchase_order_id' => $po->id, 'product' => 'Unleaded', 'quantity' => 5000],
+            ],
+        ];
+
+        $response = $this->actingAs($this->purchasingUser)
+            ->post(route('stock-orders.store-fuel-trade-po', $order->id), $payload);
+
+        $response->assertSessionHasErrors();
+        $this->assertNull(PurchaseOrderDelivery::where('atl_number', 'ATL-MPX-01')->first());
     }
 }

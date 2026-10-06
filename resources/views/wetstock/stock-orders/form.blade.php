@@ -51,8 +51,16 @@
                     @endif
 
                     @if ($mode === 'fuel_trade')
+                        @php
+                            // Volume this Sales Order requires, per product.
+                            $soRequirements = $order->productRequirements();
+                            $requiredProducts = array_keys($soRequirements);
+                            $defaultReqProduct = $requiredProducts[0] ?? 'Diesel';
+                            $productOptions = ['Diesel', 'Premium', 'Unleaded'];
+                        @endphp
                         <input type="hidden" name="product" value="Diesel">
                         <input type="hidden" id="targetOrderQty" value="{{ $order->qty_ordered }}">
+                        <input type="hidden" id="soRequirements" value="{{ json_encode($soRequirements) }}">
 
                         {{-- Order Summary Banner --}}
                         <div class="card bg-light border-0 rounded-3 p-3 mb-4">
@@ -69,11 +77,20 @@
                                 </div>
                                 <div class="col-md-3">
                                     <span class="text-muted extra-small uppercase fw-semibold d-block mb-1" style="font-size: 0.7rem;">PRODUCT</span>
-                                    <span class="badge bg-secondary-subtle text-secondary border px-2 py-1">Diesel</span>
+                                    @foreach ($soRequirements as $reqProduct => $reqQty)
+                                        <span class="badge bg-secondary-subtle text-secondary border px-2 py-1 me-1">{{ $reqProduct }}</span>
+                                    @endforeach
                                 </div>
                                 <div class="col-md-3 text-md-end">
                                     <span class="text-muted extra-small uppercase fw-semibold d-block mb-1" style="font-size: 0.7rem;">REQUIRED VOLUME</span>
                                     <span class="fw-bold text-primary fs-5 font-monospace">{{ number_format($order->qty_ordered) }} L</span>
+                                    @if (count($soRequirements) > 1)
+                                        <div class="extra-small text-muted" style="font-size: 0.7rem;">
+                                            @foreach ($soRequirements as $reqProduct => $reqQty)
+                                                <div>{{ $reqProduct }}: {{ number_format($reqQty) }} L</div>
+                                            @endforeach
+                                        </div>
+                                    @endif
                                 </div>
                             </div>
                         </div>
@@ -99,8 +116,9 @@
                                         <table class="table table-borderless align-middle mb-0" id="drawdownsTable">
                                             <thead class="table-light small">
                                                 <tr>
-                                                    <th class="ps-2" style="width: 55%;">Supplier PO</th>
-                                                    <th style="width: 35%;">Volume to Draw (Liters) <span class="text-danger">*</span></th>
+                                                    <th class="ps-2" style="width: 42%;">Supplier PO</th>
+                                                    <th style="width: 20%;">Product <span class="text-danger">*</span></th>
+                                                    <th style="width: 28%;">Volume to Draw (Liters) <span class="text-danger">*</span></th>
                                                     <th class="pe-2 text-center" style="width: 10%;">Remove</th>
                                                 </tr>
                                             </thead>
@@ -111,19 +129,33 @@
                                                             <option value="">-- Choose Supplier PO --</option>
                                                             @foreach ($availablePos as $p)
                                                                 @php
-                                                                    $avail = $p->getAvailableBalanceForProduct('Diesel');
+                                                                    // Availability per product, so the form can validate the chosen product.
+                                                                    $availByProduct = [];
+                                                                    foreach ($productOptions as $pp) {
+                                                                        $bal = $p->getAvailableBalanceForProduct($pp);
+                                                                        if ($bal > 0) { $availByProduct[$pp] = $bal; }
+                                                                    }
+                                                                    $avail = $availByProduct[$defaultReqProduct] ?? 0;
                                                                 @endphp
-                                                                <option value="{{ $p->id }}" data-avail="{{ $avail }}" {{ $loop->first ? 'selected' : '' }}>
-                                                                    {{ $p->po_number }} — {{ $p->supplier_name }} (Available: {{ number_format($avail) }} L)
+                                                                <option value="{{ $p->id }}" data-items="{{ json_encode($availByProduct) }}" data-avail="{{ $avail }}" {{ $loop->first ? 'selected' : '' }}>
+                                                                    {{ $p->po_number }} — {{ $p->supplier_name }}
                                                                 </option>
+                                                            @endforeach
+                                                        </select>
+                                                        <div class="extra-small text-muted mt-1" data-avail-hint></div>
+                                                    </td>
+                                                    <td>
+                                                        <select name="drawdowns[0][product]" class="form-select form-select-sm dd-product-select" required onchange="handleProductChange(this)">
+                                                            @foreach ($productOptions as $pp)
+                                                                <option value="{{ $pp }}" {{ $pp === $defaultReqProduct ? 'selected' : '' }}>{{ $pp }}</option>
                                                             @endforeach
                                                         </select>
                                                     </td>
                                                     <td>
                                                         <div class="input-group input-group-sm">
                                                             @php
-                                                                $firstAvail = $availablePos[0]->getAvailableBalanceForProduct('Diesel');
-                                                                $suggested = min($order->qty_ordered, $firstAvail);
+                                                                $firstAvail = $availablePos[0]->getAvailableBalanceForProduct($defaultReqProduct);
+                                                                $suggested = min($soRequirements[$defaultReqProduct] ?? $order->qty_ordered, $firstAvail);
                                                             @endphp
                                                             <input type="number" name="drawdowns[0][quantity]" class="form-control form-control-sm dd-qty-input font-monospace"
                                                                    placeholder="Liters" min="1" max="{{ $firstAvail }}" value="{{ old('drawdowns.0.quantity', $suggested) }}" required oninput="calculateTotalDrawn()">
@@ -139,10 +171,11 @@
                                             </tbody>
                                             <tfoot class="table-light border-top">
                                                 <tr>
-                                                    <td class="ps-2 fw-semibold text-dark">
+                                                    <td class="ps-2 fw-semibold text-dark" colspan="3">
                                                         Total Allocated for this ATL:
+                                                        <div class="extra-small fw-normal text-muted mt-1" id="productBreakdown"></div>
                                                     </td>
-                                                    <td colspan="2" class="d-flex align-items-center justify-content-between">
+                                                    <td class="pe-2 d-flex align-items-center justify-content-between">
                                                         <span class="fw-bold fs-6 font-monospace" id="totalDrawnDisplay">0 L</span>
                                                         <span id="matchBadge" class="badge rounded-pill px-3 py-1">Checking...</span>
                                                     </td>
@@ -346,6 +379,48 @@
 
 <script>
 let ddIndex = 1;
+const productOptionsHtml = (function () {
+    const sel = document.querySelector('.dd-product-select');
+    return sel ? sel.innerHTML : '<option value="Diesel">Diesel</option>';
+})();
+
+function poAvailability(poSelect) {
+    const opt = poSelect.options[poSelect.selectedIndex];
+    if (!opt) return {};
+    try {
+        return JSON.parse(opt.getAttribute('data-items') || '{}');
+    } catch (e) {
+        return {};
+    }
+}
+
+function handleProductChange(select) {
+    const row = select.closest('.drawdown-row');
+    const product = select.value;
+    const avail = parseInt(poAvailability(row.querySelector('.po-select'))[product] || 0);
+
+    const qtyInput = row.querySelector('.dd-qty-input');
+    if (qtyInput) {
+        qtyInput.max = avail;
+        if (parseInt(qtyInput.value || 0) > avail) {
+            qtyInput.value = avail || '';
+        }
+    }
+
+    calculateTotalDrawn();
+}
+
+function updateAvailHint(row) {
+    const product = row.querySelector('.dd-product-select').value;
+    const avail = parseInt(poAvailability(row.querySelector('.po-select'))[product] || 0);
+    const hint = row.querySelector('[data-avail-hint]');
+    if (!hint) return avail;
+    hint.textContent = avail > 0
+        ? 'Available ' + product + ': ' + avail.toLocaleString() + ' L'
+        : 'This PO has no remaining ' + product + ' allocation';
+    hint.className = 'extra-small mt-1 ' + (avail > 0 ? 'text-muted' : 'text-danger');
+    return avail;
+}
 
 function addDrawdownRow() {
     const tbody = document.getElementById('drawdownRowsBody');
@@ -361,6 +436,12 @@ function addDrawdownRow() {
         <td class="ps-2">
             <select name="drawdowns[${ddIndex}][purchase_order_id]" class="form-select form-select-sm po-select" required onchange="handlePoSelectChange(this)">
                 ${optionsHtml}
+            </select>
+            <div class="extra-small text-muted mt-1" data-avail-hint></div>
+        </td>
+        <td>
+            <select name="drawdowns[${ddIndex}][product]" class="form-select form-select-sm dd-product-select" required onchange="handleProductChange(this)">
+                ${productOptionsHtml}
             </select>
         </td>
         <td>
@@ -400,21 +481,30 @@ function updateDrawdownRemoveButtons() {
 }
 
 function handlePoSelectChange(select) {
-    const row = select.closest('tr');
-    const selectedOption = select.options[select.selectedIndex];
-    const avail = parseInt(selectedOption.getAttribute('data-avail')) || 0;
-    const qtyInput = row.querySelector('.dd-qty-input');
-    if (qtyInput) {
-        qtyInput.max = avail;
-    }
-    calculateTotalDrawn();
+    handleProductChange(select.closest('.drawdown-row').querySelector('.dd-product-select'));
 }
 
 function calculateTotalDrawn() {
+    let requirements = {};
+    const reqEl = document.getElementById('soRequirements');
+    if (reqEl) {
+        try { requirements = JSON.parse(reqEl.value || '{}'); } catch (e) { requirements = {}; }
+    }
+
+    const drawnByProduct = {};
     let total = 0;
-    document.querySelectorAll('.dd-qty-input').forEach(input => {
-        const val = parseInt(input.value) || 0;
-        total += val;
+    let overAllocated = false;
+
+    document.querySelectorAll('.drawdown-row').forEach(row => {
+        const product = row.querySelector('.dd-product-select').value;
+        const qty = parseInt(row.querySelector('.dd-qty-input').value) || 0;
+
+        drawnByProduct[product] = (drawnByProduct[product] || 0) + qty;
+        total += qty;
+
+        if (qty > updateAvailHint(row)) {
+            overAllocated = true;
+        }
     });
 
     const display = document.getElementById('totalDrawnDisplay');
@@ -422,21 +512,45 @@ function calculateTotalDrawn() {
         display.textContent = total.toLocaleString() + ' L';
     }
 
-    const targetEl = document.getElementById('targetOrderQty');
-    const badge = document.getElementById('matchBadge');
-    const submitBtn = document.getElementById('submitBtn');
+    // Per-product breakdown so the user can see each requirement being met.
+    const breakdown = document.getElementById('productBreakdown');
+    if (breakdown) {
+        let html = '';
+        Object.keys(drawnByProduct).forEach(product => {
+            const drawn = drawnByProduct[product];
+            const required = requirements[product];
+            let note;
+            if (required === undefined) {
+                note = '<span class="text-danger">not required by this SO</span>';
+            } else if (drawn === required) {
+                note = '<span class="text-success">&#10003; matched</span>';
+            } else if (drawn > required) {
+                note = '<span class="text-danger">over by ' + (drawn - required).toLocaleString() + ' L</span>';
+            } else {
+                note = '<span class="text-warning-emphasis">short by ' + (required - drawn).toLocaleString() + ' L</span>';
+            }
+            html += '<div>' + product + ': <strong>' + drawn.toLocaleString() + ' L</strong> of '
+                + (required === undefined ? '0 L' : required.toLocaleString() + ' L') + ' &mdash; ' + note + '</div>';
+        });
+        breakdown.innerHTML = html;
+    }
 
-    if (targetEl && badge) {
-        const target = parseInt(targetEl.value) || 0;
-        if (total === target && total > 0) {
+    const badge = document.getElementById('matchBadge');
+    if (badge) {
+        const products = Object.keys(requirements);
+        const allMatched = products.length > 0 && products.every(
+            product => (drawnByProduct[product] || 0) === requirements[product]
+        );
+
+        if (overAllocated) {
+            badge.className = 'badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-3 py-1';
+            badge.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-1"></i> Exceeds PO availability';
+        } else if (allMatched) {
             badge.className = 'badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1';
             badge.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> 100% Matched';
-        } else if (total > target) {
-            badge.className = 'badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-3 py-1';
-            badge.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-1"></i> Over by ${(total - target).toLocaleString()} L`;
         } else {
             badge.className = 'badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-3 py-1';
-            badge.innerHTML = `<i class="bi bi-clock-history me-1"></i> Short by ${(target - total).toLocaleString()} L`;
+            badge.innerHTML = '<i class="bi bi-clock-history me-1"></i> Check per product';
         }
     }
 }

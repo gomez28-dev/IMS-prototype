@@ -224,6 +224,38 @@ class Order extends Model
     }
 
     /**
+     * Volume this order requires, keyed by full product name.
+     *
+     * Reads the order's product lines (which store the short U / D / P codes)
+     * and maps them to the full product names used by purchase order items.
+     * Orders created before multi-product lines existed have no lines, so they
+     * fall back to a single requirement for the whole ordered volume.
+     *
+     * @return array<string, int>
+     */
+    public function productRequirements(string $fallbackProduct = 'Diesel'): array
+    {
+        $requirements = [];
+
+        foreach ($this->items as $item) {
+            $name = $item->product_type
+                ? (self::PRODUCT_TYPES[$item->product_type] ?? null)
+                : null;
+
+            // A line with no recorded product type falls back to the given product.
+            $name ??= $fallbackProduct;
+
+            $requirements[$name] = ($requirements[$name] ?? 0) + (int) $item->qty;
+        }
+
+        if (empty($requirements)) {
+            $requirements[$fallbackProduct] = (int) $this->qty_ordered;
+        }
+
+        return $requirements;
+    }
+
+    /**
      * Security gate: An ATL can only be issued if Fuel Trade order is Approved by Accounting and not cancelled.
      */
     public function canBeIssuedAtl(): bool
