@@ -8,10 +8,20 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Facades\DB;
 
 class Order extends Model
 {
     protected $table = 'orders';
+
+    /**
+     * Product type codes => display names.
+     */
+    public const PRODUCT_TYPES = [
+        'U' => 'Unleaded',
+        'D' => 'Diesel',
+        'P' => 'Premium',
+    ];
 
     protected $fillable = [
         'account',
@@ -30,6 +40,10 @@ class Order extends Model
         'terms',
         'location',
         'created_by',
+        // Virtual attribute: a readable string of product lines
+        // (e.g. "Unleaded (U) 5000 @ 78.00 | Diesel (D) 3000 @ 82.50").
+        // Setting it replaces this order's product lines when the order is saved.
+        'products',
     ];
 
     protected $casts = [
@@ -37,8 +51,121 @@ class Order extends Model
         'revised_at' => 'datetime',
         'qty_ordered' => 'integer',
         'price' => 'decimal:2',
+        'amount' => 'decimal:2',
         'location' => 'string',
     ];
+
+    /**
+     * Product lines waiting to be written when the order is next saved.
+     */
+    protected ?array $pendingItems = null;
+
+    protected static function booted(): void
+    {
+        static::saving(function (Order $order) {
+            if ($order->pendingItems !== null) {
+                // Order totals are derived from the product lines:
+                // qty = sum of quantities, amount = sum of line amounts,
+                // price = weighted average price per liter.
+                $qty = 0;
+                $amount = 0.0;
+                foreach ($order->pendingItems as $line) {
+                    $qty += (int) $line['qty'];
+                    $amount += (int) $line['qty'] * (float) $line['price'];
+                }
+                $amount = round($amount, 2);
+
+                $order->qty_ordered = $qty;
+                $order->amount = $amount;
+                $order->price = $qty > 0 ? round($amount / $qty, 2) : 0;
+            } elseif (!$order->exists || $order->isDirty(['qty_ordered', 'price'])) {
+                // Orders created/changed elsewhere without product lines.
+                $order->amount = round((float) $order->qty_ordered * (float) $order->price, 2);
+            }
+        });
+
+        static::saved(function (Order $order) {
+            if ($order->pendingItems === null) {
+                return;
+            }
+
+            $lines = $order->pendingItems;
+            $order->pendingItems = null;
+
+            DB::transaction(function () use ($order, $lines) {
+                $order->items()->delete();
+                foreach ($lines as $line) {
+                    $order->items()->create($line);
+                }
+            });
+
+            $order->unsetRelation('items');
+        });
+    }
+
+    /**
+     * Product lines (Unleaded / Diesel / Premium, each with its own qty and price).
+     */
+    public function items(): HasMany
+    {
+        return $this->hasMany(OrderItem::class, 'order_id')->orderBy('id');
+    }
+
+    /**
+     * Turn product lines into a readable string:
+     * "Unleaded (U) 5000 @ 78.00 | Diesel (D) 3000 @ 82.50"
+     */
+    public static function formatItems(iterable $items): string
+    {
+        $parts = [];
+        foreach ($items as $item) {
+            $type = is_array($item) ? ($item['product_type'] ?? null) : $item->product_type;
+            $qty = is_array($item) ? $item['qty'] : $item->qty;
+            $price = is_array($item) ? ($item['price'] ?? 0) : $item->price;
+
+            $name = self::PRODUCT_TYPES[$type] ?? 'Unspecified';
+            $parts[] = sprintf('%s (%s) %d @ %s', $name, $type ?: '-', (int) $qty, number_format((float) $price, 2, '.', ''));
+        }
+
+        return implode(' | ', $parts);
+    }
+
+    /**
+     * Reverse of formatItems().
+     */
+    public static function parseItems(string $value): array
+    {
+        preg_match_all('/\(([UDP\-])\)\s+(\d+)\s+@\s+([\d.]+)/', $value, $matches, PREG_SET_ORDER);
+
+        $lines = [];
+        foreach ($matches as $m) {
+            $lines[] = [
+                'product_type' => $m[1] === '-' ? null : $m[1],
+                'qty' => (int) $m[2],
+                'price' => (float) $m[3],
+            ];
+        }
+
+        return $lines;
+    }
+
+    public function getProductsAttribute(): string
+    {
+        if (!$this->exists) {
+            return '';
+        }
+
+        return self::formatItems($this->items);
+    }
+
+    public function setProductsAttribute($value): void
+    {
+        $lines = is_string($value) ? self::parseItems($value) : [];
+
+        if (!empty($lines)) {
+            $this->pendingItems = $lines;
+        }
+    }
 
     /**
      * Get deliveries for the order.
@@ -317,12 +444,17 @@ class Order extends Model
     }
 
     /**
-     * Get total order value (price per liter x effective quantity ordered).
-     * Price defaults to 0.00 (column is not nullable), so this is always a
-     * number — 0.00 simply means no price has been entered yet.
+     * Get total order value. With no cancelled quantity this is exactly the
+     * stored amount (sum of all product lines); when quantity was cancelled
+     * it is scaled by the weighted-average price per liter.
      */
     public function getTotalValueAttribute(): float
     {
-        return round((float) $this->price * $this->effective_qty_ordered, 2);
+        $qty = (int) $this->qty_ordered;
+        if ($qty <= 0) {
+            return 0.0;
+        }
+
+        return round(((float) $this->amount / $qty) * $this->effective_qty_ordered, 2);
     }
 }

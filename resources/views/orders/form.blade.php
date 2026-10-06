@@ -3,6 +3,25 @@
 @section('title', $title)
 
 @section('content')
+@php
+    $blankItem = ['product_type' => '', 'qty' => '', 'price' => ''];
+
+    // Rows to show: previously submitted input (after a validation error),
+    // else the order's saved product lines, else one blank row.
+    $existingItems = old('items');
+    if ($existingItems === null) {
+        $existingItems = $order
+            ? $order->items->map(fn($i) => [
+                'product_type' => $i->product_type ?? '',
+                'qty' => $i->qty,
+                'price' => number_format((float) $i->price, 2, '.', ''),
+            ])->all()
+            : [];
+    }
+    if (empty($existingItems)) {
+        $existingItems = [$blankItem];
+    }
+@endphp
 <div class="row justify-content-center">
     <div class="col-md-8 col-lg-6">
         <div class="mb-3">
@@ -101,23 +120,24 @@
                         @enderror
                     </div>
 
-                    <div class="row mb-4">
-                        <div class="col-md-6">
-                            <label for="qty_ordered" class="form-label fw-medium text-secondary small">Qty Ordered <span class="text-danger">*</span></label>
-                            <input type="number" name="qty_ordered" id="qty_ordered" class="form-control @error('qty_ordered') is-invalid @enderror" placeholder="e.g. 1000" value="{{ old('qty_ordered', $order ? $order->qty_ordered : '') }}" required>
-                            @error('qty_ordered')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
+                    {{-- Products: one row per product (type, qty, price) --}}
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="form-label fw-medium text-secondary small mb-0">Products <span class="text-danger">*</span></label>
+                            <button type="button" id="add-item-btn" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-plus-lg me-1"></i> Add Product
+                            </button>
                         </div>
-                        <div class="col-md-6">
-                            <label for="price" class="form-label fw-medium text-secondary small">Price</label>
-                            <div class="input-group">
-                                <span class="input-group-text">₱</span>
-                                <input type="number" step="0.01" min="0" name="price" id="price" class="form-control @error('price') is-invalid @enderror" placeholder="0.00" value="{{ old('price', $order ? number_format((float) $order->price, 2, '.', '') : '') }}">
-                                @error('price')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
-                            </div>
+
+                        @error('items')
+                            <div class="alert alert-danger py-2 small">{{ $message }}</div>
+                        @enderror
+
+                        <div id="items-container"></div>
+
+                        <div class="d-flex justify-content-between align-items-center border rounded-3 bg-light px-3 py-2 mt-2">
+                            <div class="small text-secondary">Total Qty: <span id="total-qty" class="fw-semibold text-dark">0</span></div>
+                            <div class="small text-secondary">Grand Total: <span class="fw-bold text-dark">₱ <span id="grand-total">0.00</span></span></div>
                         </div>
                     </div>
 
@@ -150,4 +170,121 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const productOptions = @json(\App\Models\Order::PRODUCT_TYPES);
+    const initialItems = @json($existingItems);
+    const itemErrors = @json($errors->messages());
+
+    const container = document.getElementById('items-container');
+    const addBtn = document.getElementById('add-item-btn');
+    const totalQtyEl = document.getElementById('total-qty');
+    const grandTotalEl = document.getElementById('grand-total');
+
+    let nextIndex = 0;
+
+    function fmt(n) {
+        return n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function showError(row, idx, field, input) {
+        const msgs = itemErrors['items.' + idx + '.' + field];
+        if (!msgs || !msgs.length) return;
+        input.classList.add('is-invalid');
+        const fb = document.createElement('div');
+        fb.className = 'invalid-feedback d-block';
+        fb.textContent = msgs[0];
+        input.closest('.field-wrap').appendChild(fb);
+    }
+
+    function addRow(data, idx) {
+        data = data || { product_type: '', qty: '', price: '' };
+        if (idx === undefined) {
+            idx = nextIndex;
+        }
+        idx = parseInt(idx, 10);
+        nextIndex = Math.max(nextIndex, idx + 1);
+
+        let optionsHtml = '<option value="" disabled>Select product...</option>';
+        Object.keys(productOptions).forEach(function (code) {
+            optionsHtml += '<option value="' + code + '">' + code + ' - ' + productOptions[code] + '</option>';
+        });
+
+        const row = document.createElement('div');
+        row.className = 'item-row border rounded-3 p-3 mb-2';
+        row.innerHTML =
+            '<div class="row g-2 align-items-start">' +
+                '<div class="col-md-4 field-wrap">' +
+                    '<label class="form-label text-secondary small mb-1">Type of Product</label>' +
+                    '<select name="items[' + idx + '][product_type]" class="form-control form-select item-type">' + optionsHtml + '</select>' +
+                '</div>' +
+                '<div class="col-md-3 field-wrap">' +
+                    '<label class="form-label text-secondary small mb-1">Qty.</label>' +
+                    '<input type="number" min="1" step="1" name="items[' + idx + '][qty]" class="form-control item-qty" placeholder="e.g. 1000">' +
+                '</div>' +
+                '<div class="col-md-3 field-wrap">' +
+                    '<label class="form-label text-secondary small mb-1">Price</label>' +
+                    '<div class="input-group"><span class="input-group-text">₱</span>' +
+                    '<input type="number" min="0" step="0.01" name="items[' + idx + '][price]" class="form-control item-price" placeholder="0.00"></div>' +
+                '</div>' +
+                '<div class="col-md-2 d-flex align-items-end justify-content-md-end" style="min-height:58px;">' +
+                    '<button type="button" class="btn btn-sm btn-outline-danger remove-item-btn" title="Remove this product"><i class="bi bi-trash"></i></button>' +
+                '</div>' +
+            '</div>' +
+            '<div class="text-end small text-secondary mt-2">Amount: <span class="fw-semibold text-dark">₱ <span class="line-amount">0.00</span></span></div>';
+
+        const typeEl = row.querySelector('.item-type');
+        const qtyEl = row.querySelector('.item-qty');
+        const priceEl = row.querySelector('.item-price');
+
+        typeEl.value = data.product_type || '';
+        qtyEl.value = (data.qty === null || data.qty === undefined) ? '' : data.qty;
+        priceEl.value = (data.price === null || data.price === undefined) ? '' : data.price;
+
+        showError(row, idx, 'product_type', typeEl);
+        showError(row, idx, 'qty', qtyEl);
+        showError(row, idx, 'price', priceEl);
+
+        qtyEl.addEventListener('input', recompute);
+        priceEl.addEventListener('input', recompute);
+        row.querySelector('.remove-item-btn').addEventListener('click', function () {
+            row.remove();
+            recompute();
+        });
+
+        container.appendChild(row);
+        recompute();
+    }
+
+    function recompute() {
+        const rows = container.querySelectorAll('.item-row');
+        let totalQty = 0;
+        let grand = 0;
+
+        rows.forEach(function (row) {
+            const q = parseFloat(row.querySelector('.item-qty').value) || 0;
+            const p = parseFloat(row.querySelector('.item-price').value) || 0;
+            const line = q * p;
+            row.querySelector('.line-amount').textContent = fmt(line);
+            totalQty += q;
+            grand += line;
+
+            // Can't remove the last remaining row
+            row.querySelector('.remove-item-btn').style.visibility = rows.length > 1 ? 'visible' : 'hidden';
+        });
+
+        totalQtyEl.textContent = totalQty.toLocaleString('en-PH');
+        grandTotalEl.textContent = fmt(grand);
+    }
+
+    addBtn.addEventListener('click', function () {
+        addRow();
+    });
+
+    Object.keys(initialItems).forEach(function (key) {
+        addRow(initialItems[key], key);
+    });
+});
+</script>
 @endsection

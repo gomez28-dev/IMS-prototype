@@ -52,8 +52,10 @@ class SalesFuelTradeLinkageTest extends TestCase
             'location' => 'Valenzuela',
             'so_number' => $soNumber,
             'date' => now()->format('Y-m-d'),
-            'qty_ordered' => 20000,
-            'price' => 54.50,
+            // Product lines now drive qty_ordered / price / amount.
+            'items' => [
+                ['product_type' => 'D', 'qty' => 20000, 'price' => 54.50],
+            ],
             'status' => 'Active',
             'fulfillment_type' => 'FUEL_TRADE',
             'order_category' => 'CLIENT_ORDER',
@@ -67,6 +69,15 @@ class SalesFuelTradeLinkageTest extends TestCase
             'fulfillment_type' => 'FUEL_TRADE',
             'order_category' => 'CLIENT_ORDER',
         ]);
+
+        // Totals are derived from the product lines.
+        $order = Order::where('so_number', $soNumber)->firstOrFail();
+        $this->assertEquals(20000, $order->qty_ordered);
+        $this->assertEquals(1090000.00, (float) $order->amount); // 20,000 L x P54.50
+        $this->assertCount(1, $order->items);
+        $this->assertEquals('D', $order->items->first()->product_type);
+        $this->assertEquals(20000, $order->items->first()->qty);
+        $this->assertEquals(1090000.00, (float) $order->items->first()->amount);
     }
 
     public function test_purchasing_can_create_supplier_po_from_fuel_trade_order(): void

@@ -16,6 +16,53 @@ use Illuminate\View\View;
 class OrderController extends Controller
 {
     /**
+     * Validation rules for the product lines (shared by create and edit).
+     */
+    private function itemRules(): array
+    {
+        return [
+            'items' => ['required', 'array', 'min:1', 'max:10'],
+            'items.*.product_type' => ['required', 'string', 'in:U,D,P'],
+            'items.*.qty' => ['required', 'integer', 'min:1'],
+            'items.*.price' => ['nullable', 'numeric', 'min:0', 'max:999999999.99'],
+        ];
+    }
+
+    private function itemMessages(): array
+    {
+        return [
+            'items.required' => 'Add at least one product.',
+        ];
+    }
+
+    private function itemAttributes(): array
+    {
+        return [
+            'items.*.product_type' => 'product type',
+            'items.*.qty' => 'quantity',
+            'items.*.price' => 'price',
+        ];
+    }
+
+    /**
+     * Normalize the submitted product lines into the readable string the
+     * Order model understands, e.g. "Unleaded (U) 5000 @ 78.00 | Diesel (D) 3000 @ 82.50".
+     */
+    private function itemsToProductsString(array $items): string
+    {
+        $lines = [];
+        foreach ($items as $item) {
+            $lines[] = [
+                'product_type' => $item['product_type'],
+                'qty' => (int) $item['qty'],
+                'price' => (float) ($item['price'] ?? 0),
+            ];
+        }
+
+        return Order::formatItems($lines);
+    }
+
+    /**
      * Redirect back to wherever the user actually came from (e.g. Reports with its
      * filters intact), falling back to the Dashboard if none was captured or if the
      * given value isn't actually a page on this site (basic open-redirect guard).
@@ -55,13 +102,9 @@ class OrderController extends Controller
             abort(403);
         }
 
-        $validated = $request->validate([
+        $validated = $request->validate(array_merge([
             'account' => ['required', 'string', 'max:128'],
             'date' => ['required', 'date'],
-            'qty_ordered' => ['required', 'integer', 'min:0'],
-            // Column is NOT NULL with a 0.00 default, so an omitted/blank price
-            // is valid and simply means "no price entered yet" — coerced below.
-            'price' => ['nullable', 'numeric', 'min:0', 'max:999999999.99'],
             'so_number' => ['required', 'string', 'max:64',
                 Rule::unique('orders', 'so_number')->where(fn($q) => $q->where('location', $request->location)),
             ],
@@ -72,12 +115,16 @@ class OrderController extends Controller
             'order_category' => ['nullable', 'string', 'in:CLIENT_ORDER,BUY_BACK'],
             'client_atl_number' => ['nullable', 'string', 'max:64'],
             'terms' => ['nullable', 'string', 'max:64'],
-        ]);
+        ], $this->itemRules()), $this->itemMessages(), $this->itemAttributes());
 
         $validated['fulfillment_type'] = $validated['fulfillment_type'] ?? 'DELIVERY';
         $validated['order_category'] = $validated['order_category'] ?? 'CLIENT_ORDER';
-        $validated['price'] = $validated['price'] ?? 0;
         $validated['created_by'] = Auth::id();
+
+        // Product lines -> the Order model writes them to order_items on save and
+        // derives qty_ordered / price / amount from them.
+        $validated['products'] = $this->itemsToProductsString($validated['items']);
+        unset($validated['items']);
 
         $order = Order::create($validated);
 
@@ -109,6 +156,8 @@ class OrderController extends Controller
             abort(403);
         }
 
+        $order->load('items');
+
         return view('orders.form', [
             'title' => 'Edit Order',
             'order' => $order,
@@ -126,11 +175,9 @@ class OrderController extends Controller
             abort(403);
         }
 
-        $validated = $request->validate([
+        $validated = $request->validate(array_merge([
             'account' => ['required', 'string', 'max:128'],
             'date' => ['required', 'date'],
-            'qty_ordered' => ['required', 'integer', 'min:0'],
-            'price' => ['nullable', 'numeric', 'min:0', 'max:999999999.99'],
             'so_number' => ['required', 'string', 'max:64',
                 Rule::unique('orders', 'so_number')
                     ->where(fn($q) => $q->where('location', $request->location))
@@ -144,17 +191,21 @@ class OrderController extends Controller
             'client_atl_number' => ['nullable', 'string', 'max:64'],
             'terms' => ['nullable', 'string', 'max:64'],
             'modification_reason' => ['nullable', 'string', 'max:1000'],
-        ]);
+        ], $this->itemRules()), $this->itemMessages(), $this->itemAttributes());
 
         $validated['fulfillment_type'] = $validated['fulfillment_type'] ?? 'DELIVERY';
         $validated['order_category'] = $validated['order_category'] ?? 'CLIENT_ORDER';
-        $validated['price'] = $validated['price'] ?? 0;
+
+        // Product lines as one readable string, so the approver sees a clear
+        // before/after, e.g. "Unleaded (U) 5000 @ 78.00 | Diesel (D) 3000 @ 82.50".
+        $validated['products'] = $this->itemsToProductsString($validated['items']);
 
         $returnTo = $request->input('return_to');
 
-        // Diff changes against existing model attributes
+        // Diff changes against existing model attributes.
+        // (qty_ordered / price / amount are derived from the product lines.)
         $changes = [];
-        $comparableFields = ['account', 'date', 'qty_ordered', 'price', 'so_number', 'po_number', 'location', 'status', 'fulfillment_type', 'order_category', 'client_atl_number', 'terms'];
+        $comparableFields = ['account', 'date', 'products', 'so_number', 'po_number', 'location', 'status', 'fulfillment_type', 'order_category', 'client_atl_number', 'terms'];
 
         foreach ($comparableFields as $field) {
             $oldVal = $order->{$field};
