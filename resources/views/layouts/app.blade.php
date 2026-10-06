@@ -772,6 +772,9 @@
                     <a class="nav-link d-flex align-items-center" href="{{ route('stock-orders.deliveries') }}">
                         <i class="bi bi-truck me-2"></i> Deliveries & ATLs
                     </a>
+                    <a class="nav-link d-flex align-items-center {{ request()->routeIs('stock-orders.atls.*') ? 'active' : '' }}" href="{{ route('stock-orders.atls.index') }}">
+                        <i class="bi bi-patch-check me-2"></i> ATL Queue
+                    </a>
                     @if (Auth::user()->canManageSuppliers())
                         <a class="nav-link d-flex align-items-center {{ request()->routeIs('stock-orders.suppliers.*') ? 'active' : '' }}" href="{{ route('stock-orders.suppliers.index') }}">
                             <i class="bi bi-building me-2"></i> Suppliers
@@ -917,6 +920,10 @@
                 <a href="{{ route('stock-orders.deliveries') }}" class="sidebar-nav-link {{ request()->routeIs('stock-orders.deliveries') ? 'active' : '' }}" title="Deliveries & ATLs">
                     <i class="bi bi-truck"></i>
                     <span class="nav-label">Deliveries & ATLs</span>
+                </a>
+                <a href="{{ route('stock-orders.atls.index') }}" class="sidebar-nav-link {{ request()->routeIs('stock-orders.atls.*') ? 'active' : '' }}" title="ATL Queue">
+                    <i class="bi bi-patch-check"></i>
+                    <span class="nav-label">ATL Queue</span>
                 </a>
                 @if (Auth::user()->canManageSuppliers())
                 <a href="{{ route('stock-orders.suppliers.index') }}" class="sidebar-nav-link {{ request()->routeIs('stock-orders.suppliers.*') ? 'active' : '' }}" title="Manage Suppliers">

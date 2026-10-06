@@ -213,6 +213,13 @@ Route::middleware('auth')->group(function () {
         Route::post('/deliveries/{delivery}/dispatch', [WetStock\StockOrderController::class, 'dispatchDelivery'])->name('dispatch-delivery');
         Route::get('/deliveries/{delivery}/pdf', [WetStock\StockOrderController::class, 'downloadAtlPdf'])->name('pdf');
         Route::get('/deliveries/{delivery}/atl-pdf', [WetStock\StockOrderController::class, 'downloadAtlPdf'])->name('atl-pdf');
+
+        // Module 3 redesign: Sales Order list and per-order ATL records.
+        // These live alongside the current pages rather than replacing them,
+        // so the existing Dashboard keeps working until these are signed off.
+        Route::get('/atls', [WetStock\AtlController::class, 'index'])->name('atls.index');
+        Route::get('/atls/{order}', [WetStock\AtlController::class, 'show'])->name('atls.show');
+
         Route::get('/{purchaseOrder}', [WetStock\StockOrderController::class, 'show'])->name('show');
     });
 
