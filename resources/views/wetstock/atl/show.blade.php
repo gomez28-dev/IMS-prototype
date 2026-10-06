@@ -179,11 +179,16 @@
                                                     <i class="bi bi-google me-1"></i> Scanned
                                                 </a>
                                             @endif
-                                            @if ($atl->requiresAtl() && $atl->atl_number && $atl->status !== 'Pending')
+                                            @if ($atl->requiresAtl() && $atl->atl_number
+                                                && $atl->status !== 'Pending'
+                                                && $atl->approval_status !== \App\Models\PurchaseOrderDelivery::APPROVAL_REJECTED)
                                                 <a href="{{ route('stock-orders.pdf', $atl->id) }}"
                                                    class="btn btn-sm btn-outline-danger rounded-pill px-2 py-1" title="Download ATL PDF">
                                                     <i class="bi bi-file-earmark-pdf me-1"></i> ATL PDF
                                                 </a>
+                                            @elseif ($atl->approval_status === \App\Models\PurchaseOrderDelivery::APPROVAL_REJECTED)
+                                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2 py-1"
+                                                      title="This ATL was rejected, so no PDF was issued">Rejected</span>
                                             @else
                                                 <span class="text-muted" title="Awaiting ATL issuance">&mdash;</span>
                                                 <span class="badge bg-light text-muted border rounded-pill px-2 py-1 ms-1">Pending Issuance</span>

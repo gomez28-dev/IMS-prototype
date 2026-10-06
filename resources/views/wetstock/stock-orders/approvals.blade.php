@@ -25,6 +25,113 @@
             </div>
         </div>
 
+        {{-- Two queues: Purchase Orders and ATLs, both awaiting VP approval --}}
+        <div class="d-flex flex-row align-items-center gap-4 mb-4 border-bottom pb-2">
+            <a class="fw-semibold text-decoration-none pb-1 {{ $tab === 'pos' ? 'text-dark border-bottom border-2 border-primary' : 'text-muted' }}"
+               href="{{ route('stock-orders.approvals', ['tab' => 'pos']) }}">
+                <i class="bi bi-card-checklist me-1"></i> PO Approvals
+                @if ($counts['pos'] > 0)
+                    <span class="badge rounded-pill bg-danger text-white ms-1">{{ $counts['pos'] }}</span>
+                @endif
+            </a>
+            <a class="fw-semibold text-decoration-none pb-1 {{ $tab === 'atls' ? 'text-dark border-bottom border-2 border-primary' : 'text-muted' }}"
+               href="{{ route('stock-orders.approvals', ['tab' => 'atls']) }}">
+                <i class="bi bi-patch-check me-1"></i> ATL Approvals
+                @if ($counts['atls'] > 0)
+                    <span class="badge rounded-pill bg-danger text-white ms-1">{{ $counts['atls'] }}</span>
+                @endif
+            </a>
+        </div>
+
+        @if ($tab === 'atls')
+        <div class="card card-custom border-0 shadow-sm">
+            <div class="card-body p-4">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-3 py-3">ATL Number</th>
+                                <th class="py-3">Sales Order</th>
+                                <th class="py-3">PO #</th>
+                                <th class="py-3">Pick Up Date</th>
+                                <th class="py-3 text-end">Volume</th>
+                                <th class="py-3">Prepared By</th>
+                                <th class="py-3">Driver / Plate</th>
+                                <th class="pe-3 py-3 text-end">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse ($pendingAtls as $atl)
+                                <tr>
+                                    <td class="ps-3 fw-bold text-dark">
+                                        {{ $atl->atl_number ?: '—' }}
+                                        <div class="small text-muted">Issued {{ $atl->issued_at?->format('M d, Y') }}</div>
+                                    </td>
+                                    <td>
+                                        @if ($atl->order)
+                                            <a href="{{ route('stock-orders.atls.show', $atl->order->id) }}" class="text-decoration-none">
+                                                {{ $atl->order->formatted_so_number }}
+                                            </a>
+                                            <div class="small text-muted">{{ $atl->order->account }}</div>
+                                        @else
+                                            <span class="text-muted">{{ $atl->so_number ?: '—' }}</span>
+                                        @endif
+                                    </td>
+                                    <td class="small">
+                                        @php
+                                            $atlPoNumbers = $atl->allocations->pluck('purchaseOrder')->filter()->pluck('po_number')->unique();
+                                        @endphp
+                                        {{ $atlPoNumbers->isNotEmpty() ? $atlPoNumbers->join(', ') : ($atl->purchaseOrder->po_number ?? '—') }}
+                                    </td>
+                                    <td class="small">{{ $atl->receiving_date ? $atl->receiving_date->format('M d, Y') : '—' }}</td>
+                                    <td class="text-end fw-bold font-monospace">{{ number_format($atl->qty_to_receive) }} L</td>
+                                    <td class="small">{{ $atl->preparer->name ?? 'Purchasing' }}</td>
+                                    <td class="small">
+                                        {{ $atl->driver_name ?: '—' }}
+                                        @if ($atl->plate_number)
+                                            <div class="text-muted">{{ $atl->plate_number }}</div>
+                                        @endif
+                                    </td>
+                                    <td class="pe-3 text-end">
+                                        <div class="d-inline-flex gap-1 justify-content-end">
+                                            <form method="POST" action="{{ route('stock-orders.atl-reject', $atl->id) }}" class="d-inline"
+                                                  onsubmit="return confirm('Reject this ATL and return it to Purchasing?');">
+                                                @csrf
+                                                <input type="hidden" name="rejection_reason" value="">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3 py-1">
+                                                    <i class="bi bi-x-lg me-1"></i> Reject
+                                                </button>
+                                            </form>
+                                            <form method="POST" action="{{ route('stock-orders.atl-approve', $atl->id) }}" class="d-inline"
+                                                  onsubmit="return confirm('Approve this ATL?');">
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm btn-success rounded-pill px-3 py-1">
+                                                    <i class="bi bi-check-lg me-1"></i> Approve
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="8" class="text-center py-5 text-muted">
+                                        <i class="bi bi-check2-circle fs-1 d-block mb-2 text-success"></i>
+                                        No ATLs are waiting for approval.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+
+                @if ($pendingAtls->hasPages())
+                    <div class="mt-3">
+                        {{ $pendingAtls->links() }}
+                    </div>
+                @endif
+            </div>
+        </div>
+        @else
         <div class="card card-custom border-0 shadow-sm">
             <div class="card-body p-4">
                 <div class="table-responsive">
@@ -111,6 +218,7 @@
                 </div>
             </div>
         </div>
+        @endif
     </div>
 </div>
 @endsection

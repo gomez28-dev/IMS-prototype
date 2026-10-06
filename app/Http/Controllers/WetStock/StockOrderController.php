@@ -733,14 +733,121 @@ class StockOrderController extends Controller
             ->with('success', "Stock order {$purchaseOrder->po_number} prepared and submitted for VP approval.");
     }
 
-    public function approvals(): View
+    public function approvals(Request $request): View
     {
+        // Two queues: Purchase Orders waiting on the VP, and ATLs waiting on
+        // the VP. The PO tab stays the default so the existing link is
+        // unchanged.
+        $tab = $request->input('tab', 'pos');
+        if (!in_array($tab, ['pos', 'atls'], true)) {
+            $tab = 'pos';
+        }
+
         $pendingOrders = PurchaseOrder::with(['warehouse', 'client', 'requester', 'deliveries'])
             ->where('request_status', 'RECEIVED')
             ->latest()
             ->paginate(15);
 
-        return view('wetstock.stock-orders.approvals', compact('pendingOrders'));
+        // Only Doyen-issued ATLs submitted for approval, and only those whose
+        // sales order is actually cleared. Client-provided ATLs are recorded
+        // only and never need approval.
+        $pendingAtls = PurchaseOrderDelivery::query()
+            ->where('approval_status', PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL)
+            ->where(function ($q) {
+                $q->whereNull('atl_source')
+                    ->orWhere('atl_source', PurchaseOrderDelivery::SOURCE_DOYEN_ISSUED);
+            })
+            ->whereHas('order', function ($q) {
+                $q->where('clearing_status', 'Approved');
+            })
+            ->with(['order', 'purchaseOrder', 'allocations'])
+            ->latest()
+            ->paginate(15);
+
+        $counts = [
+            'pos' => PurchaseOrder::where('request_status', 'RECEIVED')->count(),
+            'atls' => PurchaseOrderDelivery::where('approval_status', PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL)
+                ->where(function ($q) {
+                    $q->whereNull('atl_source')
+                        ->orWhere('atl_source', PurchaseOrderDelivery::SOURCE_DOYEN_ISSUED);
+                })
+                ->whereHas('order', fn ($q) => $q->where('clearing_status', 'Approved'))
+                ->count(),
+        ];
+
+        return view('wetstock.stock-orders.approvals', compact(
+            'pendingOrders', 'pendingAtls', 'tab', 'counts'
+        ));
+    }
+
+    /**
+     * VP approval for a Doyen-issued ATL.
+     */
+    public function approveAtl(PurchaseOrderDelivery $delivery): RedirectResponse
+    {
+        if (!Auth::user()->canApproveStockOrders()) {
+            abort(403, 'Unauthorized to approve ATLs.');
+        }
+
+        if ($delivery->isClientProvided()) {
+            return back()->with('error', 'Client-provided ATLs are recorded only and do not need approval.');
+        }
+
+        if ($delivery->approval_status !== PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL) {
+            return back()->with('error', 'Only ATLs awaiting approval can be approved.');
+        }
+
+        $delivery->update([
+            'approval_status' => PurchaseOrderDelivery::APPROVAL_APPROVED,
+            'approved_by' => Auth::id(),
+            'approved_at' => now(),
+        ]);
+
+        AuditLog::create([
+            'admin_id' => Auth::id(),
+            'action' => 'approved',
+            'description' => "Approved ATL " . ($delivery->atl_number ?: $delivery->client_atl_number)
+                . ($delivery->order ? " for SO {$delivery->order->formatted_so_number}" : ''),
+        ]);
+
+        return back()->with('success', 'ATL approved. The PDF is now available to download.');
+    }
+
+    /**
+     * VP rejection for a Doyen-issued ATL.
+     */
+    public function rejectAtl(Request $request, PurchaseOrderDelivery $delivery): RedirectResponse
+    {
+        if (!Auth::user()->canApproveStockOrders()) {
+            abort(403, 'Unauthorized to reject ATLs.');
+        }
+
+        if ($delivery->isClientProvided()) {
+            return back()->with('error', 'Client-provided ATLs are recorded only and cannot be rejected.');
+        }
+
+        if ($delivery->approval_status !== PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL) {
+            return back()->with('error', 'Only ATLs awaiting approval can be rejected.');
+        }
+
+        $validated = $request->validate([
+            'rejection_reason' => ['nullable', 'string', 'max:1000'],
+        ]);
+        $reason = trim($validated['rejection_reason'] ?? '');
+
+        $delivery->update([
+            'approval_status' => PurchaseOrderDelivery::APPROVAL_REJECTED,
+        ]);
+
+        AuditLog::create([
+            'admin_id' => Auth::id(),
+            'action' => 'REJECTED',
+            'description' => "Rejected ATL " . ($delivery->atl_number ?: $delivery->client_atl_number)
+                . ($delivery->order ? " for SO {$delivery->order->formatted_so_number}" : '')
+                . ($reason !== '' ? " — Reason: {$reason}" : ''),
+        ]);
+
+        return back()->with('success', 'ATL rejected and returned to Purchasing.');
     }
 
     public function approve(PurchaseOrder $purchaseOrder): RedirectResponse
@@ -839,6 +946,16 @@ class StockOrderController extends Controller
 
     public function downloadAtlPdf(PurchaseOrderDelivery $delivery)
     {
+        // The printed ATL is a Doyen-issued document. A client-provided ATL is
+        // only referenced, and a rejected one was never issued.
+        if ($delivery->isClientProvided()) {
+            abort(403, 'Client-provided ATLs do not have a Doyen ATL PDF.');
+        }
+
+        if ($delivery->approval_status === PurchaseOrderDelivery::APPROVAL_REJECTED) {
+            abort(403, 'This ATL was rejected, so no ATL PDF is available.');
+        }
+
         $po = $delivery->purchaseOrder;
 
         $logoPath = public_path('images/logo_ims.png');

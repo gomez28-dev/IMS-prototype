@@ -219,6 +219,8 @@ Route::middleware('auth')->group(function () {
         // so the existing Dashboard keeps working until these are signed off.
         Route::get('/atls', [WetStock\AtlController::class, 'index'])->name('atls.index');
         Route::get('/atls/{order}', [WetStock\AtlController::class, 'show'])->name('atls.show');
+        Route::post('/atls/{delivery}/approve', [WetStock\StockOrderController::class, 'approveAtl'])->name('atl-approve');
+        Route::post('/atls/{delivery}/reject', [WetStock\StockOrderController::class, 'rejectAtl'])->name('atl-reject');
 
         Route::get('/{purchaseOrder}', [WetStock\StockOrderController::class, 'show'])->name('show');
     });
