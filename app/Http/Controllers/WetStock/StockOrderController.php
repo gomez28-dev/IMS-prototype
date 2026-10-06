@@ -250,9 +250,20 @@ class StockOrderController extends Controller
             abort(403);
         }
 
-        if (!$order->canBeIssuedAtl()) {
+        $isClientProvided = $request->input('atl_source') === PurchaseOrderDelivery::SOURCE_CLIENT_PROVIDED;
+        $submitForApproval = (bool) $request->input('submit_for_approval');
+
+        if (!$order->canPrepareAtl()) {
             return redirect()->route('stock-orders.index')
-                ->with('error', "Cannot issue ATL: Sales Order {$order->formatted_so_number} has not been cleared by Accounting (Status: {$order->clearing_status}).");
+                ->with('error', "Cannot issue ATL: Sales Order {$order->formatted_so_number} is not open for ATL preparation.");
+        }
+
+        // Drafting is always allowed, even before Accounting clears the order.
+        // Only submitting for VP approval is gated on clearance.
+        if ($submitForApproval && !$isClientProvided && $order->clearing_status !== 'Approved') {
+            return back()->withInput()->withErrors([
+                'submit_for_approval' => "Cannot submit for approval: Sales Order {$order->formatted_so_number} has not been cleared by Accounting (Status: {$order->clearing_status}). Save it as a draft instead.",
+            ]);
         }
 
         $defaultProduct = $request->input('product', 'Diesel');
@@ -261,6 +272,8 @@ class StockOrderController extends Controller
         if ($request->has('drawdowns') && is_array($request->input('drawdowns'))) {
             $validated = $request->validate([
                 'product' => ['nullable', 'string', 'max:64'],
+                'atl_source' => ['nullable', 'in:DOYEN_ISSUED,CLIENT_PROVIDED'],
+                'submit_for_approval' => ['nullable', 'boolean'],
                 'delivery_channel' => ['nullable', 'string', 'in:SUPPLIER_CLIENT_PICKUP,SUPPLIER_DOYEN_PICKUP,BUY_BACK_CLIENT_PICKUP,BUY_BACK_DOYEN_PICKUP,SUPPLIER_STOCKS_DELIVERY,BUY_BACK_STOCKS_DELIVERY'],
                 'storage_tank_id' => ['nullable', 'exists:storage_tanks,id'],
                 'supplier_so_number' => ['nullable', 'string', 'max:64'],
@@ -273,7 +286,7 @@ class StockOrderController extends Controller
                 'reference_no' => ['nullable', 'string', 'max:64'],
                 'atl_type' => ['required', 'in:DITC_ATL,CLIENT_ATL,NONE'],
                 'atl_number' => ['nullable', 'string', 'max:64'],
-                'client_atl_number' => ['nullable', 'string', 'max:64'],
+                'client_atl_number' => ['required_if:atl_source,CLIENT_PROVIDED', 'nullable', 'string', 'max:64'],
                 'additional_remarks' => ['nullable', 'string', 'max:500'],
                 'drawdowns' => ['required', 'array', 'min:1'],
                 'drawdowns.*.purchase_order_id' => ['required', 'exists:purchase_orders,id'],
@@ -340,12 +353,28 @@ class StockOrderController extends Controller
 
             $delivery = PurchaseOrderDelivery::create([
                 'purchase_order_id' => $primaryPoId,
+                'order_id' => $order->id,
                 'storage_tank_id' => $validated['storage_tank_id'] ?? null,
                 'delivery_channel' => $validated['delivery_channel'] ?? 'SUPPLIER_CLIENT_PICKUP',
                 'order_type' => 'PICK_UP',
-                'atl_type' => $validated['atl_type'],
-                'atl_number' => $validated['atl_number'] ?? null,
-                'client_atl_number' => $validated['client_atl_number'] ?? $order->client_atl_number,
+                'atl_type' => $isClientProvided ? 'CLIENT_ATL' : $validated['atl_type'],
+                'atl_number' => $isClientProvided ? null : ($validated['atl_number'] ?? null),
+                'client_atl_number' => $isClientProvided
+                    ? ($validated['client_atl_number'] ?? null)
+                    : ($validated['client_atl_number'] ?? $order->client_atl_number),
+                'atl_category' => $order->isBuyBack()
+                    ? PurchaseOrderDelivery::CATEGORY_BUY_BACK
+                    : PurchaseOrderDelivery::CATEGORY_FUEL_TRADE,
+                'atl_source' => $isClientProvided
+                    ? PurchaseOrderDelivery::SOURCE_CLIENT_PROVIDED
+                    : PurchaseOrderDelivery::SOURCE_DOYEN_ISSUED,
+                // Client-provided ATLs are recorded only: no VP approval. A
+                // Doyen-issued ATL enters the queue only when submitted.
+                'approval_status' => ($isClientProvided || !$submitForApproval)
+                    ? PurchaseOrderDelivery::APPROVAL_DRAFT
+                    : PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL,
+                'lift_status' => PurchaseOrderDelivery::LIFT_UNLIFTED,
+                'issued_at' => now(),
                 'reference_no' => $validated['reference_no'] ?? null,
                 'so_number' => $order->so_number,
                 'supplier_so_number' => $validated['supplier_so_number'] ?? null,
@@ -377,20 +406,31 @@ class StockOrderController extends Controller
 
             $order->update(['linked_purchase_order_id' => $primaryPoId]);
 
+            $reference = $delivery->atl_number ?: $delivery->client_atl_number;
+
             AuditLog::create([
                 'admin_id' => Auth::id(),
                 'action' => 'created',
-                'description' => "Purchasing issued ATL #{$delivery->atl_number} for SO {$order->formatted_so_number}, drawn from " . count($validated['drawdowns']) . " PO(s) covering {$productSummary}.",
+                'description' => "Purchasing prepared ATL #{$reference} for SO {$order->formatted_so_number}, drawn from "
+                    . count($validated['drawdowns']) . " PO(s) covering {$productSummary}.",
             ]);
 
-            return redirect()->route('stock-orders.index')
-                ->with('success', "Authority to Load (ATL) #{$delivery->atl_number} successfully issued and linked to Supplier PO(s).");
+            $outcome = match (true) {
+                $isClientProvided => 'recorded (client-provided, no VP approval needed)',
+                $submitForApproval => 'submitted for VP approval',
+                default => 'saved as a draft',
+            };
+
+            return redirect()->route('stock-orders.atls.show', $order->id)
+                ->with('success', "Authority to Load (ATL) #{$reference} {$outcome} and linked to Supplier PO(s).");
         }
 
         // Direct PO creation fallback
         $validated = $request->validate([
             'po_number' => ['required', 'string', 'max:64'],
             'supplier_name' => ['required', 'string', 'max:128'],
+            'atl_source' => ['nullable', 'in:DOYEN_ISSUED,CLIENT_PROVIDED'],
+            'submit_for_approval' => ['nullable', 'boolean'],
             'delivery_channel' => ['nullable', 'string', 'in:SUPPLIER_CLIENT_PICKUP,SUPPLIER_DOYEN_PICKUP,BUY_BACK_CLIENT_PICKUP,BUY_BACK_DOYEN_PICKUP,SUPPLIER_STOCKS_DELIVERY,BUY_BACK_STOCKS_DELIVERY'],
             'storage_tank_id' => ['nullable', 'exists:storage_tanks,id'],
             'supplier_so_number' => ['nullable', 'string', 'max:64'],
@@ -405,7 +445,7 @@ class StockOrderController extends Controller
             'reference_no' => ['nullable', 'string', 'max:64'],
             'atl_type' => ['required', 'in:DITC_ATL,CLIENT_ATL,NONE'],
             'atl_number' => ['nullable', 'string', 'max:64'],
-            'client_atl_number' => ['nullable', 'string', 'max:64'],
+            'client_atl_number' => ['required_if:atl_source,CLIENT_PROVIDED', 'nullable', 'string', 'max:64'],
             'additional_remarks' => ['nullable', 'string', 'max:500'],
         ]);
 
@@ -437,12 +477,26 @@ class StockOrderController extends Controller
 
         $delivery = PurchaseOrderDelivery::create([
             'purchase_order_id' => $po->id,
+            'order_id' => $order->id,
             'storage_tank_id' => $validated['storage_tank_id'] ?? null,
             'delivery_channel' => $validated['delivery_channel'] ?? 'SUPPLIER_CLIENT_PICKUP',
             'order_type' => 'PICK_UP',
-            'atl_type' => $validated['atl_type'],
-            'atl_number' => $validated['atl_number'] ?? null,
-            'client_atl_number' => $validated['client_atl_number'] ?? $order->client_atl_number,
+            'atl_type' => $isClientProvided ? 'CLIENT_ATL' : $validated['atl_type'],
+            'atl_number' => $isClientProvided ? null : ($validated['atl_number'] ?? null),
+            'client_atl_number' => $isClientProvided
+                ? ($validated['client_atl_number'] ?? null)
+                : ($validated['client_atl_number'] ?? $order->client_atl_number),
+            'atl_category' => $order->isBuyBack()
+                ? PurchaseOrderDelivery::CATEGORY_BUY_BACK
+                : PurchaseOrderDelivery::CATEGORY_FUEL_TRADE,
+            'atl_source' => $isClientProvided
+                ? PurchaseOrderDelivery::SOURCE_CLIENT_PROVIDED
+                : PurchaseOrderDelivery::SOURCE_DOYEN_ISSUED,
+            'approval_status' => ($isClientProvided || !$submitForApproval)
+                ? PurchaseOrderDelivery::APPROVAL_DRAFT
+                : PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL,
+            'lift_status' => PurchaseOrderDelivery::LIFT_UNLIFTED,
+            'issued_at' => now(),
             'reference_no' => $validated['reference_no'] ?? null,
             'so_number' => $order->so_number,
             'supplier_so_number' => $validated['supplier_so_number'] ?? null,

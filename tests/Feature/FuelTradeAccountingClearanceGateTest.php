@@ -85,7 +85,7 @@ class FuelTradeAccountingClearanceGateTest extends TestCase
         $response->assertSessionHas('error');
     }
 
-    public function test_cannot_store_fuel_trade_po_when_clearance_is_not_approved(): void
+    public function test_can_save_an_atl_as_a_draft_when_clearance_is_not_approved(): void
     {
         $order = Order::create([
             'account' => $this->client->name,
@@ -108,17 +108,51 @@ class FuelTradeAccountingClearanceGateTest extends TestCase
             'receiving_date' => now()->addDays(2)->format('Y-m-d'),
             'atl_type' => 'DITC_ATL',
             'atl_number' => 'ATL-123',
+            // Explicitly saving a draft, not submitting for approval.
+            'submit_for_approval' => 0,
         ];
 
         $response = $this->actingAs($this->purchasingUser)
             ->post(route('stock-orders.store-fuel-trade-po', $order), $payload);
 
-        $response->assertRedirect(route('stock-orders.index'));
-        $response->assertSessionHas('error');
+        // Drafting is allowed before Accounting clears the order.
+        $response->assertSessionHas('success');
 
-        $this->assertDatabaseMissing('purchase_orders', [
-            'po_number' => $payload['po_number'],
+        $atl = \App\Models\PurchaseOrderDelivery::latest('id')->firstOrFail();
+        $this->assertEquals('DRAFT', $atl->approval_status);
+    }
+
+    public function test_cannot_submit_atl_for_approval_when_clearance_is_not_approved(): void
+    {
+        $order = Order::create([
+            'account' => $this->client->name,
+            'location' => 'Valenzuela',
+            'so_number' => 'SO-FT-' . rand(1000, 9999),
+            'date' => now(),
+            'qty_ordered' => 10000,
+            'price' => 50.00,
+            'status' => 'Active',
+            'clearing_status' => 'Pending',
+            'fulfillment_type' => 'FUEL_TRADE',
+            'order_category' => 'CLIENT_ORDER',
         ]);
+
+        $payload = [
+            'po_number' => 'PO-TEST-' . rand(1000, 9999),
+            'supplier_name' => 'Petron Bataan Refinery',
+            'product' => 'Diesel',
+            'qty_to_receive' => 10000,
+            'receiving_date' => now()->addDays(2)->format('Y-m-d'),
+            'atl_type' => 'DITC_ATL',
+            'atl_number' => 'ATL-123',
+            'submit_for_approval' => 1,
+        ];
+
+        $response = $this->actingAs($this->purchasingUser)
+            ->post(route('stock-orders.store-fuel-trade-po', $order), $payload);
+
+        $response->assertSessionHasErrors();
+        $this->assertNull(\App\Models\PurchaseOrderDelivery::latest('id')->first());
     }
 
     public function test_can_access_and_store_fuel_trade_po_when_clearance_is_approved(): void

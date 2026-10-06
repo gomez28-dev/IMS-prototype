@@ -256,6 +256,17 @@ class Order extends Model
     }
 
     /**
+     * Whether an ATL may be drafted for this order.
+     *
+     * Clearance only gates submitting for VP approval, not preparing the
+     * document, so this is looser than canBeIssuedAtl().
+     */
+    public function canPrepareAtl(): bool
+    {
+        return ($this->isFuelTrade() || $this->isBuyBack()) && $this->status !== 'Cancelled';
+    }
+
+    /**
      * Security gate: An ATL can only be issued if Fuel Trade order is Approved by Accounting and not cancelled.
      */
     public function canBeIssuedAtl(): bool

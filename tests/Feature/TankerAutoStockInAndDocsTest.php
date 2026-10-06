@@ -303,7 +303,8 @@ class TankerAutoStockInAndDocsTest extends TestCase
         $response = $this->actingAs($this->purchasingUser)
             ->post(route('stock-orders.store-fuel-trade-po', $so->id), $payload);
 
-        $response->assertRedirect(route('stock-orders.index'));
+        // Issuing an ATL now lands on that order's ATL details page.
+        $response->assertRedirect(route('stock-orders.atls.show', $so->id));
         $response->assertSessionHas('success');
 
         $this->assertDatabaseHas('purchase_order_deliveries', [

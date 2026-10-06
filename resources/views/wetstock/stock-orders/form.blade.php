@@ -57,7 +57,71 @@
                             $requiredProducts = array_keys($soRequirements);
                             $defaultReqProduct = $requiredProducts[0] ?? 'Diesel';
                             $productOptions = ['Diesel', 'Premium', 'Unleaded'];
+                            $isCleared = $order->clearing_status === 'Approved';
                         @endphp
+
+                        {{-- ATL source: Doyen issues the ATL, or the client provides it --}}
+                        <div class="card border-0 bg-light rounded-3 mb-4">
+                            <div class="card-body p-3">
+                                <label class="form-label fw-semibold small mb-2">Who Issues the ATL? <span class="text-danger">*</span></label>
+                                <div class="d-flex gap-4 flex-wrap">
+                                    <div class="form-check">
+                                        <input class="form-check-input atl-source-input" type="radio" name="atl_source"
+                                               id="atlSourceDoyen" value="DOYEN_ISSUED"
+                                               {{ old('atl_source', 'DOYEN_ISSUED') === 'DOYEN_ISSUED' ? 'checked' : '' }}>
+                                        <label class="form-check-label small" for="atlSourceDoyen">
+                                            <strong>Doyen issues</strong> &mdash; needs VP approval
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input atl-source-input" type="radio" name="atl_source"
+                                               id="atlSourceClient" value="CLIENT_PROVIDED"
+                                               {{ old('atl_source') === 'CLIENT_PROVIDED' ? 'checked' : '' }}>
+                                        <label class="form-check-label small" for="atlSourceClient">
+                                            <strong>Client provides</strong> &mdash; recorded only, no approval
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Client-provided ATL details --}}
+                        <div id="clientAtlFields" class="mb-4" style="display: {{ old('atl_source') === 'CLIENT_PROVIDED' ? 'block' : 'none' }};">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label for="client_atl_number" class="form-label fw-semibold small">Client ATL Number <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control @error('client_atl_number') is-invalid @enderror" id="client_atl_number"
+                                           name="client_atl_number" placeholder="e.g. ATL-2026-0099"
+                                           value="{{ old('client_atl_number', $order->client_atl_number) }}">
+                                    <div class="form-text">Required when the client issues the ATL.</div>
+                                    @error('client_atl_number')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="scanned_doc_url" class="form-label fw-semibold small">Scanned ATL (Google Drive link)</label>
+                                    <input type="url" class="form-control @error('scanned_doc_url') is-invalid @enderror" id="scanned_doc_url"
+                                           name="scanned_doc_url" placeholder="https://drive.google.com/file/d/..."
+                                           value="{{ old('scanned_doc_url') }}">
+                                    @error('scanned_doc_url')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                            </div>
+                        </div>
+
+                        @if (! $isCleared)
+                            <div class="alert alert-warning border-0 rounded-3 mb-4 small">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Accounting clearance is <strong>{{ $order->clearing_status ?: 'Pending' }}</strong> for this order.
+                                You can still save the ATL as a <strong>draft</strong>, but it cannot be submitted for VP approval yet.
+                            </div>
+                        @endif
+
+                        @error('submit_for_approval')
+                            <div class="alert alert-danger border-0 rounded-3 mb-4 small">{{ $message }}</div>
+                        @enderror
+
                         <input type="hidden" name="product" value="Diesel">
                         <input type="hidden" id="targetOrderQty" value="{{ $order->qty_ordered }}">
                         <input type="hidden" id="soRequirements" value="{{ json_encode($soRequirements) }}">
@@ -365,10 +429,17 @@
                                   placeholder="Dip requirements, refinery safety passes, calibration notes... ">{{ old('additional_remarks') }}</textarea>
                     </div>
 
-                    <div class="d-flex justify-content-end gap-2">
-                        <a href="{{ route('stock-orders.index') }}" class="btn btn-light border rounded-pill px-4">Cancel</a>
-                        <button type="submit" class="btn btn-primary-custom rounded-pill px-4 shadow-sm" id="submitBtn">
-                            <i class="bi bi-patch-check me-1"></i> Issue Authority to Load (ATL)
+                    <div class="d-flex justify-content-end gap-2 flex-wrap">
+                        <a href="{{ route('stock-orders.atls.index') }}" class="btn btn-light border rounded-pill px-4">Cancel</a>
+                        <button type="submit" name="submit_for_approval" value="0" class="btn btn-outline-secondary rounded-pill px-4" id="saveDraftBtn">
+                            <i class="bi bi-save me-1"></i> Save Draft
+                        </button>
+                        <button type="submit" name="submit_for_approval" value="1"
+                                class="btn btn-primary-custom rounded-pill px-4 shadow-sm {{ $isCleared ? '' : 'disabled' }}"
+                                id="submitBtn"
+                                @disabled(! $isCleared)
+                                title="{{ $isCleared ? 'Submit to the VP approval queue' : 'Blocked until Accounting clears this order' }}">
+                            <i class="bi bi-patch-check me-1"></i> Submit for Approval
                         </button>
                     </div>
                 </form>
@@ -583,6 +654,32 @@ document.addEventListener('DOMContentLoaded', function() {
     if (channelSelect) {
         handleDeliveryChannelChange(channelSelect.value);
     }
+
+    // Doyen-issued vs client-provided ATL: client-provided records need their
+    // own number and Drive link, and never enter the VP approval queue.
+    const sourceInputs = document.querySelectorAll('.atl-source-input');
+    const clientFields = document.getElementById('clientAtlFields');
+    const submitBtn = document.getElementById('submitBtn');
+
+    function applySourceVisibility() {
+        const clientRadio = document.getElementById('atlSourceClient');
+        const isClient = clientRadio && clientRadio.checked;
+
+        if (clientFields) {
+            clientFields.style.display = isClient ? 'block' : 'none';
+        }
+
+        if (submitBtn) {
+            // Client-provided ATLs skip approval, so submitting for approval is
+            // not a meaningful action for them.
+            submitBtn.style.display = isClient ? 'none' : '';
+        }
+    }
+
+    sourceInputs.forEach(function (input) {
+        input.addEventListener('change', applySourceVisibility);
+    });
+    applySourceVisibility();
 });
 </script>
 @endsection
