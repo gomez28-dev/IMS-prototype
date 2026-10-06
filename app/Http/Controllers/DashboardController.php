@@ -79,7 +79,10 @@ class DashboardController extends Controller
         $totalQtyDelivered = (clone $statsQuery)->get()->sum(fn($o) => $o->total_qty_out);
         $totalRemaining = (clone $statsQuery)->get()->sum(fn($o) => $o->remaining_balance);
 
-        $orders = $query->orderBy('so_number', 'desc')
+        // Eager-load product lines (and deliveries, which the rows read anyway)
+        // so the table doesn't run extra queries per row.
+        $orders = $query->with(['items', 'deliveries'])
+            ->orderBy('so_number', 'desc')
             ->paginate(10, ['*'], 'page', $page)
             ->appends(['search' => $searchQuery, 'tab' => $activeTab]);
 

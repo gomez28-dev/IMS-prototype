@@ -3,11 +3,104 @@
 @section('title', 'Dashboard')
 
 @section('content')
+@php
+    // Product chip colors: U = Unleaded, D = Diesel, P = Premium
+    $chipStyles = [
+        'U' => 'background:#dcfce7;color:#166534;border:1px solid #bbf7d0;',
+        'D' => 'background:#e0e7ff;color:#3730a3;border:1px solid #c7d2fe;',
+        'P' => 'background:#fee2e2;color:#991b1b;border:1px solid #fecaca;',
+    ];
+
+    // Small colored letter badge for a product type
+    $chip = function ($type, $title = '') use ($chipStyles) {
+        $style = $chipStyles[$type] ?? 'background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb;';
+        $label = $type ?: '—';
+        return '<span class="prod-chip" style="' . $style . '" title="' . e($title) . '">' . e($label) . '</span>';
+    };
+
+    // Price shown in the table: one price, or a range when an order has several products
+    $priceInfo = function ($order) {
+        $items = $order->items;
+
+        if ($items->count() > 1) {
+            $prices = $items->pluck('price')->map(fn($p) => (float) $p);
+            $min = $prices->min();
+            $max = $prices->max();
+
+            if ($max <= 0) {
+                $text = null;
+            } elseif ($min == $max) {
+                $text = '₱' . number_format($min, 2);
+            } else {
+                $text = '₱' . number_format($min, 2) . ' – ₱' . number_format($max, 2);
+            }
+
+            return ['text' => $text, 'sub' => $items->count() . ' products'];
+        }
+
+        $p = $items->count() === 1 ? (float) $items->first()->price : (float) $order->price;
+
+        return ['text' => $p > 0 ? '₱' . number_format($p, 2) : null, 'sub' => null];
+    };
+@endphp
 <style>
     #ordersTable thead th {
         vertical-align: middle !important;
         text-align: center !important;
     }
+    /* Tighter rows */
+    #ordersTable tbody td {
+        padding-top: 0.5rem !important;
+        padding-bottom: 0.5rem !important;
+        font-size: 0.875rem;
+    }
+    #ordersTable tbody tr.expand-row td {
+        padding-top: 0.25rem !important;
+        padding-bottom: 0.75rem !important;
+    }
+    .acct-name {
+        display: block;
+        max-width: 230px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .terms-cell {
+        display: block;
+        max-width: 130px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .prod-chip {
+        display: inline-block;
+        font-size: 0.65rem;
+        font-weight: 700;
+        line-height: 1;
+        padding: 0.2rem 0.4rem;
+        border-radius: 0.35rem;
+        margin: 0 1px;
+    }
+    .exp-item { min-width: 90px; }
+    .exp-label {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: #6b7280;
+    }
+    .exp-value {
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: #111827;
+    }
+    .prod-table th {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: #6b7280;
+        font-weight: 600;
+    }
+    .prod-table td, .prod-table th { padding: 0.2rem 0.5rem; }
 </style>
 <!-- Header Section -->
 <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-5 gap-3">
@@ -211,6 +304,18 @@
                         @php
                             $drList = $order->deliveries->pluck('dr_number')->filter()->unique()->values();
                             $atlList = $order->deliveries->pluck('atl_number')->filter()->unique()->values();
+                            $price = $priceInfo($order);
+
+                            // Product lines for the expanded row (falls back to the order's own totals)
+                            $lines = $order->items->isNotEmpty()
+                                ? $order->items
+                                : collect([(object) [
+                                    'product_type' => null,
+                                    'product_name' => '—',
+                                    'qty' => $order->qty_ordered,
+                                    'price' => $order->price,
+                                    'amount' => $order->amount,
+                                ]]);
                         @endphp
                         <tr class="main-row {{ $order->status === 'Cancelled' ? 'order-cancelled' : '' }}" style="cursor: pointer;">
                             <td class="text-center toggle-expand ps-3">
@@ -221,7 +326,9 @@
                                 <input type="checkbox" class="form-check-input order-check" value="{{ $order->id }}">
                             </td>
                             @endif
-                            <td class="ps-4 fw-semibold text-dark">{{ $order->account }}</td>
+                            <td class="ps-4 fw-semibold text-dark">
+                                <span class="acct-name" title="{{ $order->account }}">{{ $order->account }}</span>
+                            </td>
                             <td>
                                 @if ($order->location === 'San Simon')
                                     <span class="badge" style="background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a;">San Simon</span>
@@ -243,15 +350,29 @@
                                     </span>
                                 @endif
                             </td>
-                            <td class="text-center fw-medium">{{ number_format($order->effective_qty_ordered) }}</td>
-                            <td class="text-end fw-medium">
-                                @if ($order->price > 0)
-                                    ₱{{ number_format($order->price, 2) }}
+                            <td class="text-center">
+                                <div class="fw-medium">{{ number_format($order->effective_qty_ordered) }}</div>
+                                @if ($order->items->isNotEmpty())
+                                <div class="mt-1">
+                                    @foreach ($order->items as $item)
+                                        {!! $chip($item->product_type, $item->product_name . ': ' . number_format($item->qty) . ' @ ₱' . number_format((float) $item->price, 2)) !!}
+                                    @endforeach
+                                </div>
+                                @endif
+                            </td>
+                            <td class="text-end fw-medium text-nowrap">
+                                @if ($price['text'])
+                                    <div>{{ $price['text'] }}</div>
+                                    @if ($price['sub'])
+                                        <div class="text-muted" style="font-size: 0.7rem; font-weight: 400;">{{ $price['sub'] }}</div>
+                                    @endif
                                 @else
                                     <span class="text-muted">—</span>
                                 @endif
                             </td>
-                            <td class="text-muted small">{{ $order->terms ?: '—' }}</td>
+                            <td class="text-muted small">
+                                <span class="terms-cell" title="{{ $order->terms }}">{{ $order->terms ?: '—' }}</span>
+                            </td>
                             <td class="text-center">
                                 <span class="badge rounded-pill px-3 py-1 {{ $order->computed_status_badge_class }}">
                                     {{ $order->computed_status }}
@@ -282,19 +403,19 @@
                                 @endif
                             </td>
                             <td class="text-end pe-4">
-                                <div class="d-flex justify-content-end gap-2">
-                                    <a href="{{ route('order.deliveries', $order->id) }}" class="btn btn-sm btn-outline-primary rounded-3 px-3 py-1" title="View Deliveries">
+                                <div class="d-flex justify-content-end gap-1">
+                                    <a href="{{ route('order.deliveries', $order->id) }}" class="btn btn-sm btn-outline-primary rounded-3 px-2 py-1" title="View Deliveries">
                                         <i class="bi bi-truck me-1"></i> Deliveries
                                     </a>
                                     @if (Auth::user()->canEditModule1())
-                                    <a href="{{ route('order.edit', $order->id) }}" class="btn btn-sm btn-outline-secondary rounded-3 px-3 py-1" title="Edit Order">
+                                    <a href="{{ route('order.edit', $order->id) }}" class="btn btn-sm btn-outline-secondary rounded-3 px-2 py-1" title="Edit Order">
                                         <i class="bi bi-pencil"></i>
                                     </a>
                                     @endif
                                     @if (Auth::user()->isAdmin())
                                     <form method="POST" action="{{ route('order.delete', $order->id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this order? This will also delete all associated deliveries.');">
                                         @csrf
-                                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-3 px-3 py-1" title="Delete Order">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-3 px-2 py-1" title="Delete Order">
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </form>
@@ -303,56 +424,79 @@
                             </td>
                         </tr>
                         <tr class="expand-row" style="display: none; background-color: #fafafa;">
-                            <td colspan="{{ $colCount }}" class="p-3 border-top-0">
-                                <div class="px-4 py-2">
-                                    <div class="row g-2 align-items-stretch">
-                                        <div class="col-6 col-md-2">
-                                            <div class="p-2 rounded-3 bg-white border h-100 text-center">
-                                                <span class="text-muted small d-block mb-1">Order Date</span>
-                                                <span class="fw-medium text-dark">{{ $order->date ? $order->date->format('Y-m-d') : '—' }}</span>
-                                            </div>
+                            <td colspan="{{ $colCount }}" class="border-top-0">
+                                <div class="px-4">
+                                    {{-- Slim details strip --}}
+                                    <div class="d-flex flex-wrap gap-4">
+                                        <div class="exp-item">
+                                            <div class="exp-label">Order Date</div>
+                                            <div class="exp-value">{{ $order->date ? $order->date->format('Y-m-d') : '—' }}</div>
                                         </div>
-                                        <div class="col-6 col-md-2">
-                                            <div class="p-2 rounded-3 bg-white border h-100 text-center">
-                                                <span class="text-muted small d-block mb-1">{{ $order->isFuelTrade() ? 'Supplier PO#' : 'PO#' }}</span>
-                                                <span class="fw-medium text-dark">{{ $order->isFuelTrade() && $order->linkedPurchaseOrder ? $order->linkedPurchaseOrder->po_number : ($order->po_number ?: '—') }}</span>
-                                            </div>
+                                        <div class="exp-item">
+                                            <div class="exp-label">{{ $order->isFuelTrade() ? 'Supplier PO#' : 'PO#' }}</div>
+                                            <div class="exp-value">{{ $order->isFuelTrade() && $order->linkedPurchaseOrder ? $order->linkedPurchaseOrder->po_number : ($order->po_number ?: '—') }}</div>
                                         </div>
-                                        <div class="col-6 col-md-2">
-                                            <div class="p-2 rounded-3 bg-white border h-100 text-center">
-                                                <span class="text-muted small d-block mb-1">{{ $order->isFuelTrade() ? 'Pick Up Date' : 'DR#' }}</span>
-                                                @if ($order->isFuelTrade())
-                                                    <span class="fw-medium text-dark">{{ $order->linkedPurchaseOrder?->deliveries?->first()?->receiving_date ? $order->linkedPurchaseOrder->deliveries->first()->receiving_date->format('Y-m-d') : '—' }}</span>
-                                                @else
-                                                    <span class="fw-medium text-dark" title="{{ $drList->implode(', ') }}">{{ $drList->isNotEmpty() ? $drList->implode(', ') : '—' }}</span>
-                                                @endif
-                                            </div>
+                                        <div class="exp-item">
+                                            <div class="exp-label">{{ $order->isFuelTrade() ? 'Pick Up Date' : 'DR#' }}</div>
+                                            @if ($order->isFuelTrade())
+                                                <div class="exp-value">{{ $order->linkedPurchaseOrder?->deliveries?->first()?->receiving_date ? $order->linkedPurchaseOrder->deliveries->first()->receiving_date->format('Y-m-d') : '—' }}</div>
+                                            @else
+                                                <div class="exp-value" title="{{ $drList->implode(', ') }}">{{ $drList->isNotEmpty() ? $drList->implode(', ') : '—' }}</div>
+                                            @endif
                                         </div>
-                                        <div class="col-6 col-md-2">
-                                            <div class="p-2 rounded-3 bg-white border h-100 text-center">
-                                                <span class="text-muted small d-block mb-1">ATL#</span>
-                                                @if ($order->isFuelTrade())
-                                                    @php
-                                                        $ftAtl = $order->linkedPurchaseOrder?->deliveries?->first()?->atl_number ?: ($order->client_atl_number ?: '—');
-                                                    @endphp
-                                                    <span class="fw-medium text-dark">{{ $ftAtl }}</span>
-                                                @else
-                                                    <span class="fw-medium text-dark" title="{{ $atlList->implode(', ') }}">{{ $atlList->isNotEmpty() ? $atlList->implode(', ') : '—' }}</span>
-                                                @endif
-                                            </div>
+                                        <div class="exp-item">
+                                            <div class="exp-label">ATL#</div>
+                                            @if ($order->isFuelTrade())
+                                                @php
+                                                    $ftAtl = $order->linkedPurchaseOrder?->deliveries?->first()?->atl_number ?: ($order->client_atl_number ?: '—');
+                                                @endphp
+                                                <div class="exp-value">{{ $ftAtl }}</div>
+                                            @else
+                                                <div class="exp-value" title="{{ $atlList->implode(', ') }}">{{ $atlList->isNotEmpty() ? $atlList->implode(', ') : '—' }}</div>
+                                            @endif
                                         </div>
-                                        <div class="col-6 col-md-2">
-                                            <div class="p-2 rounded-3 bg-white border h-100 text-center">
-                                                <span class="text-muted small d-block mb-1">Qty. Out</span>
-                                                <span class="fw-medium text-dark">{{ number_format($order->total_qty_out) }}</span>
-                                            </div>
+                                        <div class="exp-item">
+                                            <div class="exp-label">Qty. Out</div>
+                                            <div class="exp-value">{{ number_format($order->total_qty_out) }}</div>
                                         </div>
-                                        <div class="col-6 col-md-2">
-                                            <div class="p-2 rounded-3 bg-white border h-100 text-center">
-                                                <span class="text-muted small d-block mb-1">Remaining Balance</span>
-                                                <span class="fw-medium text-dark">{{ number_format($order->remaining_balance) }}</span>
-                                            </div>
+                                        <div class="exp-item">
+                                            <div class="exp-label">Remaining Balance</div>
+                                            <div class="exp-value">{{ number_format($order->remaining_balance) }}</div>
                                         </div>
+                                    </div>
+
+                                    {{-- Products --}}
+                                    <div class="bg-white border rounded-3 px-3 py-2 mt-3" style="max-width: 540px;">
+                                        <table class="table table-sm table-borderless mb-0 prod-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Product</th>
+                                                    <th class="text-end">Qty</th>
+                                                    <th class="text-end">Price</th>
+                                                    <th class="text-end">Amount</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach ($lines as $line)
+                                                <tr>
+                                                    <td>{!! $chip($line->product_type) !!} <span class="ms-1">{{ $line->product_name }}</span></td>
+                                                    <td class="text-end">{{ number_format($line->qty) }}</td>
+                                                    <td class="text-end">{{ (float) $line->price > 0 ? '₱' . number_format((float) $line->price, 2) : '—' }}</td>
+                                                    <td class="text-end">{{ (float) $line->amount > 0 ? '₱' . number_format((float) $line->amount, 2) : '—' }}</td>
+                                                </tr>
+                                                @endforeach
+                                            </tbody>
+                                            @if ($lines->count() > 1)
+                                            <tfoot>
+                                                <tr class="fw-bold border-top">
+                                                    <td>Total</td>
+                                                    <td class="text-end">{{ number_format($lines->sum('qty')) }}</td>
+                                                    <td></td>
+                                                    <td class="text-end">₱{{ number_format((float) $lines->sum('amount'), 2) }}</td>
+                                                </tr>
+                                            </tfoot>
+                                            @endif
+                                        </table>
                                     </div>
                                 </div>
                             </td>
@@ -374,6 +518,7 @@
         <div class="d-md-none p-3">
             @if ($orders->isNotEmpty())
                 @foreach ($orders as $order)
+                @php $price = $priceInfo($order); @endphp
                 <div class="card border-0 bg-light mb-3 rounded-4 shadow-sm {{ $order->status === 'Cancelled' ? 'order-cancelled' : '' }}">
                     <div class="card-body p-4">
                         <div class="d-flex justify-content-between align-items-start mb-2">
@@ -418,12 +563,25 @@
                         </div>
                         <div class="row mb-3 small text-muted">
                             <div class="col-6">
-                                <span class="fw-medium">Price:</span> {{ $order->price > 0 ? '₱' . number_format($order->price, 2) : '—' }}
+                                <span class="fw-medium">Price:</span> {{ $price['text'] ?? '—' }}
+                                @if ($price['sub'])
+                                    <span class="d-block" style="font-size: 0.7rem;">{{ $price['sub'] }}</span>
+                                @endif
                             </div>
                             <div class="col-6 text-end">
                                 <span class="fw-medium">Terms:</span> {{ $order->terms ?: '—' }}
                             </div>
                         </div>
+                        @if ($order->items->count() > 0)
+                        <div class="bg-white border rounded-3 px-3 py-2 mb-3 small">
+                            @foreach ($order->items as $item)
+                            <div class="d-flex justify-content-between align-items-center {{ !$loop->last ? 'mb-1' : '' }}">
+                                <span>{!! $chip($item->product_type) !!} <span class="ms-1">{{ $item->product_name }}</span></span>
+                                <span class="text-muted">{{ number_format($item->qty) }} @ {{ (float) $item->price > 0 ? '₱' . number_format((float) $item->price, 2) : '—' }}</span>
+                            </div>
+                            @endforeach
+                        </div>
+                        @endif
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <div>
                                 <span class="text-muted small d-block">Qty Out</span>
