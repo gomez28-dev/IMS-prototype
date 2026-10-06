@@ -133,6 +133,7 @@ class StockOrderController extends Controller
             'items' => ['required', 'array', 'min:1'],
             'items.*.product' => ['required', 'string', 'in:Diesel,Premium,Unleaded'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'items.*.unit' => ['nullable', 'string', 'max:16'],
             'items.*.unit_price' => ['nullable', 'numeric', 'min:0'],
         ]);
 
@@ -183,6 +184,8 @@ class StockOrderController extends Controller
             PurchaseOrderItem::create([
                 'purchase_order_id' => $po->id,
                 'product' => $itemData['product'],
+                // Fuel volumes are measured in liters unless stated otherwise.
+                'unit' => $itemData['unit'] ?? 'LTRS',
                 'quantity_ordered' => $itemData['quantity'],
                 'unit_price' => $itemData['unit_price'] ?? null,
             ]);
@@ -942,6 +945,76 @@ class StockOrderController extends Controller
         $warehouses = Warehouse::with('tanks')->orderBy('name')->get();
 
         return view('wetstock.stock-orders.deliveries', compact('deliveries', 'warehouses'));
+    }
+
+    /**
+     * Printed Purchase Order, laid out to match the supplier's sample:
+     * company and reference details, one row per product line, the money
+     * summary, remarks, and prepared/approved printed names.
+     */
+    public function downloadPoPdf(PurchaseOrder $purchaseOrder)
+    {
+        $purchaseOrder->load(['items', 'supplier', 'preparer', 'approver', 'requester']);
+
+        $supplierName = $purchaseOrder->supplier?->company_name
+            ?: ($purchaseOrder->supplier_name ?: '—');
+        $supplierAddress = $purchaseOrder->supplier?->address;
+        $attention = $purchaseOrder->attention ?: $purchaseOrder->supplier?->attention;
+        $poDate = $purchaseOrder->po_date
+            ? $purchaseOrder->po_date->format('m/d/Y')
+            : ($purchaseOrder->request_date ? $purchaseOrder->request_date->format('m/d/Y') : null);
+
+        // Amount per line is derived, never stored, so it always matches the
+        // quantity and unit price on the same row.
+        $lines = $purchaseOrder->items->map(fn ($item) => [
+            'particulars' => $item->product,
+            'qty' => (int) $item->quantity_ordered,
+            'unit' => $item->unit ?: 'LTRS',
+            'price' => (float) ($item->unit_price ?? 0),
+            'amount' => round((int) $item->quantity_ordered * (float) ($item->unit_price ?? 0), 2),
+        ])->values()->all();
+
+        $lineTotal = round(array_sum(array_column($lines, 'amount')), 2);
+
+        // A PO with no item rows still prints, using the order's own volume.
+        $storedTotal = (float) $purchaseOrder->total_amount;
+        $totalAmount = $storedTotal > 0 ? $storedTotal : $lineTotal;
+
+        $totals = [
+            'total_amount' => $totalAmount,
+            'vatable_sales_amount' => (float) $purchaseOrder->vatable_sales_amount,
+            'vat_amount' => (float) $purchaseOrder->vat_amount,
+            'less_w_tax' => (float) $purchaseOrder->less_w_tax,
+            'net_payable_amount' => (float) $purchaseOrder->net_payable_amount > 0
+                ? (float) $purchaseOrder->net_payable_amount
+                : $totalAmount,
+        ];
+
+        $preparedBy = $purchaseOrder->preparer?->name ?: $purchaseOrder->requester?->name;
+        $approvedBy = $purchaseOrder->approver?->name;
+
+        $logoPath = public_path('images/logo_ims.png');
+        $logoBase64 = file_exists($logoPath)
+            ? 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath))
+            : null;
+
+        $pdf = Pdf::loadView('wetstock.stock-orders.po-pdf', [
+            // The view reads $po, matching the ATL PDF's variable name.
+            'po' => $purchaseOrder,
+            'supplierName' => $supplierName,
+            'supplierAddress' => $supplierAddress,
+            'attention' => $attention,
+            'poDate' => $poDate,
+            'lines' => $lines,
+            'totals' => $totals,
+            'preparedBy' => $preparedBy,
+            'approvedBy' => $approvedBy,
+            'logoBase64' => $logoBase64,
+        ]);        $pdf->setPaper('letter', 'portrait');
+
+        $sanitized = preg_replace('/[^A-Za-z0-9_\-]/', '_', $purchaseOrder->po_number ?: ('PO-' . $purchaseOrder->id));
+
+        return $pdf->download('PO_' . $sanitized . '.pdf');
     }
 
     public function downloadAtlPdf(PurchaseOrderDelivery $delivery)
