@@ -18,6 +18,9 @@
     </source>
     <php>
         <env name="APP_ENV" value="testing"/>
+        <!-- Run tests against a throwaway database so the suite never
+             creates/leaves rows in the real development database. -->
+        <env name="DB_DATABASE" value="ims_db_testing"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_STORE" value="array"/>
         <env name="MAIL_MAILER" value="array"/>

@@ -78,16 +78,10 @@ class PortalRoutingTest extends TestCase
             'status' => 'Pending',
         ]);
 
-        // Badge reflects the live RECEIVED count (no hardcoded "empty DB" assumption)
-        $existing = PurchaseOrder::where('request_status', 'RECEIVED')->count();
-
-        // Exactly one tab-badge under "ms-auto bg-danger" when 0, none when 0? assert properly below
+        // With no RECEIVED orders, the badge must not be rendered at all
         $response = $this->actingAs($vp)->get(route('stock-orders.approvals'));
         $response->assertStatus(200);
-
-        if ($existing === 0) {
-            $response->assertDontSee('<span class="badge rounded-pill ms-auto bg-danger text-white">', false);
-        }
+        $response->assertDontSee('<span class="badge rounded-pill ms-auto bg-danger text-white">', false);
 
         // Now create an order in RECEIVED status (awaiting VP review)
         PurchaseOrder::create([
@@ -98,9 +92,9 @@ class PortalRoutingTest extends TestCase
             'status' => 'Pending',
         ]);
 
-        // Badge should show exactly existing+1
+        // Badge should show exactly 1
         $response2 = $this->actingAs($vp)->get(route('stock-orders.approvals'));
         $response2->assertStatus(200);
-        $response2->assertSee('<span class="badge rounded-pill ms-auto bg-danger text-white">' . ($existing + 1) . '</span>', false);
+        $response2->assertSee('<span class="badge rounded-pill ms-auto bg-danger text-white">1</span>', false);
     }
 }
