@@ -538,8 +538,10 @@ class StockOrderController extends Controller
 
     public function completeFuelTrade(Request $request, PurchaseOrderDelivery $delivery): RedirectResponse
     {
-        if (!Auth::user()->canEditStockOrders()) {
-            abort(403);
+        // Explicit allowlist rather than the broader canEditStockOrders(), so
+        // lifting stays with Purchasing and Admin.
+        if (!Auth::user()->canMarkAtlLifted()) {
+            abort(403, 'Unauthorized to mark an ATL as lifted.');
         }
 
         $validated = $request->validate([

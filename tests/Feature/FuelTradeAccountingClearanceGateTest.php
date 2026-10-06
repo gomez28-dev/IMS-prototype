@@ -241,7 +241,10 @@ class FuelTradeAccountingClearanceGateTest extends TestCase
             ->get(route('order.deliveries', $approvedOrder));
 
         $approvedView->assertStatus(200);
-        $approvedView->assertSee('Issue ATL (Module 3)');
+        // ATL issuance moved to Module 3, so Module 1 hands off instead of
+        // offering the Issue ATL button.
+        $approvedView->assertSee('Open in Module 3');
+        $approvedView->assertDontSee('Issue ATL (Module 3)');
 
         // 3. Approved order with issued ATL
         $po = PurchaseOrder::create([

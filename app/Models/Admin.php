@@ -86,6 +86,29 @@ class Admin extends Authenticatable
         return in_array($this->role, ['admin', 'purchasing']);
     }
 
+    /**
+     * Mark an ATL as Lifted.
+     *
+     * Explicit allowlist. Lifting is the only way Purchasing can move a Module 1
+     * order to Fulfilled, so it must not widen to any other Module 2 editor.
+     */
+    public function canMarkAtlLifted(): bool
+    {
+        return in_array($this->role, ['purchasing', 'admin']);
+    }
+
+    /**
+     * Receive a Doyen Stocks delivery into a depot tank.
+     *
+     * Explicit allowlist rather than the broader canEditModule2(), which also
+     * admits ops_log, hod and vp. Those roles may edit wet stock generally but
+     * must not confirm that fuel physically arrived at a depot.
+     */
+    public function canReceiveStockIntoDepot(): bool
+    {
+        return in_array($this->role, ['ops_admin', 'ops_wh', 'ops_mgr', 'admin']);
+    }
+
     // Permission Helpers
     public function canMarkFulfilled(): bool
     {

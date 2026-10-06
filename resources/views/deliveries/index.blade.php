@@ -105,13 +105,14 @@
                 </a>
             @else
                 @if ($order->canBeIssuedAtl())
-                    @if (Auth::user()->canEditStockOrders())
-                        <a href="{{ route('stock-orders.create-fuel-trade-po', $order->id) }}" class="btn btn-warning shadow-sm d-flex align-items-center fw-semibold">
-                            <i class="bi bi-patch-plus me-2"></i> Issue ATL (Module 3)
+                    {{-- ATL issuance lives in Module 3 now; Module 1 only hands off. --}}
+                    @if (Auth::user()->isAdmin() || Auth::user()->isPurchasing())
+                        <a href="{{ route('stock-orders.atls.show', $order->id) }}" class="btn btn-warning shadow-sm d-flex align-items-center fw-semibold">
+                            <i class="bi bi-box-arrow-up-right me-2"></i> Open in Module 3
                         </a>
                     @else
-                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle p-2">
-                            <i class="bi bi-clock me-1"></i> Awaiting Purchasing ATL Issuance
+                        <span class="badge bg-light text-muted border p-2">
+                            <i class="bi bi-info-circle me-1"></i> For Purchasing input
                         </span>
                     @endif
                 @else
@@ -194,11 +195,16 @@
                                         <p class="small text-muted mb-0">Clearance status is currently <strong>{{ $order->clearing_status }}</strong>. Purchasing will issue the ATL once cleared.</p>
                                     @else
                                         <div class="fw-semibold text-dark fs-6 mb-1">Cleared for ATL Issuance</div>
-                                        <p class="small text-muted mb-2">Accounting clearance is approved. Purchasing can now issue the Supplier PO & ATL.</p>
-                                        @if (Auth::user()->canEditStockOrders())
-                                        <a href="{{ route('stock-orders.create-fuel-trade-po', $order->id) }}" class="btn btn-sm btn-warning rounded-pill px-3 py-1 fw-semibold">
-                                            <i class="bi bi-plus-circle me-1"></i> Issue ATL (Module 3)
-                                        </a>
+                                        <p class="small text-muted mb-2">Accounting clearance is approved. The ATL is now issued in Module 3.</p>
+                                        {{-- ATL issuance moved to Module 3; Module 1 only hands off. --}}
+                                        @if (Auth::user()->isAdmin() || Auth::user()->isPurchasing())
+                                            <a href="{{ route('stock-orders.atls.show', $order->id) }}" class="btn btn-sm btn-warning rounded-pill px-3 py-1 fw-semibold">
+                                                <i class="bi bi-box-arrow-up-right me-1"></i> Open in Module 3
+                                            </a>
+                                        @else
+                                            <span class="badge bg-light text-muted border">
+                                                <i class="bi bi-info-circle me-1"></i> For Purchasing input
+                                            </span>
                                         @endif
                                     @endif
                                 </td>

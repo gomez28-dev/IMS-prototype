@@ -117,8 +117,11 @@ class StockRequestController extends Controller
      */
     public function receiveDelivery(Request $request, PurchaseOrderDelivery $delivery): RedirectResponse
     {
-        if (!Auth::user()->canEditModule2()) {
-            abort(403);
+        // Explicit allowlist: confirming fuel physically arrived at a depot is
+        // narrower than editing Module 2 generally, so the broader
+        // canEditModule2() must not be reused here.
+        if (!Auth::user()->canReceiveStockIntoDepot()) {
+            abort(403, 'Unauthorized to mark stock as received.');
         }
 
         // HARD SAFETY CHECK: Fuel Trade deliveries strictly bypass depot wet stock!
@@ -155,9 +158,12 @@ class StockRequestController extends Controller
             'purchase_order_delivery_id' => $delivery->id,
         ]);
 
-        // Mark delivery completed
+        // Mark delivery completed, and record who confirmed receipt so the
+        // reporting page can show it.
         $delivery->update([
             'status' => 'Completed',
+            'received_at' => now(),
+            'received_by' => Auth::id(),
         ]);
 
         // If all deliveries on the parent PO are completed, mark parent PO fulfilled

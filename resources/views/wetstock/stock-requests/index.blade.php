@@ -75,7 +75,7 @@
                                 </td>
                                 <td>{{ $del->purchaseOrder->warehouse->name ?? 'Any Depot' }}</td>
                                 <td class="text-end">
-                                    @if (Auth::user()->canEditModule2())
+                                    @if (Auth::user()->canReceiveStockIntoDepot())
                                         <button type="button" class="btn btn-sm btn-primary-custom" data-bs-toggle="modal" data-bs-target="#receiveStockModal{{ $del->id }}">
                                             <i class="bi bi-box-arrow-in-down me-1"></i> Receive Stock
                                         </button>
@@ -144,7 +144,7 @@
 
 {{-- Modals container outside table (prevents layout shift and flickering) --}}
 @foreach ($incomingDeliveries->whereIn('status', ['Pending', 'Active']) as $del)
-    @if (Auth::user()->canEditModule2())
+    @if (Auth::user()->canReceiveStockIntoDepot())
         <div class="modal fade" id="receiveStockModal{{ $del->id }}" tabindex="-1" aria-labelledby="receiveStockModalLabel{{ $del->id }}" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered text-start">
                 <div class="modal-content rounded-4 border-0 shadow">

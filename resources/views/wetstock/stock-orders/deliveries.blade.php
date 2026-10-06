@@ -118,7 +118,7 @@
                                                         <i class="bi bi-check-circle me-1"></i> Mark Picked Up
                                                     </button>
                                                 </form>
-                                            @elseif (!$del->bypassesDepotTanks() && Auth::user()->canEditModule2())
+                                            @elseif (!$del->bypassesDepotTanks() && Auth::user()->canReceiveStockIntoDepot())
                                                 <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 py-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#receiveStockModalDel{{ $del->id }}">
                                                     <i class="bi bi-box-arrow-in-down me-1"></i> Receive into Tank
                                                 </button>
@@ -157,7 +157,7 @@
 
 {{-- Modals container outside table (prevents layout shift, bouncing and flickering) --}}
 @foreach ($deliveries as $del)
-    @if (!$del->bypassesDepotTanks() && $del->status === 'Active' && Auth::user()->canEditModule2())
+    @if (!$del->bypassesDepotTanks() && $del->status === 'Active' && Auth::user()->canReceiveStockIntoDepot())
         <div class="modal fade" id="receiveStockModalDel{{ $del->id }}" tabindex="-1" aria-labelledby="receiveStockModalDelLabel{{ $del->id }}" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered text-start">
                 <div class="modal-content rounded-4 border-0 shadow">
