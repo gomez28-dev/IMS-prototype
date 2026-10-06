@@ -199,6 +199,14 @@ Route::middleware('auth')->group(function () {
         Route::get('/{purchaseOrder}/prepare', [WetStock\StockOrderController::class, 'editRequest'])->name('edit-request');
         Route::post('/{purchaseOrder}/prepare', [WetStock\StockOrderController::class, 'updateRequest'])->name('update-request');
         Route::get('/approvals', [WetStock\StockOrderController::class, 'approvals'])->name('approvals');
+        Route::prefix('suppliers')->name('suppliers.')->group(function () {
+            Route::get('/', [WetStock\SupplierController::class, 'index'])->name('index');
+            Route::get('/create', [WetStock\SupplierController::class, 'create'])->name('create');
+            Route::post('/', [WetStock\SupplierController::class, 'store'])->name('store');
+            Route::get('/{supplier}/edit', [WetStock\SupplierController::class, 'edit'])->name('edit');
+            Route::post('/{supplier}/edit', [WetStock\SupplierController::class, 'update'])->name('update');
+            Route::post('/{supplier}/toggle-active', [WetStock\SupplierController::class, 'toggleActive'])->name('toggle-active');
+        });
         Route::post('/{purchaseOrder}/approve', [WetStock\StockOrderController::class, 'approve'])->name('approve');
         Route::post('/{purchaseOrder}/reject', [WetStock\StockOrderController::class, 'reject'])->name('reject');
         Route::get('/deliveries', [WetStock\StockOrderController::class, 'deliveries'])->name('deliveries');

@@ -772,6 +772,11 @@
                     <a class="nav-link d-flex align-items-center" href="{{ route('stock-orders.deliveries') }}">
                         <i class="bi bi-truck me-2"></i> Deliveries & ATLs
                     </a>
+                    @if (Auth::user()->canManageSuppliers())
+                        <a class="nav-link d-flex align-items-center {{ request()->routeIs('stock-orders.suppliers.*') ? 'active' : '' }}" href="{{ route('stock-orders.suppliers.index') }}">
+                            <i class="bi bi-building me-2"></i> Suppliers
+                        </a>
+                    @endif
                 @elseif (!request()->routeIs('portal'))
                     <a class="nav-link d-flex align-items-center" href="{{ route('dashboard') }}">
                         <i class="bi bi-speedometer2 me-2"></i> Dashboard
@@ -913,6 +918,12 @@
                     <i class="bi bi-truck"></i>
                     <span class="nav-label">Deliveries & ATLs</span>
                 </a>
+                @if (Auth::user()->canManageSuppliers())
+                <a href="{{ route('stock-orders.suppliers.index') }}" class="sidebar-nav-link {{ request()->routeIs('stock-orders.suppliers.*') ? 'active' : '' }}" title="Manage Suppliers">
+                    <i class="bi bi-building"></i>
+                    <span class="nav-label">Suppliers</span>
+                </a>
+                @endif
             @else
                 <a href="{{ route('dashboard') }}" class="sidebar-nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}" title="Dashboard">
                     <i class="bi bi-speedometer2"></i>

@@ -78,6 +78,14 @@ class Admin extends Authenticatable
         return in_array($this->role, ['admin', 'vp']);
     }
 
+    /**
+     * Manage the supplier list that Purchase Orders draw from.
+     */
+    public function canManageSuppliers(): bool
+    {
+        return in_array($this->role, ['admin', 'purchasing']);
+    }
+
     // Permission Helpers
     public function canMarkFulfilled(): bool
     {
