@@ -304,7 +304,7 @@ class TankerAutoStockInAndDocsTest extends TestCase
             ->post(route('stock-orders.store-fuel-trade-po', $so->id), $payload);
 
         // Issuing an ATL now lands on that order's ATL details page.
-        $response->assertRedirect(route('stock-orders.atls.show', $so->id));
+        $response->assertRedirect(route('stock-orders.sales-orders.show', $so->id));
         $response->assertSessionHas('success');
 
         $this->assertDatabaseHas('purchase_order_deliveries', [
@@ -355,7 +355,7 @@ class TankerAutoStockInAndDocsTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->purchasingUser)
-            ->get(route('stock-orders.index'));
+            ->get(route('stock-orders.purchase-orders.index'));
 
         $response->assertStatus(200);
         $response->assertSee('New Supplier PO');

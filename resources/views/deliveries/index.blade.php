@@ -134,7 +134,7 @@
                 @if ($order->canBeIssuedAtl())
                     {{-- ATL issuance lives in Module 3 now; Module 1 only hands off. --}}
                     @if (Auth::user()->isAdmin() || Auth::user()->isPurchasing())
-                        <a href="{{ route('stock-orders.atls.show', $order->id) }}" class="btn btn-warning shadow-sm d-flex align-items-center fw-semibold">
+                        <a href="{{ route('stock-orders.sales-orders.show', $order->id) }}" class="btn btn-warning shadow-sm d-flex align-items-center fw-semibold">
                             <i class="bi bi-box-arrow-up-right me-2"></i> Open in Module 3
                         </a>
                     @else
@@ -225,7 +225,7 @@
                                         <p class="small text-muted mb-2">Accounting clearance is approved. The ATL is now issued in Module 3.</p>
                                         {{-- ATL issuance moved to Module 3; Module 1 only hands off. --}}
                                         @if (Auth::user()->isAdmin() || Auth::user()->isPurchasing())
-                                            <a href="{{ route('stock-orders.atls.show', $order->id) }}" class="btn btn-sm btn-warning rounded-pill px-3 py-1 fw-semibold">
+                                            <a href="{{ route('stock-orders.sales-orders.show', $order->id) }}" class="btn btn-sm btn-warning rounded-pill px-3 py-1 fw-semibold">
                                                 <i class="bi bi-box-arrow-up-right me-1"></i> Open in Module 3
                                             </a>
                                         @else

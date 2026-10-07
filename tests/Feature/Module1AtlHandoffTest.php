@@ -56,7 +56,7 @@ class Module1AtlHandoffTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSee('Open in Module 3', false);
-        $response->assertSee(route('stock-orders.atls.show', $order->id), false);
+        $response->assertSee(route('stock-orders.sales-orders.show', $order->id), false);
     }
 
     public function test_admin_is_also_sent_to_module_3(): void

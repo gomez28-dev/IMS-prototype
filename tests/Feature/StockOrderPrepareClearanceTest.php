@@ -132,6 +132,6 @@ class StockOrderPrepareClearanceTest extends TestCase
         // error, so the gate is asserted at that boundary.
         $this->actingAs($this->purchasing)
             ->get(route('stock-orders.create-fuel-trade-po', $notCleared->id))
-            ->assertRedirect(route('stock-orders.index'));
+            ->assertRedirect(route('stock-orders.purchase-orders.index'));
     }
 }

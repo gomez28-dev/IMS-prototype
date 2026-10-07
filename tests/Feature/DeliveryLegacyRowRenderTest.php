@@ -107,18 +107,22 @@ class DeliveryLegacyRowRenderTest extends TestCase
         $this->actingAs($this->admin)->get(route('stock-orders.approvals'))->assertOk();
     }
 
-    public function test_atl_queue_renders(): void
+    public function test_sales_orders_page_renders(): void
     {
-        $this->actingAs($this->admin)->get(route('stock-orders.atls.index'))->assertOk();
+        $this->actingAs($this->admin)->get(route('stock-orders.sales-orders.index'))->assertOk();
     }
 
-    public function test_stock_orders_pages_render(): void
+    /**
+     * All three dedicated Module 3 pages must render legacy data
+     * (deliveries with no delivery_items rows, null product_type).
+     */
+    public function test_the_three_module_3_pages_render(): void
     {
         $this->legacyDelivery();
 
-        $this->actingAs($this->admin)->get(route('stock-orders.dashboard'))->assertOk();
-        $this->actingAs($this->admin)->get(route('stock-orders.deliveries'))->assertOk();
-        $this->actingAs($this->admin)->get(route('stock-orders.index'))->assertOk();
+        $this->actingAs($this->admin)->get(route('stock-orders.purchase-orders.index'))->assertOk();
+        $this->actingAs($this->admin)->get(route('stock-orders.sales-orders.index'))->assertOk();
+        $this->actingAs($this->admin)->get(route('stock-orders.wet-stock-requests.index'))->assertOk();
     }
 
     public function test_legacy_delivery_reports_a_summary_without_compartments(): void

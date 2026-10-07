@@ -33,7 +33,7 @@ class AtlListingTest extends TestCase
         $this->order('PLAIN-1', 'DELIVERY', 'CLIENT_ORDER');
         $this->order('BB-DELIVERED', 'DELIVERY', 'BUY_BACK');
 
-        $response = $this->actingAs($this->purchasing)->get(route('stock-orders.atls.index'));
+        $response = $this->actingAs($this->purchasing)->get(route('stock-orders.sales-orders.index'));
 
         $response->assertStatus(200);
         $response->assertSee($fuelTrade->so_number);
@@ -47,7 +47,7 @@ class AtlListingTest extends TestCase
         $live = $this->order('FT-LIVE', 'FUEL_TRADE', 'CLIENT_ORDER');
         $this->order('FT-CANCELLED', 'FUEL_TRADE', 'CLIENT_ORDER', 'Cancelled');
 
-        $response = $this->actingAs($this->purchasing)->get(route('stock-orders.atls.index'));
+        $response = $this->actingAs($this->purchasing)->get(route('stock-orders.sales-orders.index'));
 
         $response->assertStatus(200);
         $response->assertSee($live->so_number);
@@ -59,7 +59,7 @@ class AtlListingTest extends TestCase
         $pendingClearance = $this->order('FT-PENDING-CLEARANCE', 'FUEL_TRADE', 'CLIENT_ORDER');
         $pendingClearance->update(['clearing_status' => 'Pending']);
 
-        $response = $this->actingAs($this->purchasing)->get(route('stock-orders.atls.index'));
+        $response = $this->actingAs($this->purchasing)->get(route('stock-orders.sales-orders.index'));
 
         $response->assertStatus(200);
         $response->assertSee($pendingClearance->so_number);
@@ -73,13 +73,13 @@ class AtlListingTest extends TestCase
         $this->order('FT-OTHER', 'FUEL_TRADE', 'CLIENT_ORDER', 'Active', 'Some Other Client');
 
         $bySo = $this->actingAs($this->purchasing)
-            ->get(route('stock-orders.atls.index', ['search' => 'FT-SEARCH']));
+            ->get(route('stock-orders.sales-orders.index', ['search' => 'FT-SEARCH']));
         $bySo->assertStatus(200);
         $bySo->assertSee($target->so_number);
         $bySo->assertDontSee('FT-OTHER');
 
         $byAccount = $this->actingAs($this->purchasing)
-            ->get(route('stock-orders.atls.index', ['search' => 'Some Other Client']));
+            ->get(route('stock-orders.sales-orders.index', ['search' => 'Some Other Client']));
         $byAccount->assertStatus(200);
         $byAccount->assertSee('FT-OTHER');
         $byAccount->assertDontSee($target->so_number);
@@ -118,7 +118,7 @@ class AtlListingTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->purchasing)
-            ->get(route('stock-orders.atls.show', $order->id));
+            ->get(route('stock-orders.sales-orders.show', $order->id));
 
         $response->assertStatus(200);
         $response->assertSee($order->so_number);
@@ -164,7 +164,7 @@ class AtlListingTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->purchasing)
-            ->get(route('stock-orders.atls.show', $order->id));
+            ->get(route('stock-orders.sales-orders.show', $order->id));
 
         $response->assertStatus(200);
         // Total ATL'd across both ATLs, and each product broken out.
@@ -182,7 +182,7 @@ class AtlListingTest extends TestCase
             'role' => 'sales',
         ]);
 
-        $this->actingAs($sales)->get(route('stock-orders.atls.index'))->assertForbidden();
+        $this->actingAs($sales)->get(route('stock-orders.sales-orders.index'))->assertForbidden();
     }
 
     private function order(

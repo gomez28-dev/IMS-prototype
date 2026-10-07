@@ -43,7 +43,7 @@ class SupplierPurchaseOrderTest extends TestCase
             ],
         ]);
 
-        $response->assertRedirect(route('stock-orders.index'));
+        $response->assertRedirect(route('stock-orders.purchase-orders.index'));
         $response->assertSessionHas('success');
 
         $po = PurchaseOrder::where('po_number', 'PO-DITCF-26-0651')->firstOrFail();

@@ -188,8 +188,28 @@ Route::middleware('auth')->group(function () {
 
     // Module 3: Stock Orders & ATL Issuance (Gated to admin, purchasing, vp, audit, viewer)
     Route::prefix('stock-orders')->name('stock-orders.')->middleware('role:admin,purchasing,vp,audit,viewer')->group(function () {
-        Route::get('/', [WetStock\StockOrderController::class, 'index'])->name('index');
-        Route::get('/dashboard', [WetStock\StockOrderController::class, 'dashboard'])->name('dashboard');
+        // Module 3 was split into three dedicated pages. These routes come
+        // first so "purchase-orders" is never captured by a "{po}" wildcard.
+        Route::prefix('purchase-orders')->name('purchase-orders.')->group(function () {
+            Route::get('/', [WetStock\PurchaseOrderController::class, 'index'])->name('index');
+            Route::get('/{purchaseOrder}', [WetStock\PurchaseOrderController::class, 'show'])->name('show');
+        });
+
+        Route::prefix('sales-orders')->name('sales-orders.')->group(function () {
+            Route::get('/', [WetStock\SalesOrderController::class, 'index'])->name('index');
+            Route::get('/{order}', [WetStock\SalesOrderController::class, 'show'])->name('show');
+        });
+
+        Route::prefix('wet-stock-requests')->name('wet-stock-requests.')->group(function () {
+            Route::get('/', [WetStock\WetStockRequestController::class, 'index'])->name('index');
+            Route::get('/{purchaseOrder}', [WetStock\WetStockRequestController::class, 'show'])->name('show');
+        });
+
+        // Legacy page URLs now redirect to the dedicated pages they became.
+        // The POST routes below (approve/reject/prepare/pdf) are kept as real
+        // routes because forms and links still post to them.
+        Route::redirect('/', '/stock-orders/purchase-orders')->name('index');
+        Route::redirect('/dashboard', '/stock-orders/purchase-orders')->name('dashboard');
         Route::get('/create-supplier-po', [WetStock\StockOrderController::class, 'createSupplierPo'])->name('create-supplier-po');
         Route::post('/store-supplier-po', [WetStock\StockOrderController::class, 'storeSupplierPo'])->name('store-supplier-po');
         Route::get('/fuel-trade/{order}/create-po', [WetStock\StockOrderController::class, 'createFromSalesOrder'])->name('create-fuel-trade-po');
@@ -210,18 +230,20 @@ Route::middleware('auth')->group(function () {
         Route::post('/{purchaseOrder}/approve', [WetStock\StockOrderController::class, 'approve'])->name('approve');
         Route::post('/{purchaseOrder}/reject', [WetStock\StockOrderController::class, 'reject'])->name('reject');
         Route::get('/{purchaseOrder}/po-pdf', [WetStock\StockOrderController::class, 'downloadPoPdf'])->name('po-pdf');
-        Route::get('/deliveries', [WetStock\StockOrderController::class, 'deliveries'])->name('deliveries');
         Route::post('/deliveries/{delivery}/dispatch', [WetStock\StockOrderController::class, 'dispatchDelivery'])->name('dispatch-delivery');
         Route::get('/deliveries/{delivery}/pdf', [WetStock\StockOrderController::class, 'downloadAtlPdf'])->name('pdf');
         Route::get('/deliveries/{delivery}/atl-pdf', [WetStock\StockOrderController::class, 'downloadAtlPdf'])->name('atl-pdf');
 
-        // Module 3 redesign: Sales Order list and per-order ATL records.
-        // These live alongside the current pages rather than replacing them,
-        // so the existing Dashboard keeps working until these are signed off.
-        Route::get('/atls', [WetStock\AtlController::class, 'index'])->name('atls.index');
-        Route::get('/atls/{order}', [WetStock\AtlController::class, 'show'])->name('atls.show');
+        // The ATL Queue became Sales Orders and Deliveries & ATLs became Wet Stock
+        // Requests, so their page URLs redirect. The approve/reject POSTs
+        // stay real routes: atl/index.blade.php and atl/show.blade.php still
+        // post to them.
+        Route::redirect('/atls', '/stock-orders/sales-orders')->name('atls.index');
+        Route::redirect('/atls/{order}', '/stock-orders/sales-orders/{order}')->name('atls.show');
         Route::post('/atls/{delivery}/approve', [WetStock\StockOrderController::class, 'approveAtl'])->name('atl-approve');
         Route::post('/atls/{delivery}/reject', [WetStock\StockOrderController::class, 'rejectAtl'])->name('atl-reject');
+
+        Route::redirect('/deliveries', '/stock-orders/wet-stock-requests')->name('deliveries');
 
         Route::get('/{purchaseOrder}', [WetStock\StockOrderController::class, 'show'])->name('show');
     });

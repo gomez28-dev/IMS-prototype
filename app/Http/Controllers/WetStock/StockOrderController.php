@@ -198,7 +198,7 @@ class StockOrderController extends Controller
             'description' => "Purchasing created Bulk Supplier PO #{$po->po_number} ({$po->supplier_name}) for total " . number_format($totalQty) . " L",
         ]);
 
-        return redirect()->route('stock-orders.index')
+        return redirect()->route('stock-orders.purchase-orders.index')
             ->with('success', "Supplier PO #{$po->po_number} created successfully with " . count($validated['items']) . " product line(s).");
     }
 
@@ -209,7 +209,7 @@ class StockOrderController extends Controller
         }
 
         if (!$order->canBeIssuedAtl()) {
-            return redirect()->route('stock-orders.index')
+            return redirect()->route('stock-orders.purchase-orders.index')
                 ->with('error', "Cannot issue ATL: Sales Order {$order->formatted_so_number} has not been cleared by Accounting (Status: {$order->clearing_status}).");
         }
 
@@ -258,7 +258,7 @@ class StockOrderController extends Controller
         $submitForApproval = (bool) $request->input('submit_for_approval');
 
         if (!$order->canPrepareAtl()) {
-            return redirect()->route('stock-orders.index')
+            return redirect()->route('stock-orders.purchase-orders.index')
                 ->with('error', "Cannot issue ATL: Sales Order {$order->formatted_so_number} is not open for ATL preparation.");
         }
 
@@ -425,7 +425,7 @@ class StockOrderController extends Controller
                 default => 'saved as a draft',
             };
 
-            return redirect()->route('stock-orders.atls.show', $order->id)
+            return redirect()->route('stock-orders.sales-orders.show', $order->id)
                 ->with('success', "Authority to Load (ATL) #{$reference} {$outcome} and linked to Supplier PO(s).");
         }
 
@@ -532,7 +532,7 @@ class StockOrderController extends Controller
             'description' => "Purchasing created Fuel Trade PO #{$po->po_number} linked to SO #{$order->so_number} for {$order->account}",
         ]);
 
-        return redirect()->route('stock-orders.index')
+        return redirect()->route('stock-orders.purchase-orders.index')
             ->with('success', "Fuel Trade PO #{$po->po_number} created and submitted for VP approval.");
     }
 
@@ -754,7 +754,7 @@ class StockOrderController extends Controller
             'description' => "Purchasing processed stock order #{$purchaseOrder->po_number} with ATL/DR details, submitted for VP approval.",
         ]);
 
-        return redirect()->route('stock-orders.index')
+        return redirect()->route('stock-orders.purchase-orders.index')
             ->with('success', "Stock order {$purchaseOrder->po_number} prepared and submitted for VP approval.");
     }
 

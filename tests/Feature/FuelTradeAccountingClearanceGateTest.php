@@ -81,7 +81,7 @@ class FuelTradeAccountingClearanceGateTest extends TestCase
         $response = $this->actingAs($this->purchasingUser)
             ->get(route('stock-orders.create-fuel-trade-po', $order));
 
-        $response->assertRedirect(route('stock-orders.index'));
+        $response->assertRedirect(route('stock-orders.purchase-orders.index'));
         $response->assertSessionHas('error');
     }
 
@@ -190,7 +190,7 @@ class FuelTradeAccountingClearanceGateTest extends TestCase
         $storeResponse = $this->actingAs($this->purchasingUser)
             ->post(route('stock-orders.store-fuel-trade-po', $order), $payload);
 
-        $storeResponse->assertRedirect(route('stock-orders.index'));
+        $storeResponse->assertRedirect(route('stock-orders.purchase-orders.index'));
         $storeResponse->assertSessionHas('success');
 
         $this->assertDatabaseHas('purchase_orders', [
@@ -280,8 +280,10 @@ class FuelTradeAccountingClearanceGateTest extends TestCase
         $issuedView->assertSee('PO-LINKED-01');
     }
 
-    public function test_fuel_trade_queue_displays_clearance_status_and_locks_unapproved_orders(): void
+    public function test_sales_orders_page_displays_clearance_status_and_locks_unapproved_orders(): void
     {
+        // The Fuel Trade queue moved to the Sales Orders page when Module 3
+        // was split into three dedicated pages.
         $unapprovedOrder = Order::create([
             'account' => $this->client->name,
             'location' => 'Valenzuela',
@@ -309,13 +311,44 @@ class FuelTradeAccountingClearanceGateTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->purchasingUser)
-            ->get(route('stock-orders.index'));
+            ->get(route('stock-orders.sales-orders.index'));
 
         $response->assertStatus(200);
         $response->assertSee('FT-1011');
         $response->assertSee('FT-1012');
-        $response->assertSee('Locked: Pending Clearance');
-        $response->assertSee('Prepare PO & ATL', false);
+
+        // The Hold order shows its clearance status but is NOT offered the
+        // Create ATL action; the cleared order is.
+        $response->assertSee('Hold');
+        $this->assertSame(
+            1,
+            substr_count($response->getContent(), 'Create ATL'),
+            'Only the Accounting-cleared order may be offered Create ATL.'
+        );
+    }
+
+    /**
+     * A Sales Orders list with nothing in it offers no Create ATL action at
+     * all, so the button's presence genuinely tracks the clearance gate.
+     */
+    public function test_sales_orders_page_offers_no_create_atl_when_no_order_is_cleared(): void
+    {
+        Order::create([
+            'account' => $this->client->name,
+            'location' => 'Valenzuela',
+            'so_number' => 'SO-1014',
+            'date' => now(),
+            'qty_ordered' => 9000,
+            'price' => 50.00,
+            'status' => 'Active',
+            'clearing_status' => 'Hold',
+            'fulfillment_type' => 'FUEL_TRADE',
+            'order_category' => 'CLIENT_ORDER',
+        ]);
+
+        $this->actingAs($this->purchasingUser)
+            ->get(route('stock-orders.sales-orders.index'))
+            ->assertDontSee('Create ATL', false);
     }
 
     public function test_orders_dashboard_displays_ft_formatted_so_number(): void

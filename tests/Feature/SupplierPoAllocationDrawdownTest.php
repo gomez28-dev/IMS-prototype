@@ -61,7 +61,7 @@ class SupplierPoAllocationDrawdownTest extends TestCase
         $response = $this->actingAs($this->purchasingUser)
             ->post(route('stock-orders.store-supplier-po'), $payload);
 
-        $response->assertRedirect(route('stock-orders.index'));
+        $response->assertRedirect(route('stock-orders.purchase-orders.index'));
         $response->assertSessionHas('success');
 
         $this->assertDatabaseHas('purchase_orders', [
@@ -124,7 +124,7 @@ class SupplierPoAllocationDrawdownTest extends TestCase
             ->post(route('stock-orders.store-fuel-trade-po', $order->id), $payload);
 
         // Issuing an ATL lands on that order's ATL details page.
-        $response->assertRedirect(route('stock-orders.atls.show', $order->id));
+        $response->assertRedirect(route('stock-orders.sales-orders.show', $order->id));
         $response->assertSessionHas('success');
 
         $delivery = PurchaseOrderDelivery::where('atl_number', 'ATL-2026-0001')->first();
@@ -199,7 +199,7 @@ class SupplierPoAllocationDrawdownTest extends TestCase
         $response = $this->actingAs($this->purchasingUser)
             ->post(route('stock-orders.store-fuel-trade-po', $order->id), $payload);
 
-        $response->assertRedirect(route('stock-orders.atls.show', $order->id));
+        $response->assertRedirect(route('stock-orders.sales-orders.show', $order->id));
 
         // PO1 is fully depleted (0L remaining)
         $this->assertEquals(0, $po1->fresh()->getAvailableBalanceForProduct('Diesel'));
@@ -372,7 +372,7 @@ class SupplierPoAllocationDrawdownTest extends TestCase
         $response = $this->actingAs($this->purchasingUser)
             ->post(route('stock-orders.store-fuel-trade-po', $order->id), $payload);
 
-        $response->assertRedirect(route('stock-orders.atls.show', $order->id));
+        $response->assertRedirect(route('stock-orders.sales-orders.show', $order->id));
         $response->assertSessionHas('success');
 
         $delivery = PurchaseOrderDelivery::where('atl_number', 'ATL-MP-01')->first();

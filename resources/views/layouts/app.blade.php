@@ -755,11 +755,16 @@
                         </a>
                     @endif
                 @elseif (request()->is('stock-orders*'))
-                    <a class="nav-link d-flex align-items-center" href="{{ route('stock-orders.dashboard') }}">
-                        <i class="bi bi-speedometer2 me-2"></i> Dashboard
+                    {{-- Mobile nav mirrors the desktop sidebar: three dedicated
+                         pages, then Approvals (admin/vp only), Suppliers, Reports. --}}
+                    <a class="nav-link d-flex align-items-center {{ request()->routeIs('stock-orders.purchase-orders.*') ? 'active' : '' }}" href="{{ route('stock-orders.purchase-orders.index') }}">
+                        <i class="bi bi-card-checklist me-2"></i> Purchase Orders
                     </a>
-                    <a class="nav-link d-flex align-items-center" href="{{ route('stock-orders.index') }}">
-                        <i class="bi bi-file-earmark-text me-2"></i> All Orders
+                    <a class="nav-link d-flex align-items-center {{ request()->routeIs('stock-orders.sales-orders.*') ? 'active' : '' }}" href="{{ route('stock-orders.sales-orders.index') }}">
+                        <i class="bi bi-bag-check me-2"></i> Sales Orders
+                    </a>
+                    <a class="nav-link d-flex align-items-center {{ request()->routeIs('stock-orders.wet-stock-requests.*') ? 'active' : '' }}" href="{{ route('stock-orders.wet-stock-requests.index') }}">
+                        <i class="bi bi-droplet-half me-2"></i> Wet Stock Requests
                     </a>
                     @if (Auth::user()->canApproveStockOrders())
                         <a class="nav-link d-flex align-items-center" href="{{ route('stock-orders.approvals') }}">
@@ -769,17 +774,14 @@
                             @endif
                         </a>
                     @endif
-                    <a class="nav-link d-flex align-items-center" href="{{ route('stock-orders.deliveries') }}">
-                        <i class="bi bi-truck me-2"></i> Deliveries & ATLs
-                    </a>
-                    <a class="nav-link d-flex align-items-center {{ request()->routeIs('stock-orders.atls.*') ? 'active' : '' }}" href="{{ route('stock-orders.atls.index') }}">
-                        <i class="bi bi-patch-check me-2"></i> ATL Queue
-                    </a>
                     @if (Auth::user()->canManageSuppliers())
                         <a class="nav-link d-flex align-items-center {{ request()->routeIs('stock-orders.suppliers.*') ? 'active' : '' }}" href="{{ route('stock-orders.suppliers.index') }}">
                             <i class="bi bi-building me-2"></i> Suppliers
                         </a>
                     @endif
+                    <a class="nav-link d-flex align-items-center disabled opacity-50" aria-disabled="true" onclick="return false;">
+                        <i class="bi bi-graph-up me-2"></i> Reports
+                    </a>
                 @elseif (!request()->routeIs('portal'))
                     <a class="nav-link d-flex align-items-center" href="{{ route('dashboard') }}">
                         <i class="bi bi-speedometer2 me-2"></i> Dashboard
@@ -900,13 +902,19 @@
                 </a>
                 @endif
             @elseif (request()->is('stock-orders*'))
-                <a href="{{ route('stock-orders.dashboard') }}" class="sidebar-nav-link {{ request()->routeIs('stock-orders.dashboard') ? 'active' : '' }}" title="Dashboard">
-                    <i class="bi bi-speedometer2"></i>
-                    <span class="nav-label">Dashboard</span>
+                {{-- Module 3 was split into three dedicated pages. Each opens with its
+                     own stat cards, so there is no separate Dashboard entry. --}}
+                <a href="{{ route('stock-orders.purchase-orders.index') }}" class="sidebar-nav-link {{ request()->routeIs('stock-orders.purchase-orders.*') || request()->routeIs('stock-orders.show') || request()->routeIs('stock-orders.create*') || request()->routeIs('stock-orders.edit*') ? 'active' : '' }}" title="Purchase Orders">
+                    <i class="bi bi-card-checklist"></i>
+                    <span class="nav-label">Purchase Orders</span>
                 </a>
-                <a href="{{ route('stock-orders.index') }}" class="sidebar-nav-link {{ request()->routeIs('stock-orders.index') || request()->routeIs('stock-orders.create*') || request()->routeIs('stock-orders.edit*') ? 'active' : '' }}" title="All Orders">
-                    <i class="bi bi-file-earmark-text"></i>
-                    <span class="nav-label">All Orders</span>
+                <a href="{{ route('stock-orders.sales-orders.index') }}" class="sidebar-nav-link {{ request()->routeIs('stock-orders.sales-orders.*') || request()->routeIs('stock-orders.atls.*') ? 'active' : '' }}" title="Sales Orders">
+                    <i class="bi bi-bag-check"></i>
+                    <span class="nav-label">Sales Orders</span>
+                </a>
+                <a href="{{ route('stock-orders.wet-stock-requests.index') }}" class="sidebar-nav-link {{ request()->routeIs('stock-orders.wet-stock-requests.*') || request()->routeIs('stock-orders.deliveries') ? 'active' : '' }}" title="Wet Stock Requests">
+                    <i class="bi bi-droplet-half"></i>
+                    <span class="nav-label">Wet Stock Requests</span>
                 </a>
                 @if (Auth::user()->canApproveStockOrders())
                 <a href="{{ route('stock-orders.approvals') }}" class="sidebar-nav-link {{ request()->routeIs('stock-orders.approvals') ? 'active' : '' }}" title="Approvals">
@@ -917,20 +925,16 @@
                     @endif
                 </a>
                 @endif
-                <a href="{{ route('stock-orders.deliveries') }}" class="sidebar-nav-link {{ request()->routeIs('stock-orders.deliveries') ? 'active' : '' }}" title="Deliveries & ATLs">
-                    <i class="bi bi-truck"></i>
-                    <span class="nav-label">Deliveries & ATLs</span>
-                </a>
-                <a href="{{ route('stock-orders.atls.index') }}" class="sidebar-nav-link {{ request()->routeIs('stock-orders.atls.*') ? 'active' : '' }}" title="ATL Queue">
-                    <i class="bi bi-patch-check"></i>
-                    <span class="nav-label">ATL Queue</span>
-                </a>
                 @if (Auth::user()->canManageSuppliers())
-                <a href="{{ route('stock-orders.suppliers.index') }}" class="sidebar-nav-link {{ request()->routeIs('stock-orders.suppliers.*') ? 'active' : '' }}" title="Manage Suppliers">
+                <a href="{{ route('stock-orders.suppliers.index') }}" class="sidebar-nav-link {{ request()->routeIs('stock-orders.suppliers.*') ? 'active' : '' }}" title="Suppliers">
                     <i class="bi bi-building"></i>
                     <span class="nav-label">Suppliers</span>
                 </a>
                 @endif
+                <a href="#" class="sidebar-nav-link disabled opacity-50" title="Reports (coming soon)" aria-disabled="true" onclick="return false;">
+                    <i class="bi bi-graph-up"></i>
+                    <span class="nav-label">Reports</span>
+                </a>
             @else
                 <a href="{{ route('dashboard') }}" class="sidebar-nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}" title="Dashboard">
                     <i class="bi bi-speedometer2"></i>

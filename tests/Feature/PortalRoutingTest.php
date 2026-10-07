@@ -56,7 +56,7 @@ class PortalRoutingTest extends TestCase
             'role' => 'sales',
         ]);
 
-        $response = $this->actingAs($sales)->get(route('stock-orders.index'));
+        $response = $this->actingAs($sales)->get(route('stock-orders.purchase-orders.index'));
         $response->assertStatus(403);
     }
 
