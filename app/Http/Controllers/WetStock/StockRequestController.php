@@ -23,8 +23,9 @@ class StockRequestController extends Controller
     {
         $warehouseId = $request->query('warehouse_id');
 
-        // Replenishment requests originated from depots
-        $requestsQuery = PurchaseOrder::with(['warehouse', 'requester', 'approver'])
+// Replenishment requests originated from depots.
+          // deliveries is eager-loaded because the list shows the ATL number.
+          $requestsQuery = PurchaseOrder::with(['warehouse', 'requester', 'approver', 'deliveries'])
             ->whereIn('po_type', ['STANDARD_REPLENISHMENT', 'BUY_BACK']);
 
         if ($warehouseId) {

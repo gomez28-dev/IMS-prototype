@@ -97,7 +97,7 @@
                                     <div class="mt-1"><span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-2 py-1" title="Pending modification #{{ $pendingReq->id }}: {{ $pendingReq->reason }}"><i class="bi bi-hourglass-split me-1"></i>Pending Approval</span></div>
                                 @endif
                             </td>
-                            <td class="small text-muted">{{ $po->remarks ?: 'â€”' }}</td>
+                            <td class="small text-muted">{{ $po->remarks ?: '—' }}</td>
                             <td class="small text-muted">{{ $po->creator->name ?? 'System' }}</td>
                             <td class="text-end">
                                 @if (Auth::user()->canEditModule2())

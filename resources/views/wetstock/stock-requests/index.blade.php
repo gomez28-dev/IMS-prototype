@@ -1,13 +1,13 @@
 @extends('layouts.app')
 
-@section('title', 'Depot Replenishment Requests')
+@section('title', 'Incoming Supplier Stock')
 
 @section('content')
 <div class="container-fluid py-2">
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
         <div>
-            <h2 class="fw-bold text-dark mb-1">Depot Replenishment Requests</h2>
-            <p class="text-muted small mb-0">Track fuel requests submitted to Purchasing (Module 3) and incoming depot-bound deliveries.</p>
+            <h2 class="fw-bold text-dark mb-1">Incoming Supplier Stock</h2>
+            <p class="text-muted small mb-0">Track purchase orders from fuel suppliers (Unlifted Pickups &amp; Pending Depot Deliveries).</p>
         </div>
         <div class="d-flex gap-2">
             <a href="{{ route('wetstock.supplier-orders.index') }}" class="btn btn-secondary-custom">
@@ -38,7 +38,7 @@
     <!-- Incoming Depot Deliveries Ready to Receive -->
     <div class="card card-custom border-0 shadow-sm mb-4">
         <div class="card-header bg-white border-0 py-3">
-            <h5 class="fw-bold text-dark mb-0"><i class="bi bi-truck text-primary me-2"></i>Incoming Depot Deliveries (Awaiting Tank Fill)</h5>
+            <h5 class="fw-bold text-dark mb-0"><i class="bi bi-truck text-primary me-2"></i>Depot Inbound Deliveries</h5>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -103,8 +103,9 @@
                 <table class="table table-custom mb-0">
                     <thead>
                         <tr>
-                            <th>Request #</th>
-                            <th>Depot</th>
+                            <th>PO #</th>
+                            <th>ATL / DR #</th>
+                            <th>Site</th>
                             <th>Type</th>
                             <th class="text-end">Volume</th>
                             <th>Date Needed</th>
@@ -115,21 +116,33 @@
                     </thead>
                     <tbody>
                         @forelse ($stockRequests as $req)
+                            @php
+                                // The ATL is raised as a delivery on this PO; show whichever
+                                // identifier has been issued, else Pending.
+                                $atlDelivery = $req->deliveries
+                                    ->first(fn ($d) => $d->atl_number || $d->client_atl_number);
+                            @endphp
                             <tr>
-                                <td class="fw-bold text-dark">#{{ $req->id }}</td>
+                                {{-- A replenishment request has no PO number until Purchasing issues one. --}}
+                                <td class="fw-bold text-dark">
+                                    {{ $req->po_number ?: ('REQ-' . str_pad((string) $req->id, 4, '0', STR_PAD_LEFT)) }}
+                                </td>
+                                <td class="small">
+                                    {{ $atlDelivery?->atl_number ?? $atlDelivery?->client_atl_number ?? 'Pending' }}
+                                </td>
                                 <td>{{ $req->warehouse->name ?? 'All Depots' }}</td>
                                 <td><span class="badge bg-light text-dark border">{{ $req->po_type }}</span></td>
                                 <td class="text-end fw-bold">{{ number_format($req->qty_ordered) }} L</td>
-                                <td class="small">{{ $req->date_needed ? $req->date_needed->format('M d, Y') : 'â€”' }}</td>
+                                <td class="small">{{ $req->date_needed ? $req->date_needed->format('M d, Y') : '—' }}</td>
                                 <td>
                                     <span class="badge bg-warning text-dark px-2 py-1">{{ $req->request_status }}</span>
                                 </td>
                                 <td class="small text-muted">{{ $req->requester->name ?? 'Depot' }}</td>
-                                <td class="small text-muted">{{ $req->remarks ?: 'â€”' }}</td>
+                                <td class="small text-muted">{{ $req->remarks ?: '—' }}</td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="text-center text-muted py-4">No replenishment requests found.</td>
+                                <td colspan="9" class="text-center text-muted py-4">No replenishment requests found.</td>
                             </tr>
                         @endforelse
                     </tbody>

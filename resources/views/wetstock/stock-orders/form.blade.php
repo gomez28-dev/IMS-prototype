@@ -37,6 +37,24 @@
             </div>
 
             <div class="card-body p-4">
+                {{--
+                    Submit eligibility is decided once, here, for both modes.
+
+                    Only Fuel Trade orders are gated on Accounting clearance
+                    (they are drawn against a Sales Order). A Depot
+                    Replenishment PO has no Sales Order and no clearance
+                    step, so it is never blocked.
+
+                    This must be assigned OUTSIDE the mode branch below: the
+                    submit button reads it after that branch ends, so
+                    assigning it inside the fuel_trade branch left it
+                    undefined in edit_request mode and 500'd the page.
+                --}}
+                @php
+                    $isCleared = $mode === 'fuel_trade'
+                        ? ($order && $order->clearing_status === 'Approved')
+                        : true;
+                @endphp
                 <form method="POST" action="{{ $mode === 'fuel_trade' ? route('stock-orders.store-fuel-trade-po', $order->id) : route('stock-orders.update-request', $purchaseOrder->id) }}" id="atlForm">
                     @csrf
 
@@ -51,14 +69,13 @@
                     @endif
 
                     @if ($mode === 'fuel_trade')
-                        @php
-                            // Volume this Sales Order requires, per product.
-                            $soRequirements = $order->productRequirements();
-                            $requiredProducts = array_keys($soRequirements);
-                            $defaultReqProduct = $requiredProducts[0] ?? 'Diesel';
-                            $productOptions = ['Diesel', 'Premium', 'Unleaded'];
-                            $isCleared = $order->clearing_status === 'Approved';
-                        @endphp
+@php
+                                // Volume this Sales Order requires, per product.
+                                $soRequirements = $order->productRequirements();
+                                $requiredProducts = array_keys($soRequirements);
+                                $defaultReqProduct = $requiredProducts[0] ?? 'Diesel';
+                                $productOptions = ['Diesel', 'Premium', 'Unleaded'];
+                            @endphp
 
                         {{-- ATL source: Doyen issues the ATL, or the client provides it --}}
                         <div class="card border-0 bg-light rounded-3 mb-4">

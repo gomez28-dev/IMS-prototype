@@ -34,8 +34,9 @@
                                 <select name="warehouse_id" id="warehouseSelect" class="form-select @error('warehouse_id') is-invalid @enderror" required>
                                     <option value="">Select Depot</option>
                                     @foreach ($warehouses as $wh)
+                                        {{-- Plain site name: "San Simon", not "San Simon (7 Tanks)". --}}
                                         <option value="{{ $wh->id }}" {{ old('warehouse_id') == $wh->id ? 'selected' : '' }}>
-                                            {{ $wh->name }} ({{ $wh->tanks->count() }} Tanks)
+                                            {{ $wh->name }}
                                         </option>
                                     @endforeach
                                 </select>
@@ -57,12 +58,12 @@
 
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold text-dark">Product / Fuel Type <span class="text-danger">*</span></label>
+                                {{-- The three canonical products, matching Order::PRODUCT_TYPES used across Module 1 and 3. --}}
                                 <select name="product" class="form-select @error('product') is-invalid @enderror" required>
                                     <option value="">Select Fuel Product</option>
-                                    <option value="Diesel" {{ old('product') === 'Diesel' ? 'selected' : '' }}>Automotive Diesel (ADO)</option>
-                                    <option value="Mogas 91" {{ old('product') === 'Mogas 91' ? 'selected' : '' }}>Mogas Regular 91</option>
-                                    <option value="Mogas 95" {{ old('product') === 'Mogas 95' ? 'selected' : '' }}>Mogas Premium 95</option>
-                                    <option value="Kerosene" {{ old('product') === 'Kerosene' ? 'selected' : '' }}>Kerosene</option>
+                                    @foreach (['Unleaded', 'Diesel', 'Premium'] as $fuel)
+                                        <option value="{{ $fuel }}" {{ old('product') === $fuel ? 'selected' : '' }}>{{ $fuel }}</option>
+                                    @endforeach
                                 </select>
                                 @error('product')
                                     <div class="invalid-feedback">{{ $message }}</div>
@@ -72,7 +73,14 @@
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold text-dark">Liters Needed <span class="text-danger">*</span></label>
                                 <div class="input-group">
-                                    <input type="number" name="qty_ordered" class="form-control @error('qty_ordered') is-invalid @enderror" value="{{ old('qty_ordered', 10000) }}" min="1" step="100" required>
+                                    {{--
+                                        step="1" is deliberate: with min="1" step="100" a
+                                        round value like 10000 is invalid ((10000-1) % 100 = 99),
+                                        so the browser rejected the entry and snapped it to
+                                        10001. The default is 0 so typing replaces the value
+                                        instead of appending to it.
+                                    --}}
+                                    <input type="number" name="qty_ordered" class="form-control @error('qty_ordered') is-invalid @enderror" value="{{ old('qty_ordered', 0) }}" min="0" step="1" required>
                                     <span class="input-group-text">Liters</span>
                                 </div>
                                 @error('qty_ordered')
