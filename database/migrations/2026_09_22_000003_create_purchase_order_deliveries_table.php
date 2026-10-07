@@ -2,14 +2,31 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     /**
      * Run the migrations.
+     *
+     * Guarded so it is safe on a server where the earlier module-3 version of
+     * this feature (migration 2026_09_07_000002, same table under a different
+     * migration name) already created the table: instead of failing with
+     * "table already exists", the existing table is brought up to this schema.
      */
     public function up(): void
+    {
+        if (!Schema::hasTable('purchase_order_deliveries')) {
+            $this->createTable();
+
+            return;
+        }
+
+        $this->alignExistingTable();
+    }
+
+    private function createTable(): void
     {
         Schema::create('purchase_order_deliveries', function (Blueprint $table) {
             $table->id();
@@ -37,6 +54,40 @@ return new class extends Migration
             $table->timestamp('revised_at')->nullable();
             $table->timestamps();
         });
+    }
+
+    /**
+     * Bring a table created by the earlier migration up to this schema.
+     */
+    private function alignExistingTable(): void
+    {
+        if (!Schema::hasColumn('purchase_order_deliveries', 'delivery_channel')) {
+            Schema::table('purchase_order_deliveries', function (Blueprint $table) {
+                $table->string('delivery_channel', 40)->default('SUPPLIER_DOYEN_PICKUP')
+                    ->after('purchase_order_id');
+            });
+        }
+
+        if (!Schema::hasColumn('purchase_order_deliveries', 'atl_type')) {
+            Schema::table('purchase_order_deliveries', function (Blueprint $table) {
+                $table->string('atl_type', 32)->default('DITC_ATL')->after('order_type');
+            });
+        }
+
+        if (!Schema::hasColumn('purchase_order_deliveries', 'client_atl_number')) {
+            Schema::table('purchase_order_deliveries', function (Blueprint $table) {
+                $table->string('client_atl_number', 64)->nullable()->after('atl_number');
+            });
+        }
+
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
+
+        // Widen order_type to this schema's size and make qty_to_receive a
+        // signed integer to match what createTable() builds.
+        DB::statement("ALTER TABLE purchase_order_deliveries MODIFY order_type VARCHAR(32) NOT NULL DEFAULT 'PICK_UP'");
+        DB::statement('ALTER TABLE purchase_order_deliveries MODIFY qty_to_receive INT NOT NULL');
     }
 
     /**
