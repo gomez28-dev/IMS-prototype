@@ -16,6 +16,12 @@
     @endif
 </div>
 
+@php
+    // Per-product lines only make sense when the SO has more than one product
+    $productSummary = $productSummary ?? [];
+    $showBreakdown = count($productSummary) > 1;
+@endphp
+
 <!-- Order Summary Header Card -->
 <div class="card card-custom mb-5 border-0 border-start border-5 {{ $order->isFuelTrade() ? 'border-warning' : 'border-primary' }}">
     <div class="card-body p-4">
@@ -46,23 +52,44 @@
             <div class="col-md-6">
                 <div class="row text-center g-2">
                     <div class="col-4">
-                        <div class="p-3 bg-light rounded border border-light-subtle">
+                        <div class="p-3 bg-light rounded border border-light-subtle h-100">
                             <div class="text-muted extra-small uppercase fw-semibold mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">QTY ORDERED</div>
                             <div class="fs-5 fw-bold text-dark">{{ number_format($order->effective_qty_ordered) }}</div>
+                            @if ($showBreakdown)
+                                <div class="small text-muted mt-1">
+                                    @foreach ($productSummary as $code => $p)
+                                        <div title="{{ $p['name'] }}">{{ $code }} &middot; {{ number_format($p['ordered'] - $p['cancelled']) }} L</div>
+                                    @endforeach
+                                </div>
+                            @endif
                         </div>
                     </div>
                     <div class="col-4">
-                        <div class="p-3 bg-light rounded border border-light-subtle">
+                        <div class="p-3 bg-light rounded border border-light-subtle h-100">
                             <div class="text-muted extra-small uppercase fw-semibold mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">TOTAL OUT</div>
                             <div class="fs-5 fw-bold text-primary">{{ number_format($order->total_qty_out) }}</div>
+                            @if ($showBreakdown && !$order->isFuelTrade())
+                                <div class="small text-muted mt-1">
+                                    @foreach ($productSummary as $code => $p)
+                                        <div title="{{ $p['name'] }}">{{ $code }} &middot; {{ number_format($p['fulfilled']) }} L</div>
+                                    @endforeach
+                                </div>
+                            @endif
                         </div>
                     </div>
                     <div class="col-4">
-                        <div class="p-3 bg-light rounded border border-light-subtle">
+                        <div class="p-3 bg-light rounded border border-light-subtle h-100">
                             <div class="text-muted extra-small uppercase fw-semibold mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">REMAINING</div>
                             <div class="fs-5 fw-bold {{ $order->remaining_balance == 0 ? 'text-success' : 'text-warning-emphasis' }}">
                                 {{ number_format($order->remaining_balance) }}
                             </div>
+                            @if ($showBreakdown && !$order->isFuelTrade())
+                                <div class="small text-muted mt-1">
+                                    @foreach ($productSummary as $code => $p)
+                                        <div title="{{ $p['name'] }}">{{ $code }} &middot; {{ number_format($p['remaining']) }} L</div>
+                                    @endforeach
+                                </div>
+                            @endif
                         </div>
                     </div>
                 </div>
@@ -217,7 +244,16 @@
                                 <td class="ps-4 fw-semibold">{{ $delivery->dr_number }}</td>
                                 <td class="text-muted small">{{ $delivery->atl_number ?: '—' }}</td>
                                 <td>{{ $delivery->delivery_date ? $delivery->delivery_date->format('Y-m-d') : '' }}</td>
-                                <td class="text-end fw-medium">{{ number_format($delivery->qty_out) }}</td>
+                                <td class="text-end fw-medium">
+                                    {{ number_format($delivery->qty_out) }}
+                                    @if ($delivery->items->isNotEmpty())
+                                        <div class="small text-muted fw-normal">
+                                            @foreach ($delivery->items as $line)
+                                                <div title="{{ $line->product_name }}">{{ $line->product_type ?: '-' }} &middot; {{ number_format($line->qty_out) }} L</div>
+                                            @endforeach
+                                        </div>
+                                    @endif
+                                </td>
                                 <td class="text-center">
                                     @if ($delivery->status == 'FULFILLED')
                                         <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1">FULFILLED</span>
@@ -349,6 +385,11 @@
                                     <span class="fw-medium">Qty:</span> {{ number_format($delivery->qty_out) }}
                                 </div>
                             </div>
+                            @if ($delivery->items->isNotEmpty())
+                                <div class="small text-muted mb-2">
+                                    <span class="fw-medium">Products:</span> {{ $delivery->items_summary }}
+                                </div>
+                            @endif
                             <div class="mb-3">
                                 @if ($delivery->status == 'FULFILLED')
                                     <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1">FULFILLED</span>

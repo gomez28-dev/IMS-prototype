@@ -11,6 +11,7 @@ class DeliveryAllocation extends Model
 
     protected $fillable = [
         'delivery_id',
+        'delivery_item_id',
         'storage_tank_id',
         'quantity',
         'assigned_by',
@@ -23,6 +24,11 @@ class DeliveryAllocation extends Model
     public function delivery(): BelongsTo
     {
         return $this->belongsTo(Delivery::class, 'delivery_id');
+    }
+
+    public function item(): BelongsTo
+    {
+        return $this->belongsTo(DeliveryItem::class, 'delivery_item_id');
     }
 
     public function tank(): BelongsTo

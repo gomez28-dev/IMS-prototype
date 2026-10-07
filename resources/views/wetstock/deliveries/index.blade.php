@@ -59,35 +59,42 @@
         line-height: 1.5;
         max-width: 110px;
     }
-    .wetstock-allocate-form {
-        display: flex;
-        flex-direction: column;
-        gap: 0.3rem;
-        min-width: 210px;
-        max-width: 240px;
+    .compartment-line {
+        font-size: 0.72rem;
+        line-height: 1.4;
+        font-weight: 400;
     }
-    .wetstock-allocate-form .allocate-row {
-        display: flex;
-        gap: 0.25rem;
+
+    /* Allocation pop-up */
+    .alloc-modal .alloc-stat {
+        background: #f8f9fa;
+        border-radius: 0.6rem;
+        padding: 0.6rem 0.8rem;
     }
-    .wetstock-allocate-qty {
-        width: 52px !important;
-        flex-shrink: 0;
+    .alloc-modal .alloc-stat .label {
+        font-size: 0.68rem;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: #6b7280;
+        font-weight: 600;
+    }
+    .alloc-modal .alloc-stat .value {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: #111827;
+    }
+    .alloc-modal .alloc-line {
+        border: 1px solid #e5e7eb;
+        border-radius: 0.8rem;
+        padding: 0.9rem 1rem;
+        background: #fff;
+    }
+    .alloc-modal .alloc-line.done {
+        background: #f0fdf4;
+        border-color: #bbf7d0;
+    }
+    .alloc-modal .alloc-existing {
         font-size: 0.78rem;
-        padding: 0.25rem 0.35rem !important;
-    }
-    .wetstock-allocate-tank {
-        flex: 1 1 auto;
-        min-width: 0 !important;
-        font-size: 0.76rem;
-        padding: 0.25rem 0.35rem !important;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-    .wetstock-allocate-form .btn {
-        font-size: 0.76rem;
-        padding: 0.3rem 0.5rem;
     }
 </style>
 <div class="row justify-content-center">
@@ -102,7 +109,7 @@
             <h3 class="fw-bold text-dark mb-1">
                 <i class="bi bi-truck text-primary me-2"></i>Delivery Allocations and Fulfillment
             </h3>
-            <p class="text-muted small mb-3">Allocate sales deliveries to tanks (hold stock) and mark as fulfilled (dispatched fuel).</p>
+            <p class="text-muted small mb-3">Allocate sales deliveries to tanks (hold stock) and mark as fulfilled (dispatched fuel). Each product/compartment of a DR is allocated separately.</p>
 
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                 {{-- Search by DR Number or ATL Number — applies to whichever tab is active --}}
@@ -176,19 +183,19 @@
                                         <th class="py-3">ATL#</th>
                                         <th class="py-3">Client</th>
                                         <th class="py-3 text-center">Type</th>
-                                        <th class="py-3">Date</th>
-                                        <th class="py-3">Qty. Out</th>
-                                        <th class="py-3">Allocated / Remaining</th>
-                                        <th class="py-3">Activity</th>
-                                        @if (Auth::user()->canEditModule2())
-                                            <th class="py-3 pe-3">Allocate Tank</th>
-                                        @endif
+                                        <th class="py-3">Delivery Date</th>
+                                        <th class="py-3 pe-3 text-end">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     @foreach ($unassignedDeliveries as $delivery)
                                         <tr>
-                                            <td class="ps-3 fw-semibold text-dark">{{ $delivery->dr_number }}</td>
+                                            <td class="ps-3 fw-semibold text-dark">
+                                                {{ $delivery->dr_number }}
+                                                @if ($delivery->allocations->isNotEmpty())
+                                                    <span class="badge bg-warning-subtle border border-warning-subtle rounded-pill ms-1" style="color:#a16207; font-size:0.62rem;">PARTIAL</span>
+                                                @endif
+                                            </td>
                                             <td class="small">
                                                 @if (!empty($delivery->atl_number))
                                                     {{ $delivery->atl_number }}
@@ -211,51 +218,11 @@
                                             <td class="text-muted small">
                                                 {{ $delivery->delivery_date ? $delivery->delivery_date->format('M d, Y') : '-' }}
                                             </td>
-                                            <td class="fw-bold text-dark">{{ number_format($delivery->qty_out) }} L</td>
-                                            <td>
-                                                @if ($delivery->allocations->isNotEmpty())
-                                                    <span class="text-muted small">{{ number_format($delivery->allocated_quantity) }} L allocated</span>
-                                                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle rounded-pill d-block mt-1">
-                                                        {{ number_format($delivery->remaining_to_allocate) }} L remaining
-                                                    </span>
-                                                @else
-                                                    <span class="badge bg-secondary-subtle text-secondary rounded-pill">0 L / {{ number_format($delivery->qty_out) }} L</span>
-                                                @endif
+                                            <td class="pe-3 text-end">
+                                                <button type="button" class="btn btn-sm btn-primary-custom rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#allocModal{{ $delivery->id }}">
+                                                    <i class="bi bi-diagram-3 me-1"></i> {{ Auth::user()->canEditModule2() ? 'Assign Tanks' : 'View' }}
+                                                </button>
                                             </td>
-                                            <td class="wetstock-activity-cell">
-                                                <div class="text-dark">{{ $delivery->createdBy->name ?? 'Legacy Data' }}</div>
-                                                @php $latestApprovedMod = $delivery->modificationRequests->where('status', 'APPROVED')->sortByDesc('created_at')->first(); @endphp
-                                                @if ($latestApprovedMod)
-                                                    <div class="text-warning"><i class="bi bi-pencil me-1"></i>{{ $latestApprovedMod->requestedBy->name ?? '—' }}</div>
-                                                @endif
-                                            </td>
-                                            @if (Auth::user()->canEditModule2())
-                                                <td class="pe-3">
-                                                    <form method="POST" action="{{ route('wetstock.deliveries.allocate', $delivery->id) }}" class="wetstock-allocate-form">
-                                                        @csrf
-                                                        <div class="allocate-row">
-                                                            <input type="number" name="quantity" id="allocate-qty-{{ $delivery->id }}" class="form-control form-control-sm allocate-qty-input wetstock-allocate-qty" min="1" max="{{ $delivery->remaining_to_allocate }}" value="{{ $delivery->remaining_to_allocate }}" title="Quantity to allocate from this DR" required>
-                                                            @php
-                                                                $siteWarehouse = $warehouses->firstWhere('name', $delivery->order->location ?? null);
-                                                            @endphp
-                                                            <select name="storage_tank_id" id="allocate-tank-{{ $delivery->id }}" class="form-select form-select-sm allocate-tank-select wetstock-allocate-tank" required>
-                                                                <option value="">Select Tank ({{ $delivery->order->location ?? 'No Site' }})</option>
-                                                                @if (!$siteWarehouse)
-                                                                    <option value="" disabled>No warehouse matches this order's site ({{ $delivery->order->location ?? '-' }})</option>
-                                                                @else
-                                                                    @foreach ($siteWarehouse->activeTanks as $t)
-                                                                        <option value="{{ $t->id }}" data-available="{{ $t->effective_available }}" {{ $t->isFullyContaminated() ? 'disabled' : '' }}>
-                                                                            {{ $t->name }} ({{ ucfirst($t->category) }}) — {{ number_format($t->effective_available) }}L Avail
-                                                                            {{ $t->hasContamination() ? ' [' . number_format($t->contaminated_liters) . 'L Contaminated' . ($t->isFullyContaminated() ? ' - BLOCKED' : '') . ']' : '' }}
-                                                                        </option>
-                                                                    @endforeach
-                                                                @endif
-                                                            </select>
-                                                        </div>
-                                                        <button type="submit" class="btn btn-sm btn-primary-custom w-100">Allocate</button>
-                                                    </form>
-                                                </td>
-                                            @endif
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -268,6 +235,186 @@
                     @endif
                 </div>
             </div>
+
+            {{-- Allocation pop-ups (outside the table to avoid layout glitches) --}}
+            @foreach ($unassignedDeliveries as $delivery)
+                @php
+                    $siteWarehouse = $warehouses->firstWhere('name', $delivery->order->location ?? null);
+                    $depotTanks = $siteWarehouse ? $siteWarehouse->activeTanks->where('category', 'depot') : collect();
+                    $tankerTanks = $siteWarehouse ? $siteWarehouse->activeTanks->where('category', 'tanker') : collect();
+                    $otherTanks = $siteWarehouse ? $siteWarehouse->activeTanks->whereNotIn('category', ['depot', 'tanker']) : collect();
+                    $latestApprovedMod = $delivery->modificationRequests->where('status', 'APPROVED')->sortByDesc('created_at')->first();
+
+                    // Lines to allocate: real compartments, or one stand-in line for a legacy DR without any
+                    $lines = $delivery->items->isNotEmpty()
+                        ? $delivery->items->map(fn ($i) => [
+                            'id' => $i->id,
+                            'no' => $i->compartment_no ?: $loop->iteration,
+                            'code' => $i->product_type ?: '-',
+                            'name' => $i->product_name,
+                            'qty' => (int) $i->qty_out,
+                            'allocated' => $i->allocated_quantity,
+                            'remaining' => $i->remaining_to_allocate,
+                        ])->values()
+                        : collect([[
+                            'id' => null,
+                            'no' => 1,
+                            'code' => $delivery->product_type ?: '-',
+                            'name' => $delivery->product_name,
+                            'qty' => (int) $delivery->qty_out,
+                            'allocated' => $delivery->allocated_quantity,
+                            'remaining' => $delivery->remaining_to_allocate,
+                        ]]);
+                @endphp
+                <div class="modal fade alloc-modal" id="allocModal{{ $delivery->id }}" tabindex="-1" aria-labelledby="allocModalLabel{{ $delivery->id }}" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+                        <div class="modal-content border-0 shadow-lg rounded-4">
+                            <div class="modal-header border-bottom py-3 bg-light">
+                                <div>
+                                    <h5 class="modal-title fw-bold text-dark mb-1" id="allocModalLabel{{ $delivery->id }}">
+                                        <i class="bi bi-truck text-primary me-2"></i>DR# {{ $delivery->dr_number }}
+                                        @if (!empty($delivery->atl_number))
+                                            <span class="text-muted fw-normal small ms-2">ATL# {{ $delivery->atl_number }}</span>
+                                        @endif
+                                    </h5>
+                                    <div class="small text-muted">
+                                        {{ $delivery->order->account ?? '-' }}
+                                        &middot; {{ $delivery->type }}
+                                        &middot; {{ $delivery->delivery_date ? $delivery->delivery_date->format('M d, Y') : '-' }}
+                                    </div>
+                                </div>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body p-4">
+                                {{-- Summary --}}
+                                <div class="row g-2 mb-3">
+                                    <div class="col-6 col-md-3">
+                                        <div class="alloc-stat"><div class="label">Total Qty Out</div><div class="value">{{ number_format($delivery->qty_out) }} L</div></div>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <div class="alloc-stat"><div class="label">Allocated</div><div class="value text-primary">{{ number_format($delivery->allocated_quantity) }} L</div></div>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <div class="alloc-stat"><div class="label">Remaining</div><div class="value text-warning-emphasis">{{ number_format($delivery->remaining_to_allocate) }} L</div></div>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <div class="alloc-stat"><div class="label">Site</div><div class="value" style="font-size:0.9rem;">{{ $delivery->order->location ?? 'No Site' }}</div></div>
+                                    </div>
+                                </div>
+
+                                <div class="small text-muted mb-3">
+                                    <i class="bi bi-person me-1"></i>Created by <span class="text-dark">{{ $delivery->createdBy->name ?? 'Legacy Data' }}</span>
+                                    @if ($latestApprovedMod)
+                                        <span class="ms-2 text-warning"><i class="bi bi-pencil me-1"></i>Revised (requested by {{ $latestApprovedMod->requestedBy->name ?? '—' }})</span>
+                                    @endif
+                                </div>
+
+                                @if (!$siteWarehouse)
+                                    <div class="alert alert-warning small">
+                                        No warehouse matches this order's site ({{ $delivery->order->location ?? '-' }}), so no tank or truck can be selected.
+                                    </div>
+                                @endif
+
+                                {{-- One block per product / compartment --}}
+                                <div class="d-flex flex-column gap-3">
+                                    @foreach ($lines as $line)
+                                        @php
+                                            $lineAllocs = $line['id']
+                                                ? $delivery->allocations->where('delivery_item_id', $line['id'])
+                                                : $delivery->allocations;
+                                            $usedTankIds = $lineAllocs->pluck('storage_tank_id')->all();
+                                            $isDone = $line['remaining'] <= 0;
+                                        @endphp
+                                        <div class="alloc-line {{ $isDone ? 'done' : '' }}">
+                                            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+                                                <div>
+                                                    <span class="badge bg-light text-secondary border me-1">#{{ $line['no'] }}</span>
+                                                    <span class="fw-bold text-dark">{{ $line['code'] === '-' ? 'Unspecified' : $line['code'] . ' - ' . $line['name'] }}</span>
+                                                    <span class="text-muted small ms-2">needs {{ number_format($line['qty']) }} L</span>
+                                                </div>
+                                                @if ($isDone)
+                                                    <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill"><i class="bi bi-check-circle me-1"></i>Fully allocated</span>
+                                                @else
+                                                    <span class="badge bg-warning-subtle border border-warning-subtle rounded-pill" style="color:#a16207;">{{ number_format($line['remaining']) }} L left to allocate</span>
+                                                @endif
+                                            </div>
+
+                                            {{-- Already allocated tanks / trucks for this product --}}
+                                            @if ($lineAllocs->isNotEmpty())
+                                                <div class="d-flex flex-column gap-1 mb-2">
+                                                    @foreach ($lineAllocs as $alloc)
+                                                        <div class="d-flex align-items-center justify-content-between bg-light rounded px-2 py-1 border alloc-existing">
+                                                            <div>
+                                                                <i class="bi {{ ($alloc->tank->category ?? '') === 'tanker' ? 'bi-truck' : 'bi-fuel-pump' }} text-primary me-1"></i>
+                                                                <strong>{{ $alloc->tank->name ?? '—' }}</strong>
+                                                                <span class="text-muted">({{ $alloc->tank->warehouse->name ?? '—' }})</span>
+                                                            </div>
+                                                            <div class="d-flex align-items-center gap-2">
+                                                                <span class="font-monospace fw-bold">{{ number_format($alloc->quantity) }} L</span>
+                                                                @if (Auth::user()->canEditModule2())
+                                                                    <form method="POST" action="{{ route('wetstock.deliveries.unassign', $alloc->id) }}" class="d-inline" onsubmit="return confirm('Remove {{ number_format($alloc->quantity) }}L allocation from {{ $alloc->tank->name }}?');">
+                                                                        @csrf
+                                                                        <button type="submit" class="btn btn-sm btn-link text-danger p-0" title="Remove allocation"><i class="bi bi-x-circle"></i></button>
+                                                                    </form>
+                                                                @endif
+                                                            </div>
+                                                        </div>
+                                                    @endforeach
+                                                </div>
+                                            @endif
+
+                                            {{-- Allocate form --}}
+                                            @if (!$isDone && Auth::user()->canEditModule2() && $siteWarehouse)
+                                                <form method="POST" action="{{ route('wetstock.deliveries.allocate', $delivery->id) }}" class="alloc-form">
+                                                    @csrf
+                                                    @if ($line['id'])
+                                                        <input type="hidden" name="delivery_item_id" value="{{ $line['id'] }}">
+                                                    @endif
+                                                    <div class="row g-2 align-items-end">
+                                                        <div class="col-12 col-md-7">
+                                                            <label class="form-label small text-secondary mb-1">Tank / Truck</label>
+                                                            <select name="storage_tank_id" class="form-select form-select-sm alloc-tank" required>
+                                                                <option value="">Select tank or truck...</option>
+                                                                @foreach ([['Depot Tanks', $depotTanks], ['Tanker Trucks', $tankerTanks], ['Other', $otherTanks]] as [$groupLabel, $group])
+                                                                    @if ($group->isNotEmpty())
+                                                                        <optgroup label="{{ $groupLabel }}">
+                                                                            @foreach ($group as $t)
+                                                                                @php
+                                                                                    $disabled = $t->isFullyContaminated() || $t->effective_available < 1 || in_array($t->id, $usedTankIds, true);
+                                                                                @endphp
+                                                                                <option value="{{ $t->id }}" data-available="{{ $t->effective_available }}" {{ $disabled ? 'disabled' : '' }}>
+                                                                                    {{ $t->name }} — {{ number_format($t->effective_available) }} L avail
+                                                                                    {{ in_array($t->id, $usedTankIds, true) ? ' [already used for this product]' : '' }}
+                                                                                    {{ $t->hasContamination() ? ' [' . number_format($t->contaminated_liters) . 'L Contaminated' . ($t->isFullyContaminated() ? ' - BLOCKED' : '') . ']' : '' }}
+                                                                                </option>
+                                                                            @endforeach
+                                                                        </optgroup>
+                                                                    @endif
+                                                                @endforeach
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-6 col-md-3">
+                                                            <label class="form-label small text-secondary mb-1">Liters</label>
+                                                            <input type="number" name="quantity" class="form-control form-control-sm font-monospace alloc-qty" min="1" max="{{ $line['remaining'] }}" value="{{ $line['remaining'] }}" data-remaining="{{ $line['remaining'] }}" required>
+                                                        </div>
+                                                        <div class="col-6 col-md-2">
+                                                            <button type="submit" class="btn btn-sm btn-primary-custom w-100">Allocate</button>
+                                                        </div>
+                                                    </div>
+                                                    <div class="small text-muted mt-1 alloc-hint"></div>
+                                                </form>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                            <div class="modal-footer border-top bg-light py-2">
+                                <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endforeach
 
         {{-- ==================== TAB 2: ASSIGNED (PENDING FULFILLMENT) ==================== --}}
         @elseif ($activeTab === 'assigned')
@@ -318,13 +465,21 @@
                                                     <span class="badge badge-type-big-tanker rounded-pill wetstock-type-badge">BIG TANKER</span>
                                                 @endif
                                             </td>
-                                            <td class="fw-bold text-dark font-monospace">{{ number_format($delivery->qty_out) }} L</td>
+                                            <td class="fw-bold text-dark font-monospace">
+                                                {{ number_format($delivery->qty_out) }} L
+                                                @if ($delivery->items->count() > 1)
+                                                    <div class="text-muted compartment-line">{{ $delivery->items_summary }}</div>
+                                                @endif
+                                            </td>
                                             <td>
                                                 <div class="d-flex flex-column gap-1">
                                                     @foreach ($delivery->allocations as $alloc)
                                                         <div class="d-flex align-items-center justify-content-between bg-light rounded px-2 py-1 border small">
                                                             <div>
                                                                 <i class="bi bi-fuel-pump text-primary me-1"></i>
+                                                                @if ($alloc->item)
+                                                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle">{{ $alloc->item->product_type ?: '-' }}</span>
+                                                                @endif
                                                                 <strong>{{ $alloc->tank->name ?? '—' }}</strong>
                                                                 <span class="text-muted">({{ $alloc->tank->warehouse->name ?? '—' }})</span>
                                                             </div>
@@ -471,12 +626,17 @@
                                                     <span class="badge badge-type-big-tanker rounded-pill wetstock-type-badge">BIG TANKER</span>
                                                 @endif
                                             </td>
-                                            <td class="fw-bold text-dark font-monospace">{{ number_format($delivery->qty_out) }} L</td>
+                                            <td class="fw-bold text-dark font-monospace">
+                                                {{ number_format($delivery->qty_out) }} L
+                                                @if ($delivery->items->count() > 1)
+                                                    <div class="text-muted compartment-line">{{ $delivery->items_summary }}</div>
+                                                @endif
+                                            </td>
                                             <td>
                                                 <div class="d-flex flex-wrap gap-1">
                                                     @foreach ($delivery->allocations as $alloc)
                                                         <span class="badge bg-light text-dark border px-2 py-1 small">
-                                                            {{ $alloc->tank->name ?? '—' }} ({{ number_format($alloc->quantity) }}L)
+                                                            @if ($alloc->item){{ $alloc->item->product_type ?: '-' }} &middot; @endif{{ $alloc->tank->name ?? '—' }} ({{ number_format($alloc->quantity) }}L)
                                                         </span>
                                                     @endforeach
                                                 </div>
@@ -521,4 +681,46 @@
         @endif
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        function fmt(n) { return Number(n).toLocaleString('en-US'); }
+
+        // Picking a tank/truck caps the liters at what that tank can actually cover.
+        document.querySelectorAll('.alloc-form').forEach(function (form) {
+            var tank = form.querySelector('.alloc-tank');
+            var qty = form.querySelector('.alloc-qty');
+            var hint = form.querySelector('.alloc-hint');
+            if (!tank || !qty) { return; }
+
+            tank.addEventListener('change', function () {
+                var opt = tank.options[tank.selectedIndex];
+                var avail = parseInt(opt ? opt.getAttribute('data-available') : '', 10);
+                var remaining = parseInt(qty.getAttribute('data-remaining'), 10);
+
+                if (isNaN(avail)) {
+                    qty.max = remaining;
+                    qty.value = remaining;
+                    hint.textContent = '';
+                    return;
+                }
+
+                var max = Math.min(avail, remaining);
+                qty.max = max;
+                qty.value = max;
+                hint.textContent = avail < remaining
+                    ? 'This tank/truck covers only ' + fmt(avail) + ' L. Allocate the rest to another one.'
+                    : 'Max ' + fmt(max) + ' L.';
+            });
+        });
+
+        // Re-open the pop-up after a partial allocation so the next product can be assigned.
+        @if (request('open'))
+            var el = document.getElementById('allocModal{{ (int) request('open') }}');
+            if (el && window.bootstrap) {
+                window.bootstrap.Modal.getOrCreateInstance(el).show();
+            }
+        @endif
+    });
+</script>
 @endsection

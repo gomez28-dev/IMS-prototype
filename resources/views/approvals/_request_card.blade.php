@@ -1,4 +1,13 @@
 {{-- Shared modification-request review card. Expects: $req, $confirmMessage, $rejectPlaceholder --}}
+@php
+    // Compartment lines -> "U 2,000 L + P 500 L"
+    $fmtItems = fn ($lines) => collect($lines ?? [])
+        ->map(fn ($l) => (($l['product_type'] ?? null) ?: '-') . ' ' . number_format((int) ($l['qty_out'] ?? 0)) . ' L')
+        ->implode(' + ') ?: '-';
+
+    // Any other value -> plain text (arrays are JSON-encoded so they never crash the page)
+    $fmtValue = fn ($v) => is_null($v) ? '-' : (is_array($v) ? json_encode($v) : (string) $v);
+@endphp
 <div class="col-12">
     <div class="card card-custom border-0 shadow-sm overflow-hidden">
         <div class="card-header bg-light border-0 py-3 px-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -41,9 +50,15 @@
                     <tbody>
                         @foreach (($req->changes ?? []) as $field => $diff)
                             <tr>
-                                <td class="fw-semibold text-dark small">{{ ucwords(str_replace('_', ' ', $field)) }}</td>
-                                <td class="text-muted small font-monospace">{{ is_null($diff['old'] ?? null) ? '-' : (string)($diff['old']) }}</td>
-                                <td class="table-warning fw-bold text-dark small font-monospace">{{ is_null($diff['new'] ?? null) ? '-' : (string)($diff['new']) }}</td>
+                                @if ($field === 'items')
+                                    <td class="fw-semibold text-dark small">Products / Compartments</td>
+                                    <td class="text-muted small font-monospace">{{ $fmtItems($diff['old'] ?? []) }}</td>
+                                    <td class="table-warning fw-bold text-dark small font-monospace">{{ $fmtItems($diff['new'] ?? []) }}</td>
+                                @else
+                                    <td class="fw-semibold text-dark small">{{ ucwords(str_replace('_', ' ', $field)) }}</td>
+                                    <td class="text-muted small font-monospace">{{ $fmtValue($diff['old'] ?? null) }}</td>
+                                    <td class="table-warning fw-bold text-dark small font-monospace">{{ $fmtValue($diff['new'] ?? null) }}</td>
+                                @endif
                             </tr>
                         @endforeach
                     </tbody>

@@ -13,6 +13,7 @@ class Delivery extends Model
 
     protected $fillable = [
         'order_id',
+        'product_type',
         'storage_tank_id',
         'dr_number',
         'atl_number',
@@ -37,16 +38,48 @@ class Delivery extends Model
     ];
 
     /**
-     * Get the order that owns the delivery.
+     * Full product name for the stored code. For a multi-product DR this
+     * returns a combined label such as "Unleaded + Premium".
      */
+    public function getProductNameAttribute(): string
+    {
+        $items = $this->items;
+        if ($items->isNotEmpty()) {
+            return $items->map(fn ($i) => $i->product_name)->unique()->implode(' + ');
+        }
+
+        return Order::PRODUCT_TYPES[$this->product_type] ?? 'Unspecified';
+    }
+
+    /**
+     * Compact compartment summary, e.g. "U 2,000 L + P 500 L".
+     */
+    public function getItemsSummaryAttribute(): string
+    {
+        $items = $this->items;
+        if ($items->isEmpty()) {
+            return ($this->product_type ?: '-') . ' ' . number_format((int) $this->qty_out) . ' L';
+        }
+
+        return $items->map(fn ($i) => ($i->product_type ?: '-') . ' ' . number_format($i->qty_out) . ' L')
+            ->implode(' + ');
+    }
+
     public function order(): BelongsTo
     {
         return $this->belongsTo(Order::class, 'order_id');
     }
 
     /**
-     * Get the storage tank assigned to the delivery.
+     * Compartment lines (product + qty) on this DR.
      */
+    public function items(): HasMany
+    {
+        return $this->hasMany(DeliveryItem::class, 'delivery_id')
+            ->orderBy('compartment_no')
+            ->orderBy('id');
+    }
+
     public function storageTank(): BelongsTo
     {
         return $this->belongsTo(StorageTank::class, 'storage_tank_id');
@@ -57,41 +90,26 @@ class Delivery extends Model
         return $this->morphMany(ModificationRequest::class, 'requestable');
     }
 
-    /**
-     * The per-tank allocation rows for this delivery (supports split assignment).
-     */
     public function allocations(): HasMany
     {
         return $this->hasMany(DeliveryAllocation::class, 'delivery_id');
     }
 
-    /**
-     * Total quantity already allocated across tanks.
-     */
     public function getAllocatedQuantityAttribute(): int
     {
         return (int) $this->allocations()->sum('quantity');
     }
 
-    /**
-     * Quantity not yet allocated to any tank.
-     */
     public function getRemainingToAllocateAttribute(): int
     {
         return max(0, (int) $this->qty_out - $this->allocated_quantity);
     }
 
-    /**
-     * Whether this delivery has been fully allocated across tanks.
-     */
     public function getFullyAllocatedAttribute(): bool
     {
         return $this->allocated_quantity >= (int) $this->qty_out;
     }
 
-    /**
-     * Get the admin who assigned this delivery to a tank.
-     */
     public function assignedBy(): BelongsTo
     {
         return $this->belongsTo(Admin::class, 'assigned_by');

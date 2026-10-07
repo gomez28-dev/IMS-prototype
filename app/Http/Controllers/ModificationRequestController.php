@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\Admin;
 use App\Models\AuditLog;
 use App\Models\Delivery;
+use App\Models\DeliveryAllocation;
 use App\Models\ModificationRequest;
 use App\Models\Order;
 use App\Models\StockTransfer;
+use App\Models\SupplierOrder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -105,15 +107,32 @@ class ModificationRequestController extends Controller
         DB::transaction(function () use ($modificationRequest, $target, $user, $request) {
             $changes = $modificationRequest->changes ?? [];
 
+            // Product / compartment lines are applied separately below (not a column).
+            $itemLines = null;
+            if ($target instanceof Delivery && isset($changes['items']['new']) && is_array($changes['items']['new'])) {
+                $itemLines = $changes['items']['new'];
+            }
+            unset($changes['items']);
+
             foreach ($changes as $field => $diff) {
                 if (isset($diff['new'])) {
                     $target->{$field} = $diff['new'];
                 }
             }
 
+            if ($itemLines !== null) {
+                $codes = collect($itemLines)->pluck('product_type')->unique()->values();
+                $target->product_type = $codes->count() === 1 ? $codes->first() : null;
+                $target->qty_out = (int) collect($itemLines)->sum('qty_out');
+            }
+
             // Tag as revised
             $target->revised_at = now('Asia/Manila');
             $target->save();
+
+            if ($itemLines !== null) {
+                $this->syncDeliveryItems($target, $itemLines);
+            }
 
             // If cancelling an Order, auto-cancel active deliveries
             if ($target instanceof Order && ($target->status === 'Cancelled')) {
@@ -138,6 +157,41 @@ class ModificationRequestController extends Controller
         });
 
         return back()->with('success', "Modification Request #{$modificationRequest->id} for {$modificationRequest->target_identifier} approved and applied successfully.");
+    }
+
+    /**
+     * Make a delivery's compartment lines match the approved list.
+     * Lines are matched by position so existing tank allocations stay attached;
+     * allocations of a line that was removed, or whose product changed, are cleared.
+     */
+    private function syncDeliveryItems(Delivery $delivery, array $lines): void
+    {
+        $existing = $delivery->items()->get()->values();
+        $lines = array_values($lines);
+
+        foreach ($lines as $idx => $line) {
+            $payload = [
+                'product_type' => $line['product_type'] ?? null,
+                'qty_out' => (int) $line['qty_out'],
+                'compartment_no' => $idx + 1,
+            ];
+
+            $item = $existing->get($idx);
+            if ($item) {
+                if ($item->product_type !== $payload['product_type']) {
+                    DeliveryAllocation::where('delivery_item_id', $item->id)->delete();
+                }
+                $item->update($payload);
+            } else {
+                $delivery->items()->create($payload);
+            }
+        }
+
+        // Remove compartments that no longer exist
+        foreach ($existing->slice(count($lines)) as $extra) {
+            DeliveryAllocation::where('delivery_item_id', $extra->id)->delete();
+            $extra->delete();
+        }
     }
 
     /**
