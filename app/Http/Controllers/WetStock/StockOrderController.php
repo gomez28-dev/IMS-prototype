@@ -703,7 +703,14 @@ class StockOrderController extends Controller
         }
 
         $validated = $request->validate([
-            'po_number' => ['required', 'string', 'max:64'],
+            // A PO number identifies one PO. The trailing id excludes the PO
+            // being edited, so re-saving it with its own number still works.
+            'po_number' => [
+                'required',
+                'string',
+                'max:64',
+                Rule::unique('purchase_orders', 'po_number')->ignore($purchaseOrder->id),
+            ],
             'supplier_name' => ['required', 'string', 'max:128'],
             'order_type' => ['required', 'in:DELIVERY,PICK_UP'],
             'delivery_channel' => ['required', 'string'],
