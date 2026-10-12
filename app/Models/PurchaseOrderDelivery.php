@@ -29,6 +29,7 @@ class PurchaseOrderDelivery extends Model
     protected $fillable = [
         'purchase_order_id',
         'order_id',
+        'request_id',
         'storage_tank_id',
         'delivery_channel',
         'order_type',
@@ -86,6 +87,15 @@ class PurchaseOrderDelivery extends Model
     public function order(): BelongsTo
     {
         return $this->belongsTo(Order::class, 'order_id');
+    }
+
+    /**
+     * The Module 2 stock request this ATL serves. Set on Doyen Stocks ATLs,
+     * which serve a request rather than a sales order.
+     */
+    public function stockRequest(): BelongsTo
+    {
+        return $this->belongsTo(StockRequest::class, 'request_id');
     }
 
     /**
