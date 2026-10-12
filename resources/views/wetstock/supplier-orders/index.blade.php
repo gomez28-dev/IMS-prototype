@@ -10,10 +10,10 @@
     </div>
     <div class="d-flex gap-2">
         <a href="{{ route('wetstock.stock-requests.index') }}" class="btn btn-secondary-custom d-flex align-items-center">
-            <i class="bi bi-arrow-down-left-square me-2"></i> Depot Inbound Deliveries
+            <i class="bi bi-file-earmark-text me-2"></i> Stock Requests
         </a>
         @if (Auth::user()->canEditModule2())
-        <a href="{{ route('wetstock.stock-requests.create') }}" class="btn btn-outline-primary d-flex align-items-center">
+        <a href="{{ route('wetstock.stock-requests.index', ['create' => 1]) }}" class="btn btn-outline-primary d-flex align-items-center">
             <i class="bi bi-cart-plus me-2"></i> Request Replenishment
         </a>
         <a href="{{ route('wetstock.supplier-orders.create') }}" class="btn btn-primary-custom shadow-sm d-flex align-items-center">

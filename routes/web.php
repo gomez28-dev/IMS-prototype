@@ -181,6 +181,7 @@ Route::post('/warehouses/{warehouse}/tanks', [WetStock\StorageTankController::cl
             Route::get('/stock-requests', [WetStock\StockRequestController::class, 'index'])->name('stock-requests.index');
             Route::get('/stock-requests/create', [WetStock\StockRequestController::class, 'create'])->name('stock-requests.create');
             Route::post('/stock-requests', [WetStock\StockRequestController::class, 'store'])->name('stock-requests.store');
+            Route::post('/stock-requests/{stockRequest}', [WetStock\StockRequestController::class, 'update'])->name('stock-requests.update');
             Route::post('/stock-requests/{stockRequest}/picked-up', [WetStock\StockRequestController::class, 'markPickedUp'])->name('stock-requests.picked-up');
             Route::post('/stock-requests/{stockRequest}/received', [WetStock\StockRequestController::class, 'recordReceived'])->name('stock-requests.received');
             Route::post('/deliveries/{delivery}/receive-stock', [WetStock\StockRequestController::class, 'receiveDelivery'])->name('deliveries.receive-stock');

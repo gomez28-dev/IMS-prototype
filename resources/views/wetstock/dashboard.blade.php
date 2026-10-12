@@ -271,7 +271,7 @@
                                         @if ($u->bad)
                                             <span class="wsu-flag {{ $u->fully_bad ? 'wsu-flag-bad' : 'wsu-flag-warn' }}">⚠ {{ number_format($u->bad) }} L contaminated</span>
                                         @elseif ($u->pct <= 40 && $canEdit)
-                                            <a href="{{ route('wetstock.stock-requests.create') }}" class="wsu-flag {{ $u->pct <= 20 ? 'wsu-flag-bad' : 'wsu-flag-orange' }}">Request stock</a>
+                                            <a href="{{ route('wetstock.stock-requests.index', ['create' => 1]) }}" class="wsu-flag {{ $u->pct <= 20 ? 'wsu-flag-bad' : 'wsu-flag-orange' }}">Request stock</a>
                                         @endif
 
                                         <div class="wsu-foot">

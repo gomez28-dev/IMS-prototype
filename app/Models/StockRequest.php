@@ -137,6 +137,49 @@ class StockRequest extends Model
     }
 
 /**
+ * Volume totals per product, for the Stock Request page's stat cards.
+ *
+ * Passing the list's own builder keeps the cards in step with the filters, so
+ * they reconcile with the rows actually on screen. Routed Buy Back orders are
+ * not stock requests and are never counted.
+ *
+ * @param  Builder|null  $scope  restricts the totals to a filtered set
+ * @return array{requested: array<string, int>, received: array<string, int>, pending: array<string, int>}
+ */
+public static function volumeTotals(?Builder $scope = null): array
+{
+    // This builder is embedded as an IN subquery, and MySQL rejects LIMIT
+    // inside one. paginate() leaves paging behind on the builder it is called
+    // with, so it is cleared here rather than relying on the caller to have
+    // totalled up first.
+    $base = clone ($scope ?? static::query());
+    $base->getQuery()->limit = null;
+    $base->getQuery()->offset = null;
+
+    $requestIds = $base->reorder()->select('id');
+
+    $lines = StockRequestLine::whereIn('stock_request_id', $requestIds)
+        ->get(['product', 'qty_requested', 'qty_received']);
+
+    $empty = ['Diesel' => 0, 'Unleaded' => 0, 'Premium' => 0];
+
+    $requested = $received = $pending = $empty;
+
+    foreach ($lines as $line) {
+        $product = $line->product ?: 'Unspecified';
+
+        foreach (['requested' => &$requested, 'received' => &$received, 'pending' => &$pending] as $key => &$bucket) {
+            $bucket[$product] = ($bucket[$product] ?? 0) + ($key === 'requested'
+                ? (int) $line->qty_requested
+                : ($key === 'received' ? (int) $line->qty_received : $line->getQtyPendingAttribute()));
+        }
+        unset($bucket);
+    }
+
+    return compact('requested', 'received', 'pending');
+}
+
+/**
  * Requests still waiting on the depot or on Purchasing.
  */
 public function scopeOpen(Builder $query): Builder

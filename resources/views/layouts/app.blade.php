@@ -701,6 +701,12 @@
                 ->count()
             : 0;
 
+        // Open replenishment requests waiting on Purchasing. Only counted on
+        // Module 2 pages, where the Stock Request list lives.
+        $__openStockRequestsCount = request()->is('wetstock*')
+            ? \App\Models\StockRequest::open()->count()
+            : 0;
+
         $__pendingM1Count = Auth::user()->canApproveModule1Modification()
             ? \App\Models\ModificationRequest::where('status', 'PENDING')
                 ->whereIn('requestable_type', [\App\Models\Order::class, \App\Models\Delivery::class])
@@ -733,6 +739,12 @@
                     </a>
                     <a class="nav-link d-flex align-items-center" href="{{ route('wetstock.transfers.index') }}">
                         <i class="bi bi-arrow-left-right me-2"></i> Stock Transfers
+                    </a>
+                    <a class="nav-link d-flex align-items-center" href="{{ route('wetstock.stock-requests.index') }}">
+                        <i class="bi bi-file-earmark-text me-2"></i> Stock Requests
+                        @if ($__openStockRequestsCount > 0)
+                            <span class="badge rounded-pill ms-1 text-white" style="background-color: var(--brand-color);">{{ $__openStockRequestsCount }}</span>
+                        @endif
                     </a>
                     <a class="nav-link d-flex align-items-center" href="{{ route('wetstock.supplier-orders.index') }}">
                         <i class="bi bi-box-arrow-in-down me-2"></i> Incoming Stock
@@ -876,6 +888,13 @@
                 <a href="{{ route('wetstock.transfers.index') }}" class="sidebar-nav-link {{ request()->routeIs('wetstock.transfers.*') ? 'active' : '' }}" title="Stock Transfers">
                     <i class="bi bi-arrow-left-right"></i>
                     <span class="nav-label">Stock Transfers</span>
+                </a>
+                <a href="{{ route('wetstock.stock-requests.index') }}" class="sidebar-nav-link {{ request()->routeIs('wetstock.stock-requests.*') ? 'active' : '' }}" title="Stock Requests">
+                    <i class="bi bi-file-earmark-text"></i>
+                    <span class="nav-label">Stock Requests</span>
+                    @if ($__openStockRequestsCount > 0)
+                        <span class="badge rounded-pill ms-auto text-white" style="background-color: var(--brand-color);">{{ $__openStockRequestsCount }}</span>
+                    @endif
                 </a>
                 <a href="{{ route('wetstock.supplier-orders.index') }}" class="sidebar-nav-link {{ request()->routeIs('wetstock.supplier-orders.*') ? 'active' : '' }}" title="Incoming Stock">
                     <i class="bi bi-box-arrow-in-down"></i>

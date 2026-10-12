@@ -51,11 +51,10 @@ class StockReceivedHandoffTest extends TestCase
         $response = $this->actingAs($this->opsManager)
             ->post(route('wetstock.stock-requests.store'), [
                 'warehouse_id' => $this->warehouse->id,
-                'po_type' => 'STANDARD_REPLENISHMENT',
-                'product' => 'Diesel',
-                'qty_ordered' => 20000,
+                'request_type' => 'PICKUP',
                 'date_needed' => now()->addDays(3)->format('Y-m-d'),
                 'remarks' => 'Critical low stock replenishment needed for weekend.',
+                'lines' => [['product' => 'Diesel', 'qty' => 20000]],
             ]);
 
         $response->assertRedirect();

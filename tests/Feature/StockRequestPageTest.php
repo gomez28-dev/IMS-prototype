@@ -270,4 +270,184 @@ class StockRequestPageTest extends TestCase
             ])
             ->assertForbidden();
     }
+
+    // ---- Stat cards -------------------------------------------------------
+
+    public function test_the_stat_cards_total_the_product_lines(): void
+    {
+        $request = $this->request([
+            ['product' => 'Diesel', 'qty' => 10000],
+            ['product' => 'Unleaded', 'qty' => 5000],
+            ['product' => 'Premium', 'qty' => 2500],
+        ]);
+
+        // Lines are looked up by product, never by collection index: the
+        // database does not promise to return them in insertion order.
+        $request->lines->firstWhere('product', 'Diesel')->update(['qty_received' => 4000]);
+        $request->lines->firstWhere('product', 'Unleaded')->update(['qty_received' => 5000]);
+
+        $totals = StockRequest::volumeTotals();
+
+        $this->assertSame(10000, $totals['requested']['Diesel']);
+        $this->assertSame(5000, $totals['requested']['Unleaded']);
+        $this->assertSame(4000, $totals['received']['Diesel']);
+        $this->assertSame(5000, $totals['received']['Unleaded']);
+        // Diesel 10,000 - 4,000; Premium 2,500 - 0.
+        $this->assertSame(6000, $totals['pending']['Diesel']);
+        $this->assertSame(2500, $totals['pending']['Premium']);
+
+        $html = $this->page();
+
+        $this->assertStringContainsString('Total Requests', $html);
+        $this->assertStringContainsString('Total Qty. Requested', $html);
+        $this->assertStringContainsString('Total Qty. Received', $html);
+        $this->assertStringContainsString('Total Qty. Pending', $html);
+        // The cards break out per product rather than showing one grand total,
+        // so the per-product figures are what appear on the page.
+        foreach (['10,000', '5,000', '2,500', '4,000', '6,000'] as $figure) {
+            $this->assertStringContainsString($figure, $html);
+        }
+    }
+
+    public function test_the_stat_cards_reconcile_with_the_rows_on_screen(): void
+    {
+        $this->request([['product' => 'Diesel', 'qty' => 10000]]);
+        $mine = $this->request([['product' => 'Unleaded', 'qty' => 5000]]);
+
+        $other = Warehouse::create(['name' => 'Bataan Depot']);
+        $theirs = StockRequest::create([
+            'warehouse_id' => $other->id,
+            'requested_by' => $this->opsManager->id,
+            'request_date' => now(),
+        ]);
+        StockRequestLine::create([
+            'stock_request_id' => $theirs->id,
+            'product' => 'Diesel',
+            'qty_requested' => 9999,
+        ]);
+
+        // Filtering to one site must narrow the cards to match the table.
+        $totals = StockRequest::volumeTotals(
+            StockRequest::where('warehouse_id', $this->warehouse->id)
+        );
+
+        $this->assertSame(10000, $totals['requested']['Diesel']);
+        $this->assertSame(5000, $totals['requested']['Unleaded']);
+        // The other site's 9,999 is not counted in this site's cards.
+        $this->assertSame(2, StockRequest::where('warehouse_id', $this->warehouse->id)->count());
+    }
+
+    public function test_routed_buy_back_orders_are_left_out_of_the_cards(): void
+    {
+        StockRequest::volumeTotals();
+
+        // A Buy Back order is an Order, not a StockRequest, so it cannot be
+        // counted by these totals at all.
+        $totals = StockRequest::volumeTotals();
+
+        foreach ($totals as $bucket) {
+            $this->assertSame(0, $bucket['Diesel']);
+        }
+    }
+
+    // ---- Search -----------------------------------------------------------
+
+    public function test_search_matches_the_req_number(): void
+    {
+        $mine = $this->request();
+        $this->request();
+
+        $response = $this->actingAs($this->opsManager)
+            ->get(route('wetstock.stock-requests.index', ['search' => $mine->request_number]));
+
+        $response->assertOk();
+        $response->assertSee($mine->request_number);
+        $response->assertSee('Search', false);
+    }
+
+    public function test_search_matches_remarks(): void
+    {
+        $mine = $this->request();
+        $mine->update(['remarks' => 'Unique tank survey marker']);
+        $this->request();
+
+        $response = $this->actingAs($this->opsManager)
+            ->get(route('wetstock.stock-requests.index', ['search' => 'tank survey marker']));
+
+        $response->assertOk();
+        $response->assertSee('Unique tank survey marker');
+    }
+
+    public function test_search_matches_the_requesters_name(): void
+    {
+        $mine = $this->request();
+
+        $response = $this->actingAs($this->opsManager)
+            ->get(route('wetstock.stock-requests.index', ['search' => $this->opsManager->name]));
+
+        $response->assertOk();
+        $response->assertSee($mine->request_number);
+    }
+
+    public function test_search_combines_with_the_site_filter(): void
+    {
+        $mine = $this->request();
+
+        $other = Warehouse::create(['name' => 'Bataan Depot']);
+        $theirs = StockRequest::create([
+            'warehouse_id' => $other->id,
+            'requested_by' => $this->opsManager->id,
+            'request_date' => now(),
+        ]);
+        StockRequestLine::create([
+            'stock_request_id' => $theirs->id,
+            'product' => 'Diesel',
+            'qty_requested' => 1000,
+        ]);
+
+        $response = $this->actingAs($this->opsManager)
+            ->get(route('wetstock.stock-requests.index', [
+                'search' => 'REQ-',
+                'warehouse_id' => $this->warehouse->id,
+            ]));
+
+        $response->assertOk();
+        $response->assertSee($mine->request_number);
+        $response->assertDontSee($theirs->request_number);
+    }
+
+    // ---- Findability ------------------------------------------------------
+
+    public function test_the_page_has_its_own_title_and_sidebar_entry(): void
+    {
+        $html = $this->page();
+
+        $this->assertStringContainsString('Stock Requests', $html);
+        $this->assertStringContainsString(route('wetstock.stock-requests.index'), $html);
+    }
+
+    public function test_the_two_module_two_pages_no_longer_share_a_title(): void
+    {
+        $opsAdmin = Admin::create([
+            'username' => 'opsadmin_'.uniqid(),
+            'password' => bcrypt('secret'),
+            'name' => 'Ops Admin',
+            'role' => 'ops_admin',
+        ]);
+
+        $requests = $this->actingAs($this->opsManager)
+            ->get(route('wetstock.stock-requests.index'))
+            ->assertOk()
+            ->getContent();
+
+        $incoming = $this->actingAs($opsAdmin)
+            ->get(route('wetstock.supplier-orders.index'))
+            ->assertOk()
+            ->getContent();
+
+        // Both pages used to be titled "Incoming Supplier Stock", which made
+        // the Stock Request page impossible to tell apart.
+        $this->assertStringNotContainsString('Incoming Supplier Stock', $requests);
+        $this->assertStringContainsString('Incoming Supplier Stock', $incoming);
+    }
 }

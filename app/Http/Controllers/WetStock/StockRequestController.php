@@ -24,11 +24,12 @@ class StockRequestController extends Controller
      */
     public function index(Request $request): View
     {
-$warehouseId = $request->query('warehouse_id');
+        $warehouseId = $request->query('warehouse_id');
+        $search = trim((string) $request->query('search', ''));
 
         // Replenishment requests live in stock_requests now. Lines are eager
         // loaded because the list reports Pending = Requested - Received per
-        // product, and the warehouse filter narrows the same list.
+        // product, and the stat cards total the same lines.
         $requestsQuery = StockRequest::with(['warehouse', 'requester', 'lines', 'purchasingReceiver'])
             ->latest();
 
@@ -36,7 +37,24 @@ $warehouseId = $request->query('warehouse_id');
             $requestsQuery->where('warehouse_id', $warehouseId);
         }
 
-        $stockRequests = $requestsQuery->paginate(15);
+        if ($search !== '') {
+            $term = '%'.$search.'%';
+            $requestsQuery->where(function ($q) use ($term) {
+                $q->where('request_number', 'like', $term)
+                    ->orWhere('remarks', 'like', $term)
+                    ->orWhereHas('requester', fn ($r) => $r->where('name', 'like', $term));
+            });
+        }
+
+        // Computed before paginate(), which would otherwise leave a LIMIT on the
+        // builder that the totals embed as a subquery.
+        $stats = StockRequest::volumeTotals($requestsQuery);
+        $stats['requests'] = (clone $requestsQuery)->toBase()->getCountForPagination();
+
+        $stockRequests = $requestsQuery->paginate(15)->appends([
+            'warehouse_id' => $warehouseId,
+            'search' => $search,
+        ]);
 
         // Incoming deliveries bound for depot tanks
         $deliveriesQuery = PurchaseOrderDelivery::with(['purchaseOrder.warehouse', 'stockIns.tank'])
@@ -65,75 +83,174 @@ $warehouseId = $request->query('warehouse_id');
             ->latest()
             ->paginate(10);
 
+        // The stat cards total the same lines the table shows, so the two
+        // always reconcile. Routed Buy Back orders are deliberately excluded.
+
+        // ?create=1 opens the request pop-up straight away, which is how the
+        // Incoming Stock page and the dashboard reach "Request Replenishment".
+        $openCreate = $request->boolean('create');
+
         return view('wetstock.stock-requests.index', compact(
-            'stockRequests', 'incomingDeliveries', 'buyBackDeliveries', 'warehouses', 'warehouseId'
+            'stockRequests', 'incomingDeliveries', 'buyBackDeliveries', 'warehouses', 'warehouseId',
+            'search', 'stats', 'openCreate'
         ));
     }
 
-    /**
-     * Show form to request depot stock replenishment.
-     */
-    public function create(): View
-    {
-        if (!Auth::user()->canEditModule2()) {
-            abort(403);
-        }
+/**
+ * The request form is a floating pop-up on the Stock Requests page, so the
+ * standalone page route just sends people there with the pop-up open.
+ */
+public function create(): RedirectResponse
+{
+    return redirect()->route('wetstock.stock-requests.index', ['create' => 1]);
+}
 
-        $warehouses = Warehouse::with('tanks')->orderBy('name')->get();
-
-        return view('wetstock.stock-requests.create', compact('warehouses'));
+/**
+ * Store a new replenishment request.
+ *
+ * Writes a StockRequest with one line per product, rather than a placeholder
+ * purchase_orders row with no PO number and no value. The requestor stays in
+ * Module 2 afterwards; sending them to Module 3 was never intended.
+ */
+public function store(Request $request): RedirectResponse
+{
+    if (!Auth::user()->canEditModule2()) {
+        abort(403);
     }
 
-    /**
-     * Store a new replenishment request.
-     *
-     * Writes a StockRequest with its product lines, rather than a placeholder
-     * purchase_orders row with no PO number and no value.
-     */
-    public function store(Request $request): RedirectResponse
-    {
-        if (!Auth::user()->canEditModule2()) {
-            abort(403);
-        }
+    $validated = $request->validate([
+        'warehouse_id' => ['required', 'exists:warehouses,id'],
+        'request_type' => ['nullable', 'in:'.StockRequest::TYPE_PICKUP.','.StockRequest::TYPE_DELIVERY],
+        'date_needed' => ['nullable', 'date'],
+        'remarks' => ['nullable', 'string', 'max:500'],
+        'lines' => ['required', 'array', 'min:1'],
+        // Lenient on the rows themselves: removing a line in the pop-up can
+        // leave a blank row behind, and that should not block sending. Rows
+        // with no usable product or quantity are dropped below.
+        'lines.*.id' => ['nullable', 'integer'],
+        'lines.*.product' => ['nullable', 'string', 'max:64'],
+        'lines.*.qty' => ['nullable', 'integer', 'min:0'],
+    ]);
 
-        $validated = $request->validate([
-            'warehouse_id' => ['required', 'exists:warehouses,id'],
-            'po_type' => ['required', 'in:STANDARD_REPLENISHMENT,BUY_BACK'],
-            'product' => ['required', 'string', 'max:64'],
-            'qty_ordered' => ['required', 'integer', 'min:1'],
-            'date_needed' => ['nullable', 'date'],
-            'remarks' => ['nullable', 'string', 'max:500'],
-        ]);
+    $warehouse = Warehouse::findOrFail($validated['warehouse_id']);
 
-        $warehouse = Warehouse::findOrFail($validated['warehouse_id']);
+    $lines = collect($validated['lines'])
+        ->filter(fn ($line) => filled($line['product'] ?? null) && (int) ($line['qty'] ?? 0) > 0)
+        ->unique('product')
+        ->values();
 
-        $stockRequest = StockRequest::create([
-            // Depot replenishment arrives at the tank, so fuel is picked up.
-            'request_type' => StockRequest::TYPE_PICKUP,
-            'warehouse_id' => $warehouse->id,
-            'requested_by' => Auth::id(),
-            'request_date' => now(),
-            'date_needed' => $validated['date_needed'] ?? null,
-            'remarks' => $validated['remarks'] ?? null,
-            'status' => StockRequest::STATUS_REQUESTED,
-        ]);
+    if ($lines->isEmpty()) {
+        return back()
+            ->withInput()
+            ->withErrors(['lines' => 'Add at least one product with a quantity.']);
+    }
 
+    $stockRequest = StockRequest::create([
+        'request_type' => $validated['request_type'] ?? StockRequest::TYPE_PICKUP,
+        'warehouse_id' => $warehouse->id,
+        'requested_by' => Auth::id(),
+        'request_date' => now(),
+        'date_needed' => $validated['date_needed'] ?? null,
+        'remarks' => $validated['remarks'] ?? null,
+        'status' => StockRequest::STATUS_REQUESTED,
+    ]);
+
+    foreach ($lines as $line) {
         StockRequestLine::create([
             'stock_request_id' => $stockRequest->id,
-            'product' => $validated['product'],
-            'qty_requested' => $validated['qty_ordered'],
+            'product' => $line['product'],
+            'qty_requested' => (int) $line['qty'],
             'qty_received' => 0,
         ]);
-
-        AuditLog::create([
-            'admin_id' => Auth::id(),
-            'action' => 'CREATED',
-            'description' => "Created Replenishment Request {$stockRequest->request_number} ({$warehouse->name}, " . number_format($validated['qty_ordered']) . "L {$validated['product']}) for Purchasing",
-        ]);
-
-        return redirect()->route('wetstock.stock-requests.index')
-            ->with('success', "Replenishment request {$stockRequest->request_number} for {$warehouse->name} (" . number_format($validated['qty_ordered']) . "L) has been submitted to Purchasing (Module 3).");
     }
+
+    $summary = $lines->map(fn ($line) => number_format($line['qty']).'L '.$line['product'])->implode(', ');
+
+    AuditLog::create([
+        'admin_id' => Auth::id(),
+        'action' => 'CREATED',
+        'description' => "Created Replenishment Request {$stockRequest->request_number} ({$warehouse->name}, {$summary}) for Purchasing",
+    ]);
+
+    return redirect()->route('wetstock.stock-requests.index')
+        ->with('success', "Request {$stockRequest->request_number} sent to Purchasing ({$summary}).");
+}
+
+/**
+ * Edit an existing request from the same floating pop-up.
+ *
+ * The quantity already received is never overwritten, so Pending can never
+ * be pushed below zero by editing the requested figure.
+ */
+public function update(Request $request, StockRequest $stockRequest): RedirectResponse
+{
+    if (!Auth::user()->canEditModule2()) {
+        abort(403);
+    }
+
+    $validated = $request->validate([
+        'warehouse_id' => ['required', 'exists:warehouses,id'],
+        'request_type' => ['required', 'in:'.StockRequest::TYPE_PICKUP.','.StockRequest::TYPE_DELIVERY],
+        'date_needed' => ['nullable', 'date'],
+        'remarks' => ['nullable', 'string', 'max:500'],
+        'lines' => ['required', 'array', 'min:1'],
+        'lines.*.id' => ['nullable', 'integer'],
+        'lines.*.product' => ['nullable', 'string', 'max:64'],
+        'lines.*.qty' => ['nullable', 'integer', 'min:0'],
+    ]);
+
+    $stockRequest->load('lines');
+
+    $existing = $stockRequest->lines->keyBy('id');
+
+    $keepIds = [];
+
+    foreach ($validated['lines'] as $row) {
+        if (blank($row['product'] ?? null) || (int) ($row['qty'] ?? 0) <= 0) {
+            continue;
+        }
+
+        $qty = (int) $row['qty'];
+        $line = $existing->get($row['id'] ?? null);
+
+        if ($line) {
+            // Never ask for less than has already arrived.
+            $qty = max($qty, (int) $line->qty_received);
+            $line->update([
+                'product' => $row['product'],
+                'qty_requested' => $qty,
+            ]);
+        } else {
+            $line = StockRequestLine::create([
+                'stock_request_id' => $stockRequest->id,
+                'product' => $row['product'],
+                'qty_requested' => $qty,
+                'qty_received' => 0,
+            ]);
+        }
+
+        $keepIds[] = $line->id;
+    }
+
+    // Lines the pop-up removed.
+    $stockRequest->lines()->whereNotIn('id', $keepIds ?: [0])->delete();
+
+    $stockRequest->update([
+        'warehouse_id' => $validated['warehouse_id'],
+        'request_type' => $validated['request_type'],
+        'date_needed' => $validated['date_needed'] ?? null,
+        'remarks' => $validated['remarks'] ?? null,
+    ]);
+
+    AuditLog::create([
+        'admin_id' => Auth::id(),
+        'action' => 'updated',
+        'description' => "Updated stock request {$stockRequest->request_number}.",
+    ]);
+
+    return redirect()->route('wetstock.stock-requests.index')
+        ->with('success', "Request {$stockRequest->request_number} updated.");
+}
 
 /**
  * Record that Purchasing has picked the request up.
