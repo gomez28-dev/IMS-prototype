@@ -181,6 +181,8 @@ Route::post('/warehouses/{warehouse}/tanks', [WetStock\StorageTankController::cl
             Route::get('/stock-requests', [WetStock\StockRequestController::class, 'index'])->name('stock-requests.index');
             Route::get('/stock-requests/create', [WetStock\StockRequestController::class, 'create'])->name('stock-requests.create');
             Route::post('/stock-requests', [WetStock\StockRequestController::class, 'store'])->name('stock-requests.store');
+            Route::post('/stock-requests/{stockRequest}/picked-up', [WetStock\StockRequestController::class, 'markPickedUp'])->name('stock-requests.picked-up');
+            Route::post('/stock-requests/{stockRequest}/received', [WetStock\StockRequestController::class, 'recordReceived'])->name('stock-requests.received');
             Route::post('/deliveries/{delivery}/receive-stock', [WetStock\StockRequestController::class, 'receiveDelivery'])->name('deliveries.receive-stock');
         });
 
@@ -230,6 +232,8 @@ Route::post('/warehouses/{warehouse}/tanks', [WetStock\StorageTankController::cl
         Route::post('/deliveries/{delivery}/complete-fuel-trade', [WetStock\StockOrderController::class, 'completeFuelTrade'])->name('complete-fuel-trade');
         Route::post('/deliveries/{delivery}/update-docs', [WetStock\StockOrderController::class, 'updateDeliveryDocs'])->name('update-docs');
         Route::get('/{purchaseOrder}/prepare', [WetStock\StockOrderController::class, 'editRequest'])->name('edit-request');
+        // A Module 2 request becomes a purchase order when Purchasing prepares it.
+        Route::post('/stock-requests/{stockRequest}/prepare', [WetStock\StockOrderController::class, 'prepareStockRequest'])->name('prepare-stock-request');
         Route::post('/{purchaseOrder}/prepare', [WetStock\StockOrderController::class, 'updateRequest'])->name('update-request');
         // Raising an extra ATL against an already-approved PO. Separate from
         // "prepare" because it must not re-submit the PO for VP approval.

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\WetStock;
 
 use App\Http\Controllers\Controller;
 use App\Models\PurchaseOrder;
+use App\Models\StockRequest;
 use App\Models\PurchaseOrderDelivery;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -24,7 +25,10 @@ class WetStockRequestController extends Controller
     {
         $warehouseId = $request->query('warehouse_id');
 
-        $requestsQuery = PurchaseOrder::with(['warehouse', 'requester', 'approver', 'deliveries'])
+        // Replenishment requests live in stock_requests. Legacy request rows that
+          // predate the table are still listed alongside them, so nothing
+          // disappears during the changeover.
+          $requestsQuery = PurchaseOrder::with(['warehouse', 'requester', 'approver', 'deliveries'])
             ->whereIn('po_type', ['STANDARD_REPLENISHMENT', 'BUY_BACK']);
 
         if ($warehouseId) {
@@ -39,7 +43,24 @@ class WetStockRequestController extends Controller
             });
         }
 
-        $stockRequests = $requestsQuery->latest()->paginate(15);
+        $legacyRequests = $requestsQuery->latest()->paginate(15);
+
+        $stockRequestQuery = StockRequest::with(['warehouse', 'requester', 'lines'])
+            ->open();
+
+        if ($warehouseId) {
+            $stockRequestQuery->where('warehouse_id', $warehouseId);
+        }
+
+        if ($request->filled('search')) {
+            $term = '%' . $request->search . '%';
+            $stockRequestQuery->where(function ($q) use ($term) {
+                $q->where('request_number', 'like', $term)
+                  ->orWhere('remarks', 'like', $term);
+            });
+        }
+
+        $stockRequests = $stockRequestQuery->latest()->paginate(15);
 
         // Depot-bound deliveries awaiting tank fill.
         $deliveriesQuery = PurchaseOrderDelivery::with(['purchaseOrder.warehouse', 'stockIns.tank'])
@@ -59,6 +80,7 @@ class WetStockRequestController extends Controller
 
         return view('wetstock.wet-stock-requests.index', [
             'stockRequests' => $stockRequests,
+            'legacyRequests' => $legacyRequests,
             'incomingDeliveries' => $incomingDeliveries,
             'warehouses' => \App\Models\Warehouse::orderBy('name')->get(),
             'warehouseId' => $warehouseId,

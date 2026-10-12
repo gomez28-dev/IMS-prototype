@@ -116,7 +116,44 @@
                         </tr>
                     </thead>
                     <tbody>
+                        {{-- Requests raised in Module 2, which Purchasing prepares. --}}
                         @forelse ($stockRequests as $req)
+                            <tr>
+                                <td class="fw-bold text-dark">{{ $req->request_number }}</td>
+                                <td class="small">Pending</td>
+                                <td>{{ $req->warehouse->name ?? 'All Depots' }}</td>
+                                <td><span class="badge bg-light text-dark border">{{ $req->type_label }}</span></td>
+                                <td class="text-end fw-bold font-monospace">
+                                    @foreach ($req->lines as $line)
+                                        <div>{{ \Illuminate\Support\Str::substr((string) $line->product, 0, 1) }} &mdash; {{ number_format($line->qty_requested) }}</div>
+                                    @endforeach
+                                </td>
+                                <td class="small">{{ $req->date_needed ? $req->date_needed->format('M d, Y') : '—' }}</td>
+                                <td>
+                                    <span class="badge bg-warning text-dark px-2 py-1">{{ $req->status }}</span>
+                                </td>
+                                <td class="small text-muted">{{ $req->requester->name ?? 'Depot' }}</td>
+                                <td class="small text-muted">{{ $req->remarks ?: '—' }}</td>
+                                <td class="pe-3 text-end">
+                                    @if (Auth::user()->canEditStockOrders())
+                                        <form method="POST" action="{{ route('stock-orders.prepare-stock-request', $req->id) }}" class="d-inline">
+                                            @csrf
+                                            <button type="submit" class="btn btn-sm btn-primary rounded-pill px-3 py-1" title="Turn this request into a purchase order">
+                                                <i class="bi bi-pencil-square me-1"></i> Prepare &amp; Submit
+                                            </button>
+                                        </form>
+                                    @endif
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="10" class="text-center text-muted py-4">No new replenishment requests.</td>
+                            </tr>
+                        @endforelse
+
+                        {{-- Requests that predate the dedicated table and still live as
+                             purchase_orders rows. --}}
+                        @forelse ($legacyRequests as $req)
                             @php
                                 // The ATL is raised as a delivery on this PO; show whichever
                                 // identifier has been issued, else Pending.
@@ -124,9 +161,11 @@
                                     ->first(fn ($d) => $d->atl_number || $d->client_atl_number);
                             @endphp
                             <tr>
-                                {{-- A replenishment request has no PO number until Purchasing issues one. --}}
+                                {{-- Real requests carry a REQ number of their own. These
+                                     rows predate that, so they fall back to the PO number
+                                     once issued, then to a placeholder. --}}
                                 <td class="fw-bold text-dark">
-                                    {{ $req->po_number ?: ('REQ-' . str_pad((string) $req->id, 4, '0', STR_PAD_LEFT)) }}
+                                    {{ $req->po_number ?: 'Pending PO#' }}
                                 </td>
                                 <td class="small">
                                     {{ $atlDelivery?->atl_number ?? $atlDelivery?->client_atl_number ?? 'Pending' }}
@@ -148,9 +187,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr>
-                                <td colspan="10" class="text-center text-muted py-4">No replenishment requests found.</td>
-                            </tr>
+                            {{-- Nothing legacy to show. --}}
                         @endforelse
                     </tbody>
                 </table>

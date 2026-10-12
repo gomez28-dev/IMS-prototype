@@ -103,46 +103,100 @@
                 <table class="table table-custom mb-0">
                     <thead>
                         <tr>
-                            <th>PO #</th>
-                            <th>ATL / DR #</th>
+                            <th>REQ #</th>
                             <th>Site</th>
                             <th>Type</th>
-                            <th class="text-end">Volume</th>
+                            <th class="text-end">Qty. Requested</th>
+                            <th class="text-end">Qty. Received</th>
+                            <th class="text-end">Qty. Pending</th>
+                            <th>Purchasing</th>
                             <th>Date Needed</th>
                             <th>Status</th>
                             <th>Requested By</th>
                             <th>Remarks</th>
+                            <th class="pe-3 text-end">Action</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse ($stockRequests as $req)
-                            @php
-                                // The ATL is raised as a delivery on this PO; show whichever
-                                // identifier has been issued, else Pending.
-                                $atlDelivery = $req->deliveries
-                                    ->first(fn ($d) => $d->atl_number || $d->client_atl_number);
-                            @endphp
                             <tr>
-                                {{-- A replenishment request has no PO number until Purchasing issues one. --}}
-                                <td class="fw-bold text-dark">
-                                    {{ $req->po_number ?: ('REQ-' . str_pad((string) $req->id, 4, '0', STR_PAD_LEFT)) }}
-                                </td>
-                                <td class="small">
-                                    {{ $atlDelivery?->atl_number ?? $atlDelivery?->client_atl_number ?? 'Pending' }}
-                                </td>
+                                <td class="fw-bold text-dark">{{ $req->request_number }}</td>
                                 <td>{{ $req->warehouse->name ?? 'All Depots' }}</td>
-                                <td><span class="badge bg-light text-dark border">{{ $req->po_type }}</span></td>
-                                <td class="text-end fw-bold">{{ number_format($req->qty_ordered) }} L</td>
+                                <td><span class="badge bg-light text-dark border">{{ $req->type_label }}</span></td>
+                                {{-- Volumes break out per product, because a request can
+                                     cover more than one and Pending is per product:
+                                     Requested minus Received. --}}
+                                <td class="text-end fw-bold font-monospace">
+                                    @if ($req->lines->isEmpty())
+                                        <span class="text-muted">&mdash;</span>
+                                    @else
+                                        @foreach ($req->lines as $line)
+                                            <div>{{ \Illuminate\Support\Str::substr((string) $line->product, 0, 1) }} &mdash; {{ number_format($line->qty_requested) }}</div>
+                                        @endforeach
+                                    @endif
+                                </td>
+                                <td class="text-end font-monospace">
+                                    @if ($req->lines->isEmpty())
+                                        <span class="text-muted">&mdash;</span>
+                                    @else
+                                        @foreach ($req->lines as $line)
+                                            <div>{{ \Illuminate\Support\Str::substr((string) $line->product, 0, 1) }} &mdash; {{ number_format($line->qty_received) }}</div>
+                                        @endforeach
+                                    @endif
+                                </td>
+                                <td class="text-end font-monospace">
+                                    @if ($req->lines->isEmpty())
+                                        <span class="text-muted">&mdash;</span>
+                                    @else
+                                        @foreach ($req->lines as $line)
+                                            <div class="{{ $line->qty_pending > 0 ? 'text-warning-emphasis fw-semibold' : 'text-success' }}">{{ \Illuminate\Support\Str::substr((string) $line->product, 0, 1) }} &mdash; {{ number_format($line->qty_pending) }}</div>
+                                        @endforeach
+                                    @endif
+                                </td>
+                                {{-- Purchasing picking the request up is reported on its
+                                     own, separately from the fuel actually arriving. --}}
+                                <td class="small">
+                                    @if ($req->hasBeenPickedUpByPurchasing())
+                                        <span class="badge bg-success-subtle text-success border rounded-pill px-2 py-1">
+                                            <i class="bi bi-check2 me-1"></i>{{ $req->purchasingReceiver?->name ?? 'Purchasing' }}
+                                        </span>
+                                        <div class="extra-small text-muted mt-1">{{ $req->purchasing_received_at?->format('M d, Y') }}</div>
+                                    @else
+                                        <span class="badge bg-warning-subtle text-warning-emphasis border rounded-pill px-2 py-1">Awaiting</span>
+                                    @endif
+                                </td>
                                 <td class="small">{{ $req->date_needed ? $req->date_needed->format('M d, Y') : '—' }}</td>
                                 <td>
-                                    <span class="badge bg-warning text-dark px-2 py-1">{{ $req->request_status }}</span>
+                                    <span class="badge bg-warning text-dark px-2 py-1">{{ $req->status }}</span>
                                 </td>
                                 <td class="small text-muted">{{ $req->requester->name ?? 'Depot' }}</td>
                                 <td class="small text-muted">{{ $req->remarks ?: '—' }}</td>
+                            <td class="pe-3 text-end">
+                                    <div class="d-inline-flex gap-1 justify-content-end flex-wrap">
+                                        {{-- Picking up and receiving are different things, so
+                                             they are separate actions and separate columns. --}}
+                                        @if (! $req->hasBeenPickedUpByPurchasing())
+                                            <form method="POST" action="{{ route('wetstock.stock-requests.picked-up', $req->id) }}">
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm btn-outline-success rounded-pill px-2 py-1" title="Mark picked up by Purchasing">
+                                                    <i class="bi bi-check2-circle me-1"></i> Pick Up
+                                                </button>
+                                            </form>
+                                        @endif
+
+                                        @if (Auth::user()->canReceiveStockIntoDepot() && $req->lines->isNotEmpty())
+                                            <button type="button" class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary"
+                                                    data-bs-toggle="modal" data-bs-target="#receiveQuantitiesModal{{ $req->id }}"
+                                                    title="Record quantities received">
+                                                <i class="bi bi-box-arrow-in-down me-1"></i> Received
+                                            </button>
+                                        @endif
+                                    </div>
+                                </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="9" class="text-center text-muted py-4">No replenishment requests found.</td>
+                                <td colspan="12" class="text-center text-muted py-4">No replenishment requests found.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -205,6 +259,59 @@
         </div>
     </div>
 </div>
+
+{{-- Record what actually arrived on a request, per product line. --}}
+@foreach ($stockRequests as $req)
+    @if (Auth::user()->canReceiveStockIntoDepot() && $req->lines->isNotEmpty())
+        <div class="modal fade" id="receiveQuantitiesModal{{ $req->id }}" tabindex="-1" aria-labelledby="receiveQuantitiesModalLabel{{ $req->id }}" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content rounded-4 border-0 shadow">
+                    <div class="modal-header border-0 pb-0">
+                        <h5 class="modal-title fw-bold text-dark" id="receiveQuantitiesModalLabel{{ $req->id }}">
+                            <i class="bi bi-box-arrow-in-down text-success me-1"></i> Record Received &mdash; {{ $req->request_number }}
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <form method="POST" action="{{ route('wetstock.stock-requests.received', $req->id) }}">
+                        @csrf
+                        <div class="modal-body pt-3">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Product</th>
+                                        <th class="text-end">Requested</th>
+                                        <th class="text-end" style="width: 130px;">Received</th>
+                                        <th class="text-end">Pending</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($req->lines as $line)
+                                        <tr>
+                                            <td class="fw-semibold">{{ $line->product }}</td>
+                                            <td class="text-end font-monospace">{{ number_format($line->qty_requested) }}</td>
+                                            <td>
+                                                <input type="number" name="quantities[{{ $line->id }}]" min="0" step="1"
+                                                       class="form-control form-control-sm text-end"
+                                                       value="{{ $line->qty_received }}">
+                                            </td>
+                                            <td class="text-end font-monospace">{{ number_format($line->qty_pending) }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="modal-footer border-0 pt-0">
+                            <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-success rounded-pill px-4">
+                                <i class="bi bi-check2-circle me-1"></i> Save Received
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endif
+@endforeach
 
 {{-- Modals container outside table (prevents layout shift and flickering) --}}
 @foreach ($incomingDeliveries->whereIn('status', ['Pending', 'Active']) as $del)

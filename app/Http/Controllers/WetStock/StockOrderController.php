@@ -13,6 +13,7 @@ use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderDelivery;
 use App\Models\PurchaseOrderItem;
 use App\Models\StockIn;
+use App\Models\StockRequest;
 use App\Models\StorageTank;
 use App\Models\Supplier;
 use App\Models\Warehouse;
@@ -1022,9 +1023,71 @@ class StockOrderController extends Controller
             ->with('success', "Stock order {$purchaseOrder->po_number} prepared and submitted for VP approval.");
     }
 
-    /**
-     * Raise an extra ATL against a PO the VP has already approved.
-     *
+/**
+ * Turn a Module 2 stock request into a purchase order so it can be prepared.
+ *
+ * Requests used to be purchase_orders rows all along, so preparing one was just
+ * a matter of giving it a PO number. Now a request lives in stock_requests, so
+ * this materialises the PO it always implied and hands off to the existing
+ * prepare form. Real item rows are created too, which the legacy JSON-only
+ * requests never had.
+ */
+public function prepareStockRequest(StockRequest $stockRequest): RedirectResponse
+{
+    if (!Auth::user()->canEditStockOrders()) {
+        abort(403);
+    }
+
+    $stockRequest->load('lines');
+
+    // Preparing twice must not raise a second PO against the same request.
+    if ($stockRequest->isPrepared()) {
+        return back()->with('danger', 'This request already has a purchase order against it.');
+    }
+
+    $purchaseOrder = PurchaseOrder::create([
+        'po_type' => PurchaseOrder::TYPE_STANDARD_REPLENISHMENT,
+        'warehouse_id' => $stockRequest->warehouse_id,
+        'qty_ordered' => $stockRequest->qty_requested,
+        'request_status' => 'REQUESTED',
+        'status' => 'Pending',
+        'requested_by' => $stockRequest->requested_by,
+        'request_date' => $stockRequest->request_date,
+        'date_needed' => $stockRequest->date_needed,
+        'remarks' => $stockRequest->remarks,
+        'requested_products' => $stockRequest->lines
+            ->map(fn ($line) => ['product' => $line->product, 'quantity' => (int) $line->qty_requested])
+            ->all(),
+        'prepared_by' => Auth::id(),
+    ]);
+
+    foreach ($stockRequest->lines as $line) {
+        PurchaseOrderItem::create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'product' => $line->product,
+            'quantity_ordered' => (int) $line->qty_requested,
+            'unit' => $line->unit,
+        ]);
+    }
+
+    $stockRequest->update([
+        'status' => StockRequest::STATUS_RECEIVED,
+        'purchase_order_id' => $purchaseOrder->id,
+    ]);
+
+    AuditLog::create([
+        'admin_id' => Auth::id(),
+        'action' => 'updated',
+        'description' => "Prepared stock request {$stockRequest->request_number} into purchase order #{$purchaseOrder->id}.",
+    ]);
+
+    return redirect()->route('stock-orders.edit-request', $purchaseOrder->id)
+        ->with('success', "Request {$stockRequest->request_number} is ready to prepare. Add the supplier and PO number, then submit.");
+}
+
+/**
+ * Raise an extra ATL against a PO the VP has already approved.
+ *
      * This is the repeatable per-truck action that moved off the Purchase
      * Orders list. Unlike updateRequest it never re-opens the approval flow,
      * so the PO's own request_status is left exactly as it was.

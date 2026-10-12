@@ -44,6 +44,8 @@ class StockRequest extends Model
         'purchasing_received_at',
         'purchasing_received_by',
         'legacy_purchase_order_id',
+        // Set when Purchasing raises a PO from this request.
+        'purchase_order_id',
     ];
 
     protected $casts = [
@@ -113,18 +115,35 @@ class StockRequest extends Model
         return $this->belongsTo(PurchaseOrder::class, 'legacy_purchase_order_id');
     }
 
+    /**
+     * The purchase order Purchasing raised from this request, once prepared.
+     */
+    public function purchaseOrder(): BelongsTo
+    {
+        return $this->belongsTo(PurchaseOrder::class, 'purchase_order_id');
+    }
+
+    /**
+     * Purchasing has turned this request into a purchase order.
+     */
+    public function isPrepared(): bool
+    {
+        return $this->purchase_order_id !== null;
+    }
+
     public function deliveries(): HasMany
     {
         return $this->hasMany(PurchaseOrderDelivery::class, 'request_id');
     }
 
-    /**
-     * Requests still waiting on the depot or on Purchasing.
-     */
-    public function scopeOpen(Builder $query): Builder
-    {
-        return $query->whereNotIn('status', [self::STATUS_COMPLETED]);
-    }
+/**
+ * Requests still waiting on the depot or on Purchasing.
+ */
+public function scopeOpen(Builder $query): Builder
+{
+    return $query->whereNull('purchase_order_id')
+        ->whereNotIn('status', [self::STATUS_COMPLETED]);
+}
 
     /**
      * Total litres asked for, across every product line.

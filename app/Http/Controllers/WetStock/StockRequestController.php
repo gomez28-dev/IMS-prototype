@@ -8,6 +8,8 @@ use App\Models\Order;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderDelivery;
 use App\Models\StockIn;
+use App\Models\StockRequest;
+use App\Models\StockRequestLine;
 use App\Models\StorageTank;
 use App\Models\Warehouse;
 use Illuminate\Http\RedirectResponse;
@@ -22,18 +24,19 @@ class StockRequestController extends Controller
      */
     public function index(Request $request): View
     {
-        $warehouseId = $request->query('warehouse_id');
+$warehouseId = $request->query('warehouse_id');
 
-// Replenishment requests originated from depots.
-          // deliveries is eager-loaded because the list shows the ATL number.
-          $requestsQuery = PurchaseOrder::with(['warehouse', 'requester', 'approver', 'deliveries'])
-            ->whereIn('po_type', ['STANDARD_REPLENISHMENT', 'BUY_BACK']);
+        // Replenishment requests live in stock_requests now. Lines are eager
+        // loaded because the list reports Pending = Requested - Received per
+        // product, and the warehouse filter narrows the same list.
+        $requestsQuery = StockRequest::with(['warehouse', 'requester', 'lines', 'purchasingReceiver'])
+            ->latest();
 
         if ($warehouseId) {
             $requestsQuery->where('warehouse_id', $warehouseId);
         }
 
-        $stockRequests = $requestsQuery->latest()->paginate(15);
+        $stockRequests = $requestsQuery->paginate(15);
 
         // Incoming deliveries bound for depot tanks
         $deliveriesQuery = PurchaseOrderDelivery::with(['purchaseOrder.warehouse', 'stockIns.tank'])
@@ -82,7 +85,10 @@ class StockRequestController extends Controller
     }
 
     /**
-     * Store a new replenishment request (creates a PurchaseOrder in REQUESTED / Pending status).
+     * Store a new replenishment request.
+     *
+     * Writes a StockRequest with its product lines, rather than a placeholder
+     * purchase_orders row with no PO number and no value.
      */
     public function store(Request $request): RedirectResponse
     {
@@ -101,34 +107,108 @@ class StockRequestController extends Controller
 
         $warehouse = Warehouse::findOrFail($validated['warehouse_id']);
 
-        $po = PurchaseOrder::create([
-            'po_type' => $validated['po_type'],
+        $stockRequest = StockRequest::create([
+            // Depot replenishment arrives at the tank, so fuel is picked up.
+            'request_type' => StockRequest::TYPE_PICKUP,
             'warehouse_id' => $warehouse->id,
-            'qty_ordered' => $validated['qty_ordered'],
-            'request_status' => 'REQUESTED',
-            'status' => 'Pending',
             'requested_by' => Auth::id(),
             'request_date' => now(),
             'date_needed' => $validated['date_needed'] ?? null,
-            'requested_products' => [
-                ['product' => $validated['product'], 'quantity' => $validated['qty_ordered']]
-            ],
             'remarks' => $validated['remarks'] ?? null,
+            'status' => StockRequest::STATUS_REQUESTED,
+        ]);
+
+        StockRequestLine::create([
+            'stock_request_id' => $stockRequest->id,
+            'product' => $validated['product'],
+            'qty_requested' => $validated['qty_ordered'],
+            'qty_received' => 0,
         ]);
 
         AuditLog::create([
             'admin_id' => Auth::id(),
             'action' => 'CREATED',
-            'description' => "Created Replenishment Request #{$po->id} ({$warehouse->name}, " . number_format($po->qty_ordered) . "L {$validated['product']}) for Purchasing",
+            'description' => "Created Replenishment Request {$stockRequest->request_number} ({$warehouse->name}, " . number_format($validated['qty_ordered']) . "L {$validated['product']}) for Purchasing",
         ]);
 
-        return redirect()->route('wetstock.supplier-orders.index')
-            ->with('success', "Replenishment request for {$warehouse->name} (" . number_format($po->qty_ordered) . "L) has been submitted to Purchasing (Module 3).");
+        return redirect()->route('wetstock.stock-requests.index')
+            ->with('success', "Replenishment request {$stockRequest->request_number} for {$warehouse->name} (" . number_format($validated['qty_ordered']) . "L) has been submitted to Purchasing (Module 3).");
     }
 
-    /**
-     * Receive physical stock from an incoming PurchaseOrderDelivery into a storage tank.
-     */
+/**
+ * Record that Purchasing has picked the request up.
+ *
+ * This is tracked separately from the fuel actually arriving, because the M2
+ * list reports Purchasing and Qty Received as two different columns.
+ */
+public function markPickedUp(StockRequest $stockRequest): RedirectResponse
+{
+    if (!Auth::user()->canEditModule2()) {
+        abort(403);
+    }
+
+    if (!$stockRequest->hasBeenPickedUpByPurchasing()) {
+        $stockRequest->update([
+            'purchasing_received_at' => now(),
+            'purchasing_received_by' => Auth::id(),
+        ]);
+
+        AuditLog::create([
+            'admin_id' => Auth::id(),
+            'action' => 'updated',
+            'description' => "Purchasing picked up stock request {$stockRequest->request_number}.",
+        ]);
+    }
+
+    return back()->with('success', "{$stockRequest->request_number} marked as picked up by Purchasing.");
+}
+
+/**
+ * Record the quantity that actually arrived, per product line.
+ *
+ * Each line is set rather than incremented, so re-submitting corrects a typo
+ * instead of double counting.
+ */
+public function recordReceived(Request $request, StockRequest $stockRequest): RedirectResponse
+{
+    if (!Auth::user()->canReceiveStockIntoDepot()) {
+        abort(403, 'Unauthorized to record received stock.');
+    }
+
+    $quantities = $request->input('quantities', []);
+
+    $validated = [];
+    foreach ($quantities as $lineId => $quantity) {
+        $validated["quantities.{$lineId}"] = ['nullable', 'integer', 'min:0'];
+    }
+
+    $request->validate($validated);
+
+    foreach ($stockRequest->lines as $line) {
+        if (!array_key_exists($line->id, $quantities)) {
+            continue;
+        }
+
+        $received = (int) $quantities[$line->id];
+        $line->update(['qty_received' => $received]);
+    }
+
+    $stockRequest->load('lines');
+
+    // The request is finished only once every product is fully received.
+    $fullyReceived = $stockRequest->lines->isNotEmpty()
+        && $stockRequest->lines->every(fn ($line) => $line->isFullyReceived());
+
+    $stockRequest->update([
+        'status' => $fullyReceived ? StockRequest::STATUS_COMPLETED : StockRequest::STATUS_RECEIVED,
+    ]);
+
+    return back()->with('success', "Received quantities recorded for {$stockRequest->request_number}.");
+}
+
+/**
+ * Receive physical stock from an incoming PurchaseOrderDelivery into a storage tank.
+ */
     public function receiveDelivery(Request $request, PurchaseOrderDelivery $delivery): RedirectResponse
     {
         // Explicit allowlist: confirming fuel physically arrived at a depot is

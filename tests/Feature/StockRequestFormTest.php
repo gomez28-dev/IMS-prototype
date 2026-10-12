@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Admin;
 use App\Models\Client;
-use App\Models\PurchaseOrder;
+use App\Models\StockRequest;
 use App\Models\Warehouse;
 use Tests\TestCase;
 
@@ -136,14 +136,15 @@ class StockRequestFormTest extends TestCase
 
         $response->assertSessionHasNoErrors();
 
-        $po = PurchaseOrder::latest('id')->first();
+        $request = StockRequest::latest('id')->firstOrFail();
 
-        $this->assertSame(10000, (int) $po->qty_ordered);
+        $this->assertSame(10000, $request->qty_requested);
+        $this->assertSame(0, $request->qty_received);
+        $this->assertSame(10000, $request->lines->first()->qty_pending);
 
-        // requested_products is cast to array by the model.
-        $products = $po->requested_products;
-        $this->assertSame('Diesel', $products[0]['product']);
-        $this->assertSame(10000, (int) $products[0]['quantity']);
+        // A real REQ-001 style number, not a padded row id.
+        $this->assertMatchesRegularExpression('/^REQ-\d{3}$/', $request->request_number);
+        $this->assertSame('Diesel', $request->lines->first()->product);
     }
 
     public function test_all_three_canonical_products_are_accepted(): void
@@ -158,8 +159,8 @@ class StockRequestFormTest extends TestCase
             ])->assertSessionHasNoErrors();
         }
 
-        $stored = PurchaseOrder::latest('id')->limit(3)->get()
-            ->map(fn ($po) => $po->requested_products[0]['product'])->all();
+        $stored = StockRequest::latest('id')->limit(3)->get()
+            ->map(fn ($request) => $request->lines->first()->product)->all();
 
         foreach (['Unleaded', 'Diesel', 'Premium'] as $product) {
             $this->assertContains($product, $stored);

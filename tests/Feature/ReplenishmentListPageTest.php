@@ -3,7 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Admin;
-use App\Models\PurchaseOrder;
+use App\Models\StockRequest;
+use App\Models\StockRequestLine;
 use App\Models\Warehouse;
 use Tests\TestCase;
 
@@ -34,19 +35,25 @@ class ReplenishmentListPageTest extends TestCase
         $this->sanSimon = Warehouse::create(['name' => 'San Simon ' . rand(1000, 9999)]);
     }
 
-    protected function replenishmentPo(array $overrides = []): PurchaseOrder
+    protected function replenishmentRequest(array $overrides = []): StockRequest
     {
-        return PurchaseOrder::create(array_merge([
-            'po_type' => 'STANDARD_REPLENISHMENT',
+        $request = StockRequest::create(array_merge([
+            'request_type' => StockRequest::TYPE_PICKUP,
             'warehouse_id' => $this->sanSimon->id,
-            'qty_ordered' => 10000,
-            'request_status' => 'REQUESTED',
-            'status' => 'Pending',
             'requested_by' => $this->opsUser->id,
             'request_date' => now(),
-            'requested_products' => [['product' => 'Diesel', 'quantity' => 10000]],
+            'status' => StockRequest::STATUS_REQUESTED,
             'remarks' => 'Tank below reorder point',
         ], $overrides));
+
+        StockRequestLine::create([
+            'stock_request_id' => $request->id,
+            'product' => 'Diesel',
+            'qty_requested' => 10000,
+            'qty_received' => 0,
+        ]);
+
+        return $request->fresh();
     }
 
     protected function pageHtml(): string
@@ -59,7 +66,7 @@ class ReplenishmentListPageTest extends TestCase
 
     public function test_list_renders_a_submitted_request_with_its_real_site(): void
     {
-        $this->replenishmentPo();
+        $this->replenishmentRequest();
 
         $html = $this->pageHtml();
 
@@ -69,14 +76,14 @@ class ReplenishmentListPageTest extends TestCase
 
     public function test_request_number_column_is_removed(): void
     {
-        $this->replenishmentPo();
+        $this->replenishmentRequest();
 
         $this->assertStringNotContainsString('Request #', $this->pageHtml());
     }
 
     public function test_depot_column_is_renamed_to_site(): void
     {
-        $this->replenishmentPo();
+        $this->replenishmentRequest();
 
         $html = $this->pageHtml();
 
@@ -85,7 +92,7 @@ class ReplenishmentListPageTest extends TestCase
 
     public function test_remarks_render_without_mojibake(): void
     {
-        $this->replenishmentPo(['remarks' => 'Tank below reorder point']);
+        $this->replenishmentRequest(['remarks' => 'Tank below reorder point']);
 
         $html = $this->pageHtml();
 
@@ -106,7 +113,7 @@ class ReplenishmentListPageTest extends TestCase
      */
     public function test_empty_date_and_remarks_placeholders_are_clean(): void
     {
-        $this->replenishmentPo(['date_needed' => null, 'remarks' => null]);
+        $this->replenishmentRequest(['date_needed' => null, 'remarks' => null]);
 
         $html = $this->pageHtml();
 
@@ -119,7 +126,7 @@ class ReplenishmentListPageTest extends TestCase
      */
     public function test_merged_list_shows_po_atl_and_dr_columns(): void
     {
-        $this->replenishmentPo();
+        $this->replenishmentRequest();
 
         $html = $this->pageHtml();
 

@@ -6,6 +6,7 @@ use App\Models\Admin;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderDelivery;
 use App\Models\StockIn;
+use App\Models\StockRequest;
 use App\Models\StorageTank;
 use App\Models\Warehouse;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -58,14 +59,30 @@ class StockReceivedHandoffTest extends TestCase
             ]);
 
         $response->assertRedirect();
-        
-        $this->assertDatabaseHas('purchase_orders', [
+
+        // The request and its product line land in the dedicated tables.
+        $this->assertDatabaseHas('stock_requests', [
             'warehouse_id' => $this->warehouse->id,
-            'po_type' => 'STANDARD_REPLENISHMENT',
-            'qty_ordered' => 20000,
-            'request_status' => 'REQUESTED',
-            'status' => 'Pending',
+            'status' => 'REQUESTED',
             'requested_by' => $this->opsManager->id,
+        ]);
+
+        $request = StockRequest::latest('id')->firstOrFail();
+
+        $this->assertSame($this->warehouse->id, (int) $request->warehouse_id);
+        $this->assertSame('REQUESTED', $request->status);
+        $this->assertSame($this->opsManager->id, (int) $request->requested_by);
+        $this->assertDatabaseHas('stock_request_lines', [
+            'stock_request_id' => $request->id,
+            'product' => 'Diesel',
+            'qty_requested' => 20000,
+            'qty_received' => 0,
+        ]);
+
+        // Nothing is raised against a supplier until Purchasing prepares it.
+        $this->assertDatabaseMissing('purchase_orders', [
+            'warehouse_id' => $this->warehouse->id,
+            'qty_ordered' => 20000,
         ]);
     }
 
