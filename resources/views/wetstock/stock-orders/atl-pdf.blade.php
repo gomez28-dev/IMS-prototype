@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Authority To Load - {{ $delivery->atl_number ?? $po->po_number }}</title>
+    <title>Authority To Load - {{ $delivery->atl_number ?? ($po?->po_number ?? 'ATL') }}</title>
     <style>
         @page {
             margin: 28px 32px 32px 32px;
@@ -190,8 +190,8 @@
             <td class="meta-value">
                 @if($delivery->approved_at)
                     {{ \Carbon\Carbon::parse($delivery->approved_at)->format('F d, Y') }}
-                @elseif($po->approved_at)
-                    {{ \Carbon\Carbon::parse($po->approved_at)->format('F d, Y') }}
+@elseif($po?->approved_at)
+{{ \Carbon\Carbon::parse($po->approved_at)->format('F d, Y') }}
                 @else
                     {{ now()->format('F d, Y') }}
                 @endif
@@ -201,13 +201,13 @@
         </tr>
         <tr>
             <td class="meta-label">COMPANY</td>
-            <td class="meta-value">{{ $po->supplier_name ?: '—' }}</td>
+            <td class="meta-value">{{ $po?->supplier_name ?: ($delivery->stockRequest?->requester?->name ?: '—') }}</td>
             <td class="meta-label">S.O. NO.</td>
             <td class="meta-value">{{ $delivery->so_number ?: '—' }}</td>
         </tr>
         <tr>
             <td class="meta-label">DESTINATION / SITE</td>
-            <td class="meta-value" colspan="3">{{ optional($po->warehouse)->name ?: ($po->isFuelTrade() ? 'Direct to Client Pick-Up' : '—') }}</td>
+            <td class="meta-value" colspan="3">{{ optional($po?->warehouse)->name ?: (optional($delivery->stockRequest?->warehouse)->name ?: ($po?->isFuelTrade() ? 'Direct to Client Pick-Up' : '—')) }}</td>
         </tr>
     </table>
 
@@ -235,7 +235,7 @@
                             </div>
                         @endif
                     @else
-                        {{ $po->po_number ?: '—' }}
+                        {{ $po?->po_number ?: ($delivery->stockRequest?->request_number ?: '—') }}
                     @endif
                 </td>
                 <td><strong style="color: #222;">{{ $delivery->product }}</strong></td>

@@ -115,7 +115,9 @@
                     <table class="table table-hover align-middle mb-0">
                         <thead class="bg-light">
                             <tr>
-                                <th class="ps-3 py-3">ATL #</th>
+                                <th class="ps-3 py-3">REF #</th>
+                                <th class="py-3">Type</th>
+                                <th class="py-3">ATL #</th>
                                 <th class="py-3">PO #</th>
                                 <th class="py-3">Pick Up Date</th>
                                 <th class="py-3">Product / Qty</th>
@@ -138,6 +140,13 @@
                                 @endphp
                                 <tr>
                                     <td class="ps-3 fw-bold text-dark">
+                                        {{-- REF# says what the ATL serves: SO-FT or SO-BB. --}}
+                                        {{ $atl->refNumber() }}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-light text-dark border">{{ $atl->typeLabel() }}</span>
+                                    </td>
+                                    <td class="small">
                                         {{ $atl->atl_number ?: ($atl->client_atl_number ?: 'Pending') }}
                                         @if ($atl->client_atl_number && $atl->atl_number)
                                             <div class="small text-muted">Client: {{ $atl->client_atl_number }}</div>
@@ -180,26 +189,20 @@
                                         @endif
                                     </td>
                                     <td class="pe-3 text-end">
+                                        {{-- Exactly two actions: View opens the ATL pop-up,
+                                             Pen opens the ATL form. The PDF download lives
+                                             inside the pop-up and is VP gated there. --}}
                                         <div class="d-inline-flex gap-1 justify-content-end">
-                                            @if ($atl->hasScannedDocs())
-                                                <a href="{{ $atl->scanned_doc_url }}" target="_blank"
-                                                   class="btn btn-sm btn-outline-success rounded-pill px-2 py-1" title="View scanned ATL">
-                                                    <i class="bi bi-google me-1"></i> Scanned
+                                            <button type="button" class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary"
+                                                    data-bs-toggle="modal" data-bs-target="#atlDetailModal{{ $atl->id }}"
+                                                    title="View ATL">
+                                                <i class="bi bi-eye me-1"></i> View
+                                            </button>
+                                            @if (Auth::user()->canEditStockOrders())
+                                                <a href="{{ route('stock-orders.add-atl', $order->id) }}"
+                                                   class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary" title="Edit ATL">
+                                                    <i class="bi bi-pencil me-1"></i> Pen
                                                 </a>
-                                            @endif
-                                            @if ($atl->requiresAtl() && $atl->atl_number
-                                                && $atl->status !== 'Pending'
-                                                && $atl->approval_status !== \App\Models\PurchaseOrderDelivery::APPROVAL_REJECTED)
-                                                <a href="{{ route('stock-orders.pdf', $atl->id) }}"
-                                                   class="btn btn-sm btn-outline-danger rounded-pill px-2 py-1" title="Download ATL PDF">
-                                                    <i class="bi bi-file-earmark-pdf me-1"></i> ATL PDF
-                                                </a>
-                                            @elseif ($atl->approval_status === \App\Models\PurchaseOrderDelivery::APPROVAL_REJECTED)
-                                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2 py-1"
-                                                      title="This ATL was rejected, so no PDF was issued">Rejected</span>
-                                            @else
-                                                <span class="text-muted" title="Awaiting ATL issuance">&mdash;</span>
-                                                <span class="badge bg-light text-muted border rounded-pill px-2 py-1 ms-1">Pending Issuance</span>
                                             @endif
                                         </div>
                                     </td>
@@ -219,6 +222,107 @@
         </div>
     </div>
 </div>
+
+{{-- ATL detail pop-up, opened by the View action on each ATL row. --}}
+@foreach ($atls as $atl)
+    <div class="modal fade" id="atlDetailModal{{ $atl->id }}" tabindex="-1" aria-labelledby="atlDetailModalLabel{{ $atl->id }}" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content rounded-4 border-0 shadow">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold text-dark" id="atlDetailModalLabel{{ $atl->id }}">
+                        <i class="bi bi-file-earmark-text text-primary me-1"></i> ATL {{ $atl->atl_number ?: ($atl->client_atl_number ?: 'Pending') }}
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body pt-3">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="text-muted extra-small fw-semibold text-uppercase">REF #</div>
+                            <div class="fw-bold">{{ $atl->refNumber() }}</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="text-muted extra-small fw-semibold text-uppercase">Type</div>
+                            <div class="fw-bold">{{ $atl->typeLabel() }}</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="text-muted extra-small fw-semibold text-uppercase">Client</div>
+                            <div class="fw-semibold">{{ $order->account }}</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="text-muted extra-small fw-semibold text-uppercase">Pick Up Date</div>
+                            <div class="fw-semibold">{{ $atl->receiving_date ? $atl->receiving_date->format('M d, Y') : '—' }}</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="text-muted extra-small fw-semibold text-uppercase">Channel</div>
+                            <div class="fw-semibold">{{ $atl->channel_label ?: '—' }}</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="text-muted extra-small fw-semibold text-uppercase">Driver</div>
+                            <div class="fw-semibold">
+                                {{ $atl->driver_name ?: '—' }}
+                                @if ($atl->plate_number)
+                                    <span class="text-muted">({{ $atl->plate_number }})</span>
+                                @endif
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="text-muted extra-small fw-semibold text-uppercase mb-1">Product / Qty</div>
+                            @php
+                                $modalBreakdown = $atl->productBreakdown();
+                            @endphp
+                            @if ($modalBreakdown === [])
+                                <div class="fw-semibold">{{ $atl->product ?: '—' }} — {{ number_format($atl->qty_to_receive) }} L</div>
+                            @else
+                                @foreach ($modalBreakdown as $product => $qty)
+                                    <div class="fw-semibold">{{ $product }} — {{ number_format($qty) }} L</div>
+                                @endforeach
+                            @endif
+                        </div>
+                        @if ($atl->dr_number)
+                            <div class="col-md-6">
+                                <div class="text-muted extra-small fw-semibold text-uppercase">DR #</div>
+                                <div class="fw-semibold">{{ $atl->dr_number }}</div>
+                            </div>
+                        @endif
+                        @if ($atl->additional_remarks)
+                            <div class="col-12">
+                                <div class="text-muted extra-small fw-semibold text-uppercase mb-1">Remarks</div>
+                                <div class="small">{{ $atl->additional_remarks }}</div>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    @if ($atl->hasScannedDocs())
+                        <a href="{{ $atl->scanned_doc_url }}" target="_blank" class="btn btn-outline-success rounded-pill px-3">
+                            <i class="bi bi-google me-1"></i> Scanned Docs
+                        </a>
+                    @endif
+                    {{-- The ATL document is only released once the VP has approved,
+                         which the route enforces as well as this link. --}}
+                    @if ($atl->requiresAtl() && $atl->atl_number
+                        && $atl->status !== 'Pending'
+                        && $atl->approval_status !== \App\Models\PurchaseOrderDelivery::APPROVAL_REJECTED
+                        && ($atl->purchaseOrder?->isVpApproved() ?? $atl->approval_status === \App\Models\PurchaseOrderDelivery::APPROVAL_APPROVED))
+                        <a href="{{ route('stock-orders.pdf', $atl->id) }}" class="btn btn-outline-danger rounded-pill px-3">
+                            <i class="bi bi-file-earmark-pdf me-1"></i> ATL PDF
+                        </a>
+                    @else
+                        <span class="badge bg-light text-muted border rounded-pill px-3 py-2"
+                              title="The ATL document is released once the VP has approved">
+                            @if ($atl->approval_status === \App\Models\PurchaseOrderDelivery::APPROVAL_REJECTED)
+                                Rejected
+                            @else
+                                Awaiting VP Approval
+                            @endif
+                        </span>
+                    @endif
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+@endforeach
 
 @if ($liftableDelivery)
     <div class="modal fade" id="confirmLiftModal{{ $liftableDelivery->id }}" tabindex="-1" aria-hidden="true">

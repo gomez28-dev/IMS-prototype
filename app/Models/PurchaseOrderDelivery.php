@@ -172,6 +172,64 @@ class PurchaseOrderDelivery extends Model
             ->all();
     }
 
+    /**
+     * The ATL's reference on the whiteboard: SO-FT, SO-BB or REQ.
+     *
+     * An ATL serves one of three things, and the reference says which:
+     * a Fuel Trade or Buy Back sales order, or a Module 2 stock request.
+     */
+    public function refNumber(): string
+    {
+        if ($this->atl_category === self::CATEGORY_FUEL_TRADE || $this->order?->isFuelTrade()) {
+            return 'SO-FT '.$this->sourceNumber();
+        }
+
+        if ($this->atl_category === self::CATEGORY_BUY_BACK || $this->order?->isBuyBack()) {
+            return 'SO-BB '.$this->sourceNumber();
+        }
+
+        if ($this->stockRequest) {
+            return $this->stockRequest->request_number ?: 'REQ-'.$this->stockRequest->id;
+        }
+
+        return 'REQ-'.$this->id;
+    }
+
+    /**
+     * The bare number behind refNumber(), taken from whichever document the
+     * ATL was raised against.
+     */
+    private function sourceNumber(): string
+    {
+        if ($this->order?->so_number) {
+            return ltrim($this->order->so_number, 'SO-');
+        }
+
+        return (string) ($this->order_id ?? $this->id);
+    }
+
+    /**
+     * The ATL's Type, as the whiteboard words it: FT, BUY BACK or
+     * DOYEN - PICK UP.
+     */
+    public function typeLabel(): string
+    {
+        return match ($this->atl_category) {
+            self::CATEGORY_FUEL_TRADE => 'FT',
+            self::CATEGORY_BUY_BACK => 'BUY BACK',
+            default => $this->isDeliveredRequest() ? 'DOYEN - DELIVERY' : 'DOYEN - PICK UP',
+        };
+    }
+
+    /**
+     * A Doyen Stocks ATL for a request that is being delivered rather than
+     * collected.
+     */
+    private function isDeliveredRequest(): bool
+    {
+        return $this->stockRequest?->isDelivered() ?? false;
+    }
+
     public function stockIns(): HasMany
     {
         return $this->hasMany(StockIn::class, 'purchase_order_delivery_id');

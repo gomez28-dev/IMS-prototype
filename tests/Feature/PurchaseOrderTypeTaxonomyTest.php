@@ -77,7 +77,7 @@ class PurchaseOrderTypeTaxonomyTest extends TestCase
         ];
     }
 
-    public function test_the_list_shows_the_new_type_labels(): void
+    public function test_the_list_no_longer_shows_a_type_column_or_filter(): void
     {
         $this->po('FUEL_TRADE');
         $this->po('BUY_BACK');
@@ -87,22 +87,25 @@ class PurchaseOrderTypeTaxonomyTest extends TestCase
             ->get(route('stock-orders.purchase-orders.index'));
 
         $response->assertStatus(200);
-        $response->assertSee('SO-FT');
-        $response->assertSee('SO-BUY BACK');
-        $response->assertSee('Doyen Stock');
-        // The old wording should be gone from the list.
+
+        // The labels still exist, they just no longer appear on the list.
+        $response->assertDontSee('SO-BUY BACK');
+        $response->assertDontSee('Doyen Stock');
+        $response->assertDontSee('-- All PO Types --');
+        $response->assertDontSee('name="po_type"', false);
+
+        // The old wording stays gone.
         $response->assertDontSee('Standard Replenishment');
     }
 
-    public function test_the_type_filter_offers_the_new_labels(): void
+    public function test_the_list_keeps_search_and_status_filters(): void
     {
         $response = $this->actingAs($this->purchasing)
             ->get(route('stock-orders.purchase-orders.index'));
 
         $response->assertStatus(200);
-        $response->assertSee('SO-FT');
-        $response->assertSee('SO-BUY BACK');
-        $response->assertSee('Doyen Stock');
+        $response->assertSee('name="search"', false);
+        $response->assertSee('name="status"', false);
     }
 
     public function test_the_detail_page_shows_the_type_label(): void

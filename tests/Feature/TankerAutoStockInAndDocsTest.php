@@ -362,7 +362,7 @@ class TankerAutoStockInAndDocsTest extends TestCase
             ->get(route('stock-orders.purchase-orders.index'));
 
         $response->assertStatus(200);
-        $response->assertSee('New Supplier PO');
+        $response->assertSee('Create P.O.');
         // The PO and its active delivery still render without error.
         $response->assertSee($poNumber);
     }

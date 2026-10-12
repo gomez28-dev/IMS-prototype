@@ -173,4 +173,50 @@ class PurchaseOrderActionColumnTest extends TestCase
         $response->assertDontSee('confirmLiftModal', false);
         $response->assertDontSee('Confirm Refinery Pick Up / Lift');
     }
+
+    public function test_the_action_column_offers_exactly_print_view_and_pen(): void
+    {
+        $po = $this->po('CONFIRMED');
+
+        $response = $this->actingAs($this->purchasing)
+            ->get(route('stock-orders.purchase-orders.index'));
+
+        $response->assertStatus(200);
+
+        // Print | View | Pen.
+        $response->assertSee(route('stock-orders.po-pdf', $po->id), false);
+        $response->assertSee(route('stock-orders.purchase-orders.show', $po->id), false);
+        $response->assertSee(route('stock-orders.edit-supplier-po', $po->id), false);
+        $response->assertSee('> Print', false);
+        $response->assertSee('> View', false);
+        $response->assertSee('> Pen', false);
+
+        // Work that used to clutter the list now lives on the detail page.
+        // Note: the Approvals route itself still appears in the sidebar, so the
+        // in-row button is what is checked here.
+        $response->assertDontSee('Review for Approval');
+        $response->assertDontSee(route('stock-orders.wet-stock-requests.show', $po->id), false);
+        $response->assertDontSee('ATL PDF');
+        $response->assertDontSee('> Edit<', false);
+    }
+
+    public function test_the_pen_action_is_hidden_from_roles_that_cannot_edit(): void
+    {
+        $po = $this->po('CONFIRMED');
+
+        $viewer = Admin::create([
+            'username' => 'viewer_'.uniqid(),
+            'password' => bcrypt('secret'),
+            'name' => 'Audit Viewer',
+            'role' => 'audit',
+        ]);
+
+        $this->actingAs($viewer)
+            ->get(route('stock-orders.purchase-orders.index'))
+            ->assertStatus(200)
+            ->assertDontSee(route('stock-orders.edit-supplier-po', $po->id), false)
+            // Print and View remain.
+            ->assertSee(route('stock-orders.po-pdf', $po->id), false)
+            ->assertSee(route('stock-orders.purchase-orders.show', $po->id), false);
+    }
 }

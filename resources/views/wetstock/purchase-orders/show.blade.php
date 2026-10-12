@@ -329,6 +329,8 @@
                                 @endphp
                                 <tr>
                                     <td class="ps-3 fw-bold text-dark">
+                                        {{-- The REF# names what the ATL serves: SO-FT, SO-BB or REQ. --}}
+                                        <div>{{ $delivery->refNumber() }}</div>
                                         {{ $delivery->atl_number ?: ($delivery->client_atl_number ?: 'Pending') }}
                                         @if ($delivery->client_atl_number && $delivery->atl_number)
                                             <div class="small text-muted">Client: {{ $delivery->client_atl_number }}</div>
@@ -340,7 +342,7 @@
                                     </td>
                                     <td class="small">{{ $purchaseOrder->supplier_name ?: ($purchaseOrder->client->name ?? '—') }}</td>
                                     <td>
-                                        <span class="badge {{ $purchaseOrder->typeBadgeClass() }}">{{ $purchaseOrder->typeLabel() }}</span>
+                                        <span class="badge {{ $purchaseOrder->typeBadgeClass() }}">{{ $delivery->typeLabel() }}</span>
                                     </td>
                                     <td class="text-end small font-monospace">
                                         @foreach ($rates as $product => $qty)
@@ -373,9 +375,12 @@
                                                     <i class="bi bi-google me-1"></i> Scanned
                                                 </a>
                                             @endif
+                                            {{-- The ATL document is only released once the VP has approved, which
+                                                 the route enforces as well as this link. --}}
                                             @if ($delivery->requiresAtl() && $delivery->atl_number
                                                 && $delivery->status !== 'Pending'
-                                                && $delivery->approval_status !== \App\Models\PurchaseOrderDelivery::APPROVAL_REJECTED)
+                                                && $delivery->approval_status !== \App\Models\PurchaseOrderDelivery::APPROVAL_REJECTED
+                                                && $purchaseOrder->isVpApproved())
                                                 <a href="{{ route('stock-orders.pdf', $delivery->id) }}"
                                                    class="btn btn-sm btn-outline-danger rounded-pill px-2 py-1" title="Download ATL PDF">
                                                     <i class="bi bi-file-earmark-pdf me-1"></i> ATL PDF

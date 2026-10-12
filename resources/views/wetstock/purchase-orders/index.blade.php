@@ -20,7 +20,7 @@
             <div class="d-flex gap-2">
                 @if (Auth::user()->canEditStockOrders())
                 <a href="{{ route('stock-orders.create-supplier-po') }}" class="btn btn-primary-custom shadow-sm">
-                    <i class="bi bi-plus-lg me-1"></i> New Supplier PO
+                    <i class="bi bi-plus-lg me-1"></i> Create P.O.
                 </a>
                 @endif
                 <a href="{{ route('stock-orders.approvals') }}" class="btn btn-outline-success">
@@ -145,18 +145,12 @@
         <div class="card card-custom border-0 shadow-sm mb-4">
             <div class="card-body p-3">
                 <form method="GET" action="{{ route('stock-orders.purchase-orders.index') }}" class="row g-2 align-items-center">
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <input type="text" name="search" class="form-control form-control-sm" placeholder="Search PO # or Supplier..." value="{{ request('search') }}">
                     </div>
-                    <div class="col-md-3">
-                        <select name="po_type" class="form-select form-select-sm">
-                            <option value="">-- All PO Types --</option>
-                            @foreach (\App\Models\PurchaseOrder::TYPE_LABELS as $value => $label)
-                                <option value="{{ $value }}" {{ request('po_type') === $value ? 'selected' : '' }}>{{ $label }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-md-3">
+                    <div class="col-md-4">
+                        {{-- The PO Type column is gone from the table, so its filter
+                             goes with it. Status and search stay. --}}
                         <select name="status" class="form-select form-select-sm">
                             <option value="">-- All Statuses --</option>
                             <option value="REQUESTED" {{ request('status') === 'REQUESTED' ? 'selected' : '' }}>1. REQUESTED</option>
@@ -166,7 +160,7 @@
                             <option value="COMPLETED" {{ request('status') === 'COMPLETED' ? 'selected' : '' }}>5. COMPLETED</option>
                         </select>
                     </div>
-                    <div class="col-md-3 d-flex gap-2">
+                    <div class="col-md-4 d-flex gap-2">
                         <button type="submit" class="btn btn-sm btn-primary w-100">Filter</button>
                         <a href="{{ route('stock-orders.purchase-orders.index') }}" class="btn btn-sm btn-outline-secondary">Reset</a>
                     </div>
@@ -182,9 +176,7 @@
                         <thead class="bg-light">
                             <tr>
                                 <th class="ps-3 py-3">PO #</th>
-                                <th class="py-3">Type</th>
                                 <th class="py-3">Supplier</th>
-                                <th class="py-3">Site / Channel</th>
                                 <th class="py-3 text-end">Qty.</th>
                                 <th class="py-3 text-end">Price</th>
                                 <th class="py-3 text-end">Amount</th>
@@ -202,19 +194,7 @@
                                         @endif
                                     </td>
                                     <td>
-                                        <span class="badge {{ $po->typeBadgeClass() }}">{{ $po->typeLabel() }}</span>
-                                    </td>
-                                    <td>
                                         <strong>{{ $po->supplier_name ?: ($po->client->name ?? '—') }}</strong>
-                                    </td>
-                                    <td>
-                                        @if ($po->warehouse)
-                                            <i class="bi bi-geo-alt text-primary me-1"></i>{{ $po->warehouse->name }}
-                                        @elseif ($po->isFuelTrade())
-                                            <span class="badge bg-light text-dark border">Direct Pick-up</span>
-                                        @else
-                                            —
-                                        @endif
                                     </td>
                                     {{-- Qty / Price / Amount, broken out per product. Amount is the stored
                                              total; the line columns are the per-product detail
@@ -266,56 +246,26 @@
                                         <div class="extra-small text-muted mt-1">{{ $po->computed_status }}</div>
                                     </td>
                                     <td class="pe-3 text-end">
-                                        @php
-                                            // Every row leads with View. ATL processing and
-                                            // approval both start from the PO detail page now,
-                                            // so the list is read-only navigation.
-                                            $canApprove = Auth::user()->canApproveStockOrders();
-                                            $activeDel = $po->deliveries->firstWhere('status', 'Active');
-                                            $atlDel = $po->deliveries->first(fn($d) => $d->requiresAtl());
-                                        @endphp
+                                        {{-- Exactly three actions, per the whiteboard: Print, View, Pen.
+                                             Approval, ATL PDFs, scanned docs and tracking all live on
+                                             the PO detail page, so the list stays navigation only. --}}
                                         <div class="d-inline-flex gap-1 align-items-center flex-wrap justify-content-end">
+                                            {{-- Print is only released once the VP has approved, which
+                                                 the route enforces as well as this link. --}}
+                                            @if ($po->isVpApproved())
+                                                <a href="{{ route('stock-orders.po-pdf', $po->id) }}"
+                                                   class="btn btn-sm btn-outline-danger rounded-pill px-2 py-1" title="Print Purchase Order">
+                                                    <i class="bi bi-printer me-1"></i> Print
+                                                </a>
+                                            @endif
+
                                             <a href="{{ route('stock-orders.purchase-orders.show', $po->id) }}" class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary" title="Open purchase order">
                                                 <i class="bi bi-eye me-1"></i> View
                                             </a>
 
                                             @if (Auth::user()->canEditStockOrders())
                                                 <a href="{{ route('stock-orders.edit-supplier-po', $po->id) }}" class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary" title="Edit purchase order">
-                                                    <i class="bi bi-pencil me-1"></i> Edit
-                                                </a>
-                                            @endif
-
-                                            {{-- Only released once the VP has approved. --}}
-                                            @if ($po->isVpApproved())
-                                                <a href="{{ route('stock-orders.po-pdf', $po->id) }}"
-                                                   class="btn btn-sm btn-outline-danger rounded-pill px-2 py-1" title="Download Purchase Order PDF">
-                                                    <i class="bi bi-file-earmark-pdf me-1"></i> PO PDF
-                                                </a>
-                                            @endif
-
-                                            @if ($po->request_status === 'REQUESTED' || $po->request_status === 'RECEIVED')
-                                                @if ($canApprove)
-                                                    <a href="{{ route('stock-orders.approvals') }}" class="btn btn-sm btn-outline-success rounded-pill px-3 py-1" title="Review in Approvals Queue">
-                                                        <i class="bi bi-patch-check me-1"></i> Review for Approval
-                                                    </a>
-                                                @else
-                                                    <span class="badge bg-warning-subtle text-warning border rounded-pill px-3 py-1">Pending VP</span>
-                                                @endif
-                                            @endif
-
-                                            @if ($po->request_status === 'FOR_DELIVERY')
-                                                @if ($activeDel && $activeDel->hasScannedDocs())
-                                                    <a href="{{ $activeDel->scanned_doc_url }}" target="_blank" class="btn btn-sm btn-outline-success rounded-pill px-2 py-1 shadow-sm" title="View Scanned Documents on Google Drive">
-                                                        <i class="bi bi-google me-1"></i> Docs
-                                                    </a>
-                                                @endif
-                                                @if ($atlDel)
-                                                    <a href="{{ route('stock-orders.pdf', $atlDel->id) }}" class="btn btn-sm btn-outline-danger rounded-pill px-2 py-1 shadow-sm" title="Extract Authority to Load PDF">
-                                                        <i class="bi bi-file-earmark-pdf me-1"></i> ATL PDF
-                                                    </a>
-                                                @endif
-                                                <a href="{{ route('stock-orders.wet-stock-requests.show', $po->id) }}" class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary" title="Open request">
-                                                    <i class="bi bi-truck me-1"></i> Track
+                                                    <i class="bi bi-pencil me-1"></i> Pen
                                                 </a>
                                             @endif
                                         </div>
@@ -323,7 +273,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="9" class="text-center py-5 text-muted">No stock orders found matching criteria.</td>
+                                    <td colspan="7" class="text-center py-5 text-muted">No stock orders found matching criteria.</td>
                                 </tr>
                             @endforelse
                         </tbody>
