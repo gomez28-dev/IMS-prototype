@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Delivery;
 use App\Models\DeliveryAllocation;
+use App\Models\Order;
 use App\Models\StorageTank;
 use App\Models\Warehouse;
 use Illuminate\Http\RedirectResponse;
@@ -26,6 +27,7 @@ class DeliveryAssignmentController extends Controller
             'items.allocations',
             'allocations.item',
             'allocations.tank.warehouse',
+            'allocations.compartment',
             'allocations.assignedBy',
             'fulfilledBy',
             'createdBy',
@@ -135,6 +137,11 @@ class DeliveryAssignmentController extends Controller
     /**
      * Allocate a partial or full quantity of ONE compartment of a delivery to a storage tank.
      * The delivery remains PENDING with volume placed on hold (stock_for_delivery).
+     *
+     * Product-aware:
+     *  - Tanker truck with compartments: only compartments holding the DR line's product are used,
+     *    and the liters are split across them automatically.
+     *  - Depot (or a truck without compartments): the tank's product must match the DR line.
      */
     public function allocate(Request $request, Delivery $delivery): RedirectResponse
     {
@@ -170,7 +177,8 @@ class DeliveryAssignmentController extends Controller
 
         $tank = StorageTank::findOrFail($validated['storage_tank_id']);
         $quantity = (int) $validated['quantity'];
-        $productLabel = ($item->product_type ?: '-') . ' - ' . $item->product_name;
+        $code = $item->product_type;
+        $productLabel = ($code ?: '-') . ' - ' . $item->product_name;
         $remaining = $item->remaining_to_allocate;
 
         if ($delivery->order && $delivery->order->status === 'Cancelled') {
@@ -185,10 +193,6 @@ class DeliveryAssignmentController extends Controller
             return back()->with('danger', "Cannot allocate: {$quantity}L exceeds the remaining unallocated {$productLabel} quantity of {$remaining}L for DR #{$delivery->dr_number}.");
         }
 
-        if ($item->allocations->contains('storage_tank_id', $tank->id)) {
-            return back()->with('danger', "Cannot allocate: the {$productLabel} compartment of DR #{$delivery->dr_number} already has an allocation on tank {$tank->name}.");
-        }
-
         // Site lock: the tank must belong to the same warehouse as the order's location.
         // Cross-site stock must be moved via a Borrow transfer first, then allocated locally.
         $tank->load('warehouse');
@@ -196,26 +200,79 @@ class DeliveryAssignmentController extends Controller
             return back()->with('danger', "Cannot allocate: tank {$tank->name} belongs to {$tank->warehouse->name}, but this order's site is " . ($delivery->order->location ?? '(no site)') . ". Cross-site stock must be moved via a Borrow transfer first, then allocated from the local tank.");
         }
 
-        if ($quantity > $tank->effective_available) {
-            return back()->with('danger', "Cannot allocate: {$quantity}L exceeds available stock in {$tank->name} ({$tank->effective_available}L available after accounting for pending deliveries).");
+        // Work out where the liters come from: [compartment|null, liters] rows.
+        $rows = [];
+        $compartments = $tank->compartments()->get();
+
+        if ($compartments->isNotEmpty()) {
+            if (!$code) {
+                return back()->with('danger', "DR #{$delivery->dr_number} has no product set on this line, so a truck compartment cannot be matched. Edit the DR and set the product first.");
+            }
+
+            $matching = $compartments->filter(fn ($c) => $c->product_type === $code
+                    && $c->effective_available > 0
+                    && !$item->allocations->contains('tank_compartment_id', $c->id))
+                ->values();
+
+            if ($matching->isEmpty()) {
+                return back()->with('danger', "Cannot allocate: no compartment on {$tank->name} has {$productLabel} available. Check the truck's compartments on the Wet Stock dashboard.");
+            }
+
+            $pool = (int) $matching->sum('effective_available');
+            if ($quantity > $pool) {
+                return back()->with('danger', "Cannot allocate: {$tank->name} only has " . number_format($pool) . "L of {$productLabel} available across its compartments (after pending deliveries).");
+            }
+
+            $left = $quantity;
+            foreach ($matching as $c) {
+                if ($left <= 0) {
+                    break;
+                }
+                $take = min($left, $c->effective_available);
+                $rows[] = [$c, $take];
+                $left -= $take;
+            }
+        } else {
+            if ($item->allocations->contains('storage_tank_id', $tank->id)) {
+                return back()->with('danger', "Cannot allocate: the {$productLabel} compartment of DR #{$delivery->dr_number} already has an allocation on tank {$tank->name}.");
+            }
+
+            if ($tank->product_type && $code && $tank->product_type !== $code) {
+                $held = Order::PRODUCT_TYPES[$tank->product_type] ?? $tank->product_type;
+                return back()->with('danger', "Cannot allocate: {$tank->name} holds {$held}, but this DR line needs {$productLabel}. Pick a tank with the matching product.");
+            }
+
+            if ($quantity > $tank->effective_available) {
+                return back()->with('danger', "Cannot allocate: {$quantity}L exceeds available stock in {$tank->name} ({$tank->effective_available}L available after accounting for pending deliveries).");
+            }
+
+            $rows[] = [null, $quantity];
         }
 
         $preAllocated = (int) $delivery->allocations->sum('quantity');
         $newAllocated = $preAllocated + $quantity;
         $isFullyAllocated = $newAllocated >= (int) $delivery->qty_out;
 
-        DeliveryAllocation::create([
-            'delivery_id' => $delivery->id,
-            'delivery_item_id' => $item->id,
-            'storage_tank_id' => $tank->id,
-            'quantity' => $quantity,
-            'assigned_by' => Auth::id(),
-        ]);
+        DB::transaction(function () use ($rows, $delivery, $item, $tank) {
+            foreach ($rows as [$c, $liters]) {
+                DeliveryAllocation::create([
+                    'delivery_id' => $delivery->id,
+                    'delivery_item_id' => $item->id,
+                    'storage_tank_id' => $tank->id,
+                    'tank_compartment_id' => $c ? $c->id : null,
+                    'quantity' => $liters,
+                    'assigned_by' => Auth::id(),
+                ]);
+            }
+        });
+
+        $where = collect($rows)->map(fn ($r) => $r[0] ? 'C' . $r[0]->compartment_no . ' ' . number_format($r[1]) . 'L' : null)->filter()->implode(', ');
 
         AuditLog::create([
             'admin_id' => Auth::id(),
             'action' => 'UPDATED',
             'description' => "Allocated {$quantity}L {$productLabel} (compartment #{$item->compartment_no}) of DR #{$delivery->dr_number} ({$delivery->qty_out}L) to tank {$tank->name} ({$tank->warehouse->name})"
+                . ($where ? " [{$where}]" : '')
                 . ($isFullyAllocated ? ' — DR is now fully allocated and ready for fulfillment in the Assigned tab.' : ''),
         ]);
 
@@ -232,8 +289,8 @@ class DeliveryAssignmentController extends Controller
 
     /**
      * Mark an assigned delivery as FULFILLED (Transitions volume from stock_for_delivery to stock_out).
-     * Tank stock is computed from each compartment's allocations, so every product
-     * is deducted from the tank(s) it was allocated to.
+     * Tank and compartment stock are both computed from the allocations, so every product
+     * is deducted from the tank (and truck compartment) it was allocated to.
      */
     public function markFulfilled(Request $request, Delivery $delivery): RedirectResponse
     {
@@ -306,6 +363,7 @@ class DeliveryAssignmentController extends Controller
         }
 
         $tankName = $allocation->tank->name;
+        $comp = $allocation->compartment ? ' C' . $allocation->compartment->compartment_no : '';
         $quantity = $allocation->quantity;
         $product = $allocation->item ? ($allocation->item->product_type ?: '-') . ' ' : '';
 
@@ -314,9 +372,9 @@ class DeliveryAssignmentController extends Controller
         AuditLog::create([
             'admin_id' => Auth::id(),
             'action' => 'UPDATED',
-            'description' => "Removed {$quantity}L {$product}allocation of DR #{$delivery->dr_number} ({$delivery->qty_out}L) from tank {$tankName}",
+            'description' => "Removed {$quantity}L {$product}allocation of DR #{$delivery->dr_number} ({$delivery->qty_out}L) from tank {$tankName}{$comp}",
         ]);
 
-        return back()->with('success', "Removed {$quantity}L allocation of DR #{$delivery->dr_number} from tank {$tankName}.");
+        return back()->with('success', "Removed {$quantity}L allocation of DR #{$delivery->dr_number} from tank {$tankName}{$comp}.");
     }
 }

@@ -176,11 +176,12 @@
 
                     <div class="row mb-3" id="atl-number-group" style="display:none;">
                         <div class="col-md-6">
-                            <label for="atl_number" class="form-label fw-medium text-secondary small">ATL #</label>
+                            <label for="atl_number" class="form-label fw-medium text-secondary small">ATL # <span class="text-danger">*</span></label>
                             <input type="text" name="atl_number" id="atl_number" class="form-control @error('atl_number') is-invalid @enderror" placeholder="e.g. ATL-00123" value="{{ old('atl_number', $delivery ? $delivery->atl_number : '') }}">
                             @error('atl_number')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
+                            <div class="invalid-feedback" id="atl-error">ATL # is required for pick-up deliveries.</div>
                         </div>
                     </div>
 
@@ -215,6 +216,8 @@
         var warning = document.getElementById('cancel-warning');
         var typeSelect = document.getElementById('type');
         var atlGroup = document.getElementById('atl-number-group');
+        var atlInput = document.getElementById('atl_number');
+        var atlError = document.getElementById('atl-error');
         var form = container.closest('form');
         var rowIndex = 0;
 
@@ -329,10 +332,33 @@
             }
         }
 
+        function isPickup() {
+            return typeSelect && typeSelect.value === 'PICK-UP';
+        }
+
         function updateAtlVisibility() {
             if (typeSelect && atlGroup) {
-                atlGroup.style.display = (typeSelect.value === 'PICK-UP') ? '' : 'none';
+                atlGroup.style.display = isPickup() ? '' : 'none';
+                if (atlInput) {
+                    atlInput.required = isPickup();
+                    if (!isPickup()) { atlInput.classList.remove('is-invalid'); }
+                }
             }
+        }
+
+        // Returns true when ATL # is satisfied (or not needed)
+        function validateAtl() {
+            if (!isPickup() || !atlInput) { return true; }
+            var ok = atlInput.value.trim() !== '';
+            atlInput.classList.toggle('is-invalid', !ok);
+            if (!ok) { atlError.style.display = 'block'; }
+            return ok;
+        }
+
+        if (atlInput) {
+            atlInput.addEventListener('input', function() {
+                if (atlInput.value.trim() !== '') { atlInput.classList.remove('is-invalid'); }
+            });
         }
 
         if (statusSelect) {
@@ -348,6 +374,12 @@
             // The server re-checks everything; this just saves a round trip.
             if (!refresh()) {
                 e.preventDefault();
+                return;
+            }
+
+            if (!validateAtl()) {
+                e.preventDefault();
+                atlInput.focus();
                 return;
             }
 

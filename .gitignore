@@ -34,3 +34,7 @@ docs/superpowers/
 
 # Stray SQLite database from old Python prototype (local only)
 ims_db
+
+# Scratch folder holding the copy downloaded from Hostinger for diffing.
+# Its contents are merged selectively; the folder itself is never committed.
+Edited in hostinger/

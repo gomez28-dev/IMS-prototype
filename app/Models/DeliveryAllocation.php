@@ -13,6 +13,7 @@ class DeliveryAllocation extends Model
         'delivery_id',
         'delivery_item_id',
         'storage_tank_id',
+        'tank_compartment_id',
         'quantity',
         'assigned_by',
     ];
@@ -24,6 +25,15 @@ class DeliveryAllocation extends Model
     public function delivery(): BelongsTo
     {
         return $this->belongsTo(Delivery::class, 'delivery_id');
+    }
+
+    /**
+     * The specific tanker compartment this allocation drew from, when the
+     * tank is a tanker split into compartments.
+     */
+    public function compartment(): BelongsTo
+    {
+        return $this->belongsTo(TankCompartment::class, 'tank_compartment_id');
     }
 
     public function item(): BelongsTo

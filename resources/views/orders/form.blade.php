@@ -63,34 +63,22 @@
                         @enderror
                     </div>
 
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label for="fulfillment_type" class="form-label fw-medium text-secondary small">Fulfillment Type <span class="text-danger">*</span></label>
-                            <select name="fulfillment_type" id="fulfillment_type" class="form-control form-select @error('fulfillment_type') is-invalid @enderror" required>
-                                <option value="DELIVERY" {{ old('fulfillment_type', $order ? $order->fulfillment_type : 'DELIVERY') === 'DELIVERY' ? 'selected' : '' }}>Delivery (Small/Big Tanker)</option>
-                                <option value="DEPOT_PICKUP" {{ old('fulfillment_type', $order ? $order->fulfillment_type : '') === 'DEPOT_PICKUP' ? 'selected' : '' }}>Pick Up at Doyen Depot</option>
-                                <option value="FUEL_TRADE" {{ old('fulfillment_type', $order ? $order->fulfillment_type : '') === 'FUEL_TRADE' ? 'selected' : '' }}>Fuel Trade: Pick Up at Supplier</option>
-                            </select>
-                            @error('fulfillment_type')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-                        <div class="col-md-6">
-                            <label for="order_category" class="form-label fw-medium text-secondary small">Order Category <span class="text-danger">*</span></label>
-                            <select name="order_category" id="order_category" class="form-control form-select @error('order_category') is-invalid @enderror" required>
-                                <option value="CLIENT_ORDER" {{ old('order_category', $order ? $order->order_category : 'CLIENT_ORDER') === 'CLIENT_ORDER' ? 'selected' : '' }}>Client Order</option>
-                                <option value="BUY_BACK" {{ old('order_category', $order ? $order->order_category : '') === 'BUY_BACK' ? 'selected' : '' }}>Buy Back</option>
-                            </select>
-                            @error('order_category')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-                    </div>
-
+                    @php
+                        // Current order type: Fuel Trade wins if an old order is somehow both.
+                        $currentOrderType = 'REGULAR';
+                        if ($order) {
+                            $currentOrderType = $order->isFuelTrade() ? 'FUEL_TRADE' : ($order->isBuyBack() ? 'BUY_BACK' : ($order->isConsumo() ? 'CONSUMO' : 'REGULAR'));
+                        }
+                    @endphp
                     <div class="mb-3">
-                        <label for="client_atl_number" class="form-label fw-medium text-secondary small">Client ATL Number (Optional / If Client provides ATL)</label>
-                        <input type="text" name="client_atl_number" id="client_atl_number" class="form-control @error('client_atl_number') is-invalid @enderror" placeholder="e.g. ATL-CLIENT-12345" value="{{ old('client_atl_number', $order ? $order->client_atl_number : '') }}">
-                        @error('client_atl_number')
+                        <label for="order_type" class="form-label fw-medium text-secondary small">Order Category <span class="text-danger">*</span></label>
+                        <select name="order_type" id="order_type" class="form-control form-select @error('order_type') is-invalid @enderror" required>
+                            <option value="REGULAR" {{ old('order_type', $currentOrderType) === 'REGULAR' ? 'selected' : '' }}>Regular Order</option>
+                            <option value="FUEL_TRADE" {{ old('order_type', $currentOrderType) === 'FUEL_TRADE' ? 'selected' : '' }}>Fuel Trade</option>
+                            <option value="BUY_BACK" {{ old('order_type', $currentOrderType) === 'BUY_BACK' ? 'selected' : '' }}>Buy Back</option>
+                            <option value="CONSUMO" {{ old('order_type', $currentOrderType) === 'CONSUMO' ? 'selected' : '' }}>Consumo</option>
+                        </select>
+                        @error('order_type')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
                     </div>
@@ -153,8 +141,8 @@
                             @enderror
                         </div>
                         <div class="col-md-6">
-                            <label for="terms" class="form-label fw-medium text-secondary small">Terms</label>
-                            <input type="text" name="terms" id="terms" class="form-control @error('terms') is-invalid @enderror" placeholder="e.g. COD, 30 days (optional)" value="{{ old('terms', $order ? $order->terms : '') }}">
+                            <label for="terms" class="form-label fw-medium text-secondary small">Terms <span class="text-danger">*</span></label>
+                            <input type="text" name="terms" id="terms" class="form-control @error('terms') is-invalid @enderror" placeholder="e.g. COD, 30 days" value="{{ old('terms', $order ? $order->terms : '') }}" required>
                             @error('terms')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror

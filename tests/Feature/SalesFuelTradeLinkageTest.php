@@ -57,12 +57,15 @@ class SalesFuelTradeLinkageTest extends TestCase
                 ['product_type' => 'D', 'qty' => 20000, 'price' => 54.50],
             ],
             'status' => 'Active',
-            'fulfillment_type' => 'FUEL_TRADE',
-            'order_category' => 'CLIENT_ORDER',
+            // The form now posts one order_type that expands into the
+            // fulfillment_type + order_category pair.
+            'order_type' => 'FUEL_TRADE',
+            'terms' => 'COD',
         ];
 
         $response = $this->actingAs($this->salesUser)->post(route('order.store'), $payload);
         $response->assertRedirect();
+        $response->assertSessionHasNoErrors();
 
         $this->assertDatabaseHas('orders', [
             'so_number' => $soNumber,

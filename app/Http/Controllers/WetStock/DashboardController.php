@@ -10,13 +10,20 @@ use Illuminate\View\View;
 class DashboardController extends Controller
 {
     /**
-     * Show the Web Stock main dashboard (per-tank stats rolling up to warehouse level).
+     * Show the Wet Stock main dashboard (per-tank stats rolling up to warehouse level).
+     *
+     * All tanks are loaded (active and deactivated) with their compartments, because the
+     * "Manage Tanks & Tankers" pop-up lists deactivated units too. The view filters to
+     * active units for the cards and totals.
      */
     public function index(): View
     {
-        $warehouses = Warehouse::with(['tanks' => function ($query) {
-            $query->where('is_active', true)->orderBy('name', 'asc');
-        }])->orderBy('name', 'asc')->get();
+        $warehouses = Warehouse::with([
+            'tanks' => function ($query) {
+                $query->orderBy('name', 'asc');
+            },
+            'tanks.compartments',
+        ])->orderBy('name', 'asc')->get();
 
         return view('wetstock.dashboard', [
             'warehouses' => $warehouses,

@@ -101,12 +101,20 @@ Route::middleware('auth')->group(function () {
 
         // Tank CRUD & Contamination
         Route::middleware('role:admin,ops_admin,ops_mgr,ops_wh,ops_log,hod,vp')->group(function () {
-            Route::get('/warehouses/{warehouse}/tanks/create', [WetStock\StorageTankController::class, 'create'])->name('tanks.create');
-            Route::post('/warehouses/{warehouse}/tanks', [WetStock\StorageTankController::class, 'store'])->name('tanks.store');
-            Route::get('/tanks/{tank}/edit', [WetStock\StorageTankController::class, 'edit'])->name('tanks.edit');
-            Route::post('/tanks/{tank}/edit', [WetStock\StorageTankController::class, 'update'])->name('tanks.update');
-            Route::post('/tanks/{tank}/toggle-active', [WetStock\StorageTankController::class, 'toggleActive'])->name('tanks.toggle-active');
-            Route::post('/tanks/{tank}/toggle-contamination', [WetStock\StorageTankController::class, 'toggleContamination'])->name('tanks.toggle-contamination');
+Route::post('/warehouses/{warehouse}/tanks', [WetStock\StorageTankController::class, 'store'])->name('tanks.store');
+        // Tanks and tankers are managed through the Wet Stock dashboard modals,
+        // so there is no separate create/edit page any more. The POST routes
+        // stay because the modals still submit to them.
+        Route::post('/tanks/{tank}/edit', [WetStock\StorageTankController::class, 'update'])->name('tanks.update');
+        Route::post('/tanks/{tank}/toggle-active', [WetStock\StorageTankController::class, 'toggleActive'])->name('tanks.toggle-active');
+        Route::post('/tanks/{tank}/delete', [WetStock\StorageTankController::class, 'destroy'])->name('tanks.destroy');
+        Route::post('/tanks/{tank}/toggle-contamination', [WetStock\StorageTankController::class, 'toggleContamination'])->name('tanks.toggle-contamination');
+
+        // Product-aware tank actions from the dashboard pop-up: add stock,
+        // reduce volume, flag or clear contamination.
+        Route::post('/tank-actions/{tank}/add', [WetStock\TankActionController::class, 'add'])->name('tank-actions.add');
+        Route::post('/tank-actions/{tank}/reduce', [WetStock\TankActionController::class, 'reduce'])->name('tank-actions.reduce');
+        Route::post('/tank-actions/{tank}/contamination', [WetStock\TankActionController::class, 'contamination'])->name('tank-actions.contamination');
         });
 
         // Stock IN
@@ -212,12 +220,21 @@ Route::middleware('auth')->group(function () {
         Route::redirect('/dashboard', '/stock-orders/purchase-orders')->name('dashboard');
         Route::get('/create-supplier-po', [WetStock\StockOrderController::class, 'createSupplierPo'])->name('create-supplier-po');
         Route::post('/store-supplier-po', [WetStock\StockOrderController::class, 'storeSupplierPo'])->name('store-supplier-po');
+        // Editing an existing PO reuses the create form in edit mode. Editing
+        // an approved PO sends it back for VP re-approval rather than
+        // changing the approved commitment in place.
+        Route::get('/{purchaseOrder}/edit-supplier-po', [WetStock\StockOrderController::class, 'editSupplierPo'])->name('edit-supplier-po');
+        Route::post('/{purchaseOrder}/edit-supplier-po', [WetStock\StockOrderController::class, 'updateSupplierPo'])->name('update-supplier-po');
         Route::get('/fuel-trade/{order}/create-po', [WetStock\StockOrderController::class, 'createFromSalesOrder'])->name('create-fuel-trade-po');
         Route::post('/fuel-trade/{order}/store-po', [WetStock\StockOrderController::class, 'storeFuelTradePo'])->name('store-fuel-trade-po');
         Route::post('/deliveries/{delivery}/complete-fuel-trade', [WetStock\StockOrderController::class, 'completeFuelTrade'])->name('complete-fuel-trade');
         Route::post('/deliveries/{delivery}/update-docs', [WetStock\StockOrderController::class, 'updateDeliveryDocs'])->name('update-docs');
         Route::get('/{purchaseOrder}/prepare', [WetStock\StockOrderController::class, 'editRequest'])->name('edit-request');
         Route::post('/{purchaseOrder}/prepare', [WetStock\StockOrderController::class, 'updateRequest'])->name('update-request');
+        // Raising an extra ATL against an already-approved PO. Separate from
+        // "prepare" because it must not re-submit the PO for VP approval.
+        Route::get('/{purchaseOrder}/atl', [WetStock\StockOrderController::class, 'createAtl'])->name('add-atl');
+        Route::post('/{purchaseOrder}/atl', [WetStock\StockOrderController::class, 'storeAtl'])->name('store-atl');
         Route::get('/approvals', [WetStock\StockOrderController::class, 'approvals'])->name('approvals');
         Route::prefix('suppliers')->name('suppliers.')->group(function () {
             Route::get('/', [WetStock\SupplierController::class, 'index'])->name('index');

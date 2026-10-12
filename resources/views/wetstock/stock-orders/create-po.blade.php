@@ -1,6 +1,18 @@
 @extends('layouts.app')
 
-@section('title', 'New Supplier Purchase Order')
+@php
+    // The same view renders both creating a PO and editing an existing one.
+    $isEdit = $isEdit ?? false;
+    $po = $isEdit ? ($purchaseOrder ?? null) : null;
+    $poLocked = $po && $po->isVpApproved();
+    $formAction = $isEdit
+        ? route('stock-orders.update-supplier-po', $po->id)
+        : route('stock-orders.store-supplier-po');
+    // Editing renders one row per existing line; creating renders one blank row.
+    $lineItems = ($isEdit && $po && $po->items->isNotEmpty()) ? $po->items->values() : collect([null]);
+@endphp
+
+@section('title', $isEdit ? 'Edit Purchase Order' : 'New Supplier Purchase Order')
 
 @section('content')
 <div class="row justify-content-center">
@@ -15,10 +27,16 @@
             <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
                 <div>
                     <h4 class="fw-bold mb-0 text-dark">
-                        <i class="bi bi-bag-plus text-primary me-2"></i>Create Supplier Purchase Order
+                        <i class="bi bi-{{ $isEdit ? 'pencil-square' : 'bag-plus' }} text-primary me-2"></i>{{ $isEdit ? 'Edit Purchase Order' : 'Create Supplier Purchase Order' }}
                     </h4>
                     <p class="text-muted small mb-0 mt-1">
-                        Contract bulk fuel volume from refinery suppliers (Petron, Shell, etc.) for allocation and drawdown.
+                        @if ($isEdit && $poLocked)
+                            Editing an approved PO. Saving will send it back to the VP for approval.
+                        @elseif ($isEdit)
+                            Editing PO {{ $po->po_number }} ({{ $po->typeLabel() }}).
+                        @else
+                            Contract bulk fuel volume from refinery suppliers (Petron, Shell, etc.) for allocation and drawdown.
+                        @endif
                     </p>
                 </div>
                 <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-3 py-2">
@@ -27,7 +45,7 @@
             </div>
 
             <div class="card-body p-4">
-                <form method="POST" action="{{ route('stock-orders.store-supplier-po') }}" id="supplierPoForm">
+                <form method="POST" action="{{ $formAction }}" id="supplierPoForm">
                     @csrf
 
                     @if ($errors->any())
@@ -42,10 +60,20 @@
 
                     <div class="row g-3 mb-4">
                         <div class="col-md-6">
-                            <label for="po_number" class="form-label fw-semibold small">Official PO Number <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control @error('po_number') is-invalid @enderror" id="po_number" name="po_number"
-                                   placeholder="e.g. PO-PETRON-2026-001" value="{{ old('po_number') }}" required>
-                            <div class="form-text extra-small">Unique purchasing reference number issued to refinery.</div>
+                            <label for="po_number" class="form-label fw-semibold small">
+                                Official PO Number
+                                @unless ($poLocked)<span class="text-danger">*</span>@endunless
+                            </label>
+                            <input type="text" class="form-control @error('po_number') is-invalid @enderror @if ($poLocked) bg-light @endif" id="po_number" name="po_number"
+                                   @if ($poLocked) readonly @else required @endif
+                                   placeholder="e.g. PO-PETRON-2026-001" value="{{ old('po_number', $po->po_number ?? '') }}">
+                            <div class="form-text extra-small">
+                                @if ($poLocked)
+                                    Locked: this PO is already approved, so its number cannot change.
+                                @else
+                                    Unique purchasing reference number issued to refinery.
+                                @endif
+                            </div>
                         </div>
 
                         <div class="col-md-6">
@@ -53,7 +81,7 @@
                             <select class="form-select @error('supplier_id') is-invalid @enderror" id="supplier_id" name="supplier_id" required>
                                 <option value="">-- Choose Company --</option>
                                 @foreach ($suppliers as $supplier)
-                                    <option value="{{ $supplier->id }}" data-location="{{ $supplier->location }}" {{ (int) old('supplier_id') === $supplier->id ? 'selected' : '' }}>
+                                    <option value="{{ $supplier->id }}" data-location="{{ $supplier->location }}" {{ (int) old('supplier_id', $po->supplier_id ?? 0) === $supplier->id ? 'selected' : '' }}>
                                         {{ $supplier->company_name }}
                                     </option>
                                 @endforeach
@@ -76,16 +104,26 @@
                         </div>
 
                         <div class="col-md-4">
-                            <label for="po_type" class="form-label fw-semibold small">PO Classification <span class="text-danger">*</span></label>
-                            <select class="form-select" id="po_type" name="po_type" required>
-                                <option value="STANDARD_REPLENISHMENT" {{ old('po_type') === 'STANDARD_REPLENISHMENT' ? 'selected' : '' }}>Standard Refinery Replenishment</option>
-                                <option value="BUY_BACK" {{ old('po_type') === 'BUY_BACK' ? 'selected' : '' }}>PO Buy Back (Repurchase from Client)</option>
-                            </select>
+                            @if ($isEdit)
+                                {{-- The type also records which page raised the PO, so
+                                     an edit must never move it between categories. --}}
+                                <label for="po_type" class="form-label fw-semibold small">PO Classification</label>
+                                <input type="text" class="form-control bg-light" id="po_type"
+                                       value="{{ $po->typeLabel() }}" readonly>
+                            @else
+                                <label for="po_type" class="form-label fw-semibold small">PO Classification</label>
+                                <select class="form-select" id="po_type" required disabled>
+                                    <option selected>Doyen Stock</option>
+                                </select>
+                                <div class="form-text extra-small">
+                                    Raised from the Wet Stock Requests page. SO-FT and SO-BUY BACK come from Sales Orders.
+                                </div>
+                            @endif
                         </div>
 
                         <div class="col-md-4">
                             <label for="date_needed" class="form-label fw-semibold small">Target Availability Date</label>
-                            <input type="date" class="form-control" id="date_needed" name="date_needed" value="{{ old('date_needed', now()->format('Y-m-d')) }}">
+                            <input type="date" class="form-control" id="date_needed" name="date_needed" value="{{ old('date_needed', $po?->date_needed?->format('Y-m-d') ?? now()->format('Y-m-d')) }}">
                         </div>
 
                         <div class="col-md-4">
@@ -93,7 +131,7 @@
                             <select class="form-select" id="warehouse_id" name="warehouse_id">
                                 <option value="">-- General Allocation Pool (Refinery Rack) --</option>
                                 @foreach ($warehouses as $wh)
-                                    <option value="{{ $wh->id }}" {{ old('warehouse_id') == $wh->id ? 'selected' : '' }}>{{ $wh->name }}</option>
+                                    <option value="{{ $wh->id }}" {{ (int) old('warehouse_id', $po->warehouse_id ?? 0) === (int) $wh->id ? 'selected' : '' }}>{{ $wh->name }}</option>
                                 @endforeach
                             </select>
                             <div class="form-text extra-small">Leave blank if volume can be lifted by Fuel Trade or Tankers.</div>
@@ -121,45 +159,47 @@
                                             <th class="ps-3" style="width: 30%;">Product</th>
                                             <th style="width: 22%;">Volume (Liters) <span class="text-danger">*</span></th>
                                             <th style="width: 18%;">Unit</th>
-                                            <th style="width: 18%;">Price / Liter (₱)</th>
+                                            <th style="width: 18%;">Price / Liter (â‚±)</th>
                                             <th style="width: 12%;">Amount</th>
                                             <th class="pe-3 text-center" style="width: 10%;">Remove</th>
                                         </tr>
                                     </thead>
                                     <tbody id="productRowsBody">
-                                        <tr class="product-row">
-                                            <td class="ps-3">
-                                                <select name="items[0][product]" class="form-select form-select-sm" required>
-                                                    <option value="Diesel" selected>Diesel</option>
-                                                    <option value="Premium">Premium (Mogas 95)</option>
-                                                    <option value="Unleaded">Unleaded (Mogas 91)</option>
-                                                </select>
-                                            </td>
-                                            <td>
-                                                <div class="input-group input-group-sm">
-                                                    <input type="number" name="items[0][quantity]" class="form-control form-control-sm qty-input"
-                                                           placeholder="e.g. 50000" min="1" required oninput="calculateTotalVolume()">
-                                                    <span class="input-group-text">L</span>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <input type="text" name="items[0][unit]" class="form-control form-control-sm" value="LTRS" readonly>
-                                            </td>
-                                            <td>
-                                                <div class="input-group input-group-sm">
-                                                    <span class="input-group-text">₱</span>
-                                                    <input type="number" step="0.01" name="items[0][unit_price]" class="form-control form-control-sm price-input" placeholder="0.00" oninput="calculateTotalAmount()">
-                                                </div>
-                                            </td>
-                                            <td class="text-end fw-semibold font-monospace">
-                                                <span class="line-amount">0.00</span>
-                                            </td>
-                                            <td class="pe-3 text-center">
-                                                <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="removeProductRow(this)" disabled>
-                                                    <i class="bi bi-trash"></i>
-                                                </button>
-                                            </td>
-                                        </tr>
+                                        @foreach ($lineItems as $index => $item)
+                                            <tr class="product-row">
+                                                <td class="ps-3">
+                                                    <select name="items[{{ $index }}][product]" class="form-select form-select-sm" required>
+                                                        <option value="Diesel" {{ $item?->product === 'Diesel' ? 'selected' : '' }}>Diesel</option>
+                                                        <option value="Premium" {{ $item?->product === 'Premium' ? 'selected' : '' }}>Premium (Mogas 95)</option>
+                                                        <option value="Unleaded" {{ $item?->product === 'Unleaded' ? 'selected' : '' }}>Unleaded (Mogas 91)</option>
+                                                    </select>
+                                                </td>
+                                                <td>
+                                                    <div class="input-group input-group-sm">
+                                                        <input type="number" name="items[{{ $index }}][quantity]" class="form-control form-control-sm qty-input"
+                                                               placeholder="e.g. 50000" min="1" value="{{ old("items.$index.quantity", $item?->quantity_ordered) }}" required oninput="calculateTotalVolume()">
+                                                        <span class="input-group-text">L</span>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <input type="text" name="items[{{ $index }}][unit]" class="form-control form-control-sm" value="{{ $item?->unit ?? 'LTRS' }}" readonly>
+                                                </td>
+                                                <td>
+                                                    <div class="input-group input-group-sm">
+                                                        <span class="input-group-text">â‚±</span>
+                                                        <input type="number" step="0.01" name="items[{{ $index }}][unit_price]" class="form-control form-control-sm price-input" placeholder="0.00" value="{{ old("items.$index.unit_price", $item?->unit_price) }}" oninput="calculateTotalAmount()">
+                                                    </div>
+                                                </td>
+                                                <td class="text-end fw-semibold font-monospace">
+                                                    <span class="line-amount">0.00</span>
+                                                </td>
+                                                <td class="pe-3 text-center">
+                                                    <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="removeProductRow(this)" @if ($lineItems->count() < 2) disabled @endif>
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        @endforeach
                                     </tbody>
                                     <tfoot class="table-light border-top">
                                         <tr>
@@ -179,7 +219,7 @@
                         <div class="col-md-6">
                             <label for="attention" class="form-label fw-semibold small">Attention</label>
                             <input type="text" class="form-control @error('attention') is-invalid @enderror" id="attention" name="attention"
-                                   placeholder="e.g. Mr. Aaron Uy" value="{{ old('attention') }}">
+                                   placeholder="e.g. Mr. Aaron Uy" value="{{ old('attention', $po?->attention) }}">
                             <div class="form-text extra-small">Defaults to the supplier's contact when left blank.</div>
                             @error('attention')
                                 <div class="invalid-feedback">{{ $message }}</div>
@@ -188,7 +228,7 @@
                         <div class="col-md-3">
                             <label for="terms" class="form-label fw-semibold small">Terms</label>
                             <input type="text" class="form-control @error('terms') is-invalid @enderror" id="terms" name="terms"
-                                   placeholder="e.g. VAT EX CASH" value="{{ old('terms') }}">
+                                   placeholder="e.g. VAT EX CASH" value="{{ old('terms', $po?->terms) }}">
                             @error('terms')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
@@ -196,7 +236,7 @@
                         <div class="col-md-3">
                             <label for="po_date" class="form-label fw-semibold small">PO Date</label>
                             <input type="date" class="form-control @error('po_date') is-invalid @enderror" id="po_date" name="po_date"
-                                   value="{{ old('po_date', now()->format('Y-m-d')) }}">
+                                   value="{{ old('po_date', $po?->po_date?->format('Y-m-d') ?? now()->format('Y-m-d')) }}">
                             @error('po_date')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
@@ -210,12 +250,12 @@
                                 <div class="col-md-7">
                                     <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2">
                                         <span class="fw-semibold text-dark">Total Amount</span>
-                                        <span class="fw-bold font-monospace" id="totalAmountDisplay">{{ number_format((float) old('total_amount', 0), 2) }}</span>
+                                        <span class="fw-bold font-monospace" id="totalAmountDisplay">{{ number_format((float) old('total_amount', $po?->total_amount ?? 0), 2) }}</span>
                                     </div>
                                     <div class="mb-2">
                                         <label for="vatable_sales_amount" class="form-label fw-medium text-secondary small mb-1">Vatable Sales Amount</label>
                                         <input type="number" step="0.01" min="0" class="form-control form-control-sm text-end font-monospace @error('vatable_sales_amount') is-invalid @enderror"
-                                               id="vatable_sales_amount" name="vatable_sales_amount" value="{{ old('vatable_sales_amount') }}" placeholder="0.00">
+                                               id="vatable_sales_amount" name="vatable_sales_amount" value="{{ old('vatable_sales_amount', $po?->vatable_sales_amount) }}" placeholder="0.00">
                                         @error('vatable_sales_amount')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
@@ -223,7 +263,7 @@
                                     <div class="mb-2">
                                         <label for="vat_amount" class="form-label fw-medium text-secondary small mb-1">VAT Amount</label>
                                         <input type="number" step="0.01" min="0" class="form-control form-control-sm text-end font-monospace @error('vat_amount') is-invalid @enderror"
-                                               id="vat_amount" name="vat_amount" value="{{ old('vat_amount') }}" placeholder="0.00">
+                                               id="vat_amount" name="vat_amount" value="{{ old('vat_amount', $po?->vat_amount) }}" placeholder="0.00">
                                         @error('vat_amount')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
@@ -231,21 +271,25 @@
                                     <div class="mb-2">
                                         <label for="less_w_tax" class="form-label fw-medium text-secondary small mb-1">Less w/ Tax</label>
                                         <input type="number" step="0.01" min="0" class="form-control form-control-sm text-end font-monospace @error('less_w_tax') is-invalid @enderror"
-                                               id="less_w_tax" name="less_w_tax" value="{{ old('less_w_tax') }}" placeholder="0.00">
+                                               id="less_w_tax" name="less_w_tax" value="{{ old('less_w_tax', $po?->less_w_tax) }}" placeholder="0.00">
                                         @error('less_w_tax')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center border-top pt-2">
                                         <label for="net_payable_amount" class="fw-semibold text-dark mb-0">Net Payable Amount</label>
-                                        <input type="number" step="0.01" min="0" class="form-control form-control-sm text-end font-monospace fw-bold @error('net_payable_amount') is-invalid @enderror"
+                                        <input type="number" step="0.01" min="0" readonly tabindex="-1"
+                                               class="form-control form-control-sm text-end font-monospace fw-bold bg-light @error('net_payable_amount') is-invalid @enderror"
                                                id="net_payable_amount" name="net_payable_amount"
-                                               value="{{ old('net_payable_amount', number_format((float) old('total_amount', 0), 2, '.', '')) }}">
+                                               aria-describedby="netPayableHelp"
+                                               value="{{ old('net_payable_amount', number_format((float) ($po?->net_payable_amount ?? $po?->total_amount ?? 0), 2, '.', '')) }}">
                                         @error('net_payable_amount')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
                                     </div>
-                                    <div class="form-text extra-small">Pre-filled with the total amount; adjust if the terms differ.</div>
+                                    <div class="form-text extra-small" id="netPayableHelp">
+                                        Automatically calculated as Total Amount minus Less w/ Tax. This field cannot be edited.
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -255,13 +299,14 @@
 
                         <div class="mb-4">
                             <label for="remarks" class="form-label fw-semibold small">Special Terms / Refinery Remarks</label>
-                        <textarea class="form-control" id="remarks" name="remarks" rows="2" placeholder="e.g. Pre-paid contract, valid for lift at Bataan Limay rack until month-end.">{{ old('remarks') }}</textarea>
+                        <textarea class="form-control" id="remarks" name="remarks" rows="2" placeholder="e.g. Pre-paid contract, valid for lift at Bataan Limay rack until month-end.">{{ old('remarks', $po?->remarks) }}</textarea>
                     </div>
 
                     <div class="d-flex justify-content-end gap-2">
-                        <a href="{{ route('stock-orders.index') }}" class="btn btn-light border rounded-pill px-4">Cancel</a>
+                        <a href="{{ route('stock-orders.purchase-orders.index') }}" class="btn btn-light border rounded-pill px-4">Cancel</a>
                         <button type="submit" class="btn btn-primary-custom rounded-pill px-4 shadow-sm">
-                            <i class="bi bi-check2-circle me-1"></i> Save Supplier Purchase Order
+                            <i class="bi bi-{{ $isEdit ? 'check2-circle' : 'check2-circle' }} me-1"></i>
+                            {{ $isEdit ? 'Save Changes' : 'Save Supplier Purchase Order' }}
                         </button>
                     </div>
                 </form>
@@ -271,7 +316,9 @@
 </div>
 
 <script>
-let rowIndex = 1;
+// Continue numbering after the rows already rendered, so an added line does
+    // not overwrite an existing one when the form posts.
+    let rowIndex = {{ $lineItems->count() }};
 
 function addProductRow() {
     const tbody = document.getElementById('productRowsBody');
@@ -297,7 +344,7 @@ function addProductRow() {
         </td>
         <td>
             <div class="input-group input-group-sm">
-                <span class="input-group-text">₱</span>
+                <span class="input-group-text">â‚±</span>
                 <input type="number" step="0.01" name="items[${rowIndex}][unit_price]" class="form-control form-control-sm price-input" placeholder="0.00" oninput="calculateTotalAmount()">
             </div>
         </td>
@@ -348,6 +395,23 @@ function calculateTotalVolume() {
  * Line amounts and the total come from the product rows, so the stored PO
  * totals can never drift from what was actually ordered. VAT rows stay manual.
  */
+/**
+ * Net Payable is the gross less the creditable withholding tax. VAT already
+ * sits inside the line total, so it is not subtracted. The field is readonly,
+ * so this is display only -- the server recalculates the same figure on save.
+ */
+function calculateNetPayable() {
+    const netPayable = document.getElementById('net_payable_amount');
+    if (!netPayable) {
+        return;
+    }
+
+    const total = parseFloat(document.getElementById('computed_total_amount').value) || 0;
+    const lessWTax = parseFloat(document.getElementById('less_w_tax').value) || 0;
+
+    netPayable.value = Math.max(0, total - lessWTax).toFixed(2);
+}
+
 function calculateTotalAmount() {
     let total = 0;
 
@@ -370,28 +434,25 @@ function calculateTotalAmount() {
         totalDisplay.textContent = formatted;
     }
 
-    // Keep Net Payable in step with the total until it is edited by hand.
-    const netPayable = document.getElementById('net_payable_amount');
-    if (netPayable && !netPayable.dataset.touched) {
-        netPayable.value = total.toFixed(2);
-    }
-
     // Mirror into a hidden field so the exact computed total is submitted.
     const hiddenTotal = document.getElementById('computed_total_amount');
     if (hiddenTotal) {
         hiddenTotal.value = total.toFixed(2);
     }
+
+    calculateNetPayable();
 }
 
 document.addEventListener('DOMContentLoaded', function () {
     calculateTotalVolume();
     calculateTotalAmount();
 
-    const netPayable = document.getElementById('net_payable_amount');
-    if (netPayable) {
-        netPayable.addEventListener('input', function () {
-            this.dataset.touched = '1';
-        });
+    // Withholding tax feeds straight into Net Payable, so it recalculates
+    // live rather than waiting for a product row to change.
+    const lessWTax = document.getElementById('less_w_tax');
+    if (lessWTax) {
+        lessWTax.addEventListener('input', calculateNetPayable);
+        lessWTax.addEventListener('change', calculateNetPayable);
     }
 
     // Supplier company -> location dropdown, filtered to that company only.

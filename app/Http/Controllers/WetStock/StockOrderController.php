@@ -109,6 +109,34 @@ class StockOrderController extends Controller
         return view('wetstock.stock-orders.create-po', compact('warehouses', 'suppliers'));
     }
 
+    /**
+     * Edit an existing supplier PO. Same form as create, prefilled.
+     */
+    public function editSupplierPo(PurchaseOrder $purchaseOrder): View
+    {
+        if (!Auth::user()->canEditStockOrders()) {
+            abort(403);
+        }
+
+        $purchaseOrder->load(['items', 'supplier', 'deliveries.preparer']);
+
+        $warehouses = Warehouse::orderBy('name')->get();
+
+        // Deactivated suppliers stay selectable on the PO they are already
+        // attached to, but cannot be newly chosen.
+        $suppliers = Supplier::active()->orderBy('company_name')->orderBy('location')->get();
+        if ($purchaseOrder->supplier && ! $suppliers->contains('id', $purchaseOrder->supplier_id)) {
+            $suppliers->push($purchaseOrder->supplier);
+        }
+
+        return view('wetstock.stock-orders.create-po', [
+            'warehouses' => $warehouses,
+            'suppliers' => $suppliers,
+            'purchaseOrder' => $purchaseOrder,
+            'isEdit' => true,
+        ]);
+    }
+
     public function storeSupplierPo(Request $request): RedirectResponse
     {
         if (!Auth::user()->canEditStockOrders()) {
@@ -120,7 +148,8 @@ class StockOrderController extends Controller
             // Only active suppliers are selectable; deactivated ones remain on
             // existing Purchase Orders but cannot be chosen for new ones.
             'supplier_id' => ['required', Rule::exists('suppliers', 'id')->where('is_active', true)],
-            'po_type' => ['required', 'in:STANDARD_REPLENISHMENT,BUY_BACK'],
+            // The manual form only raises Doyen Stock. SO-FT and SO-BUY BACK
+            // originate from the Sales Orders page instead.
             'date_needed' => ['nullable', 'date'],
             'warehouse_id' => ['nullable', 'exists:warehouses,id'],
             'remarks' => ['nullable', 'string', 'max:1000'],
@@ -130,7 +159,6 @@ class StockOrderController extends Controller
             'vatable_sales_amount' => ['nullable', 'numeric', 'min:0'],
             'vat_amount' => ['nullable', 'numeric', 'min:0'],
             'less_w_tax' => ['nullable', 'numeric', 'min:0'],
-            'net_payable_amount' => ['nullable', 'numeric', 'min:0'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product' => ['required', 'string', 'in:Diesel,Premium,Unleaded'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
@@ -152,11 +180,15 @@ class StockOrderController extends Controller
         $supplier = Supplier::find($validated['supplier_id']);
         $supplierName = $supplier->company_name;
 
-        $netPayable = $validated['net_payable_amount'] ?? $lineTotal;
+        // Net Payable is always the gross less the creditable withholding tax.
+        // VAT already sits inside the line total, so it is not subtracted. The
+        // field is read-only in the browser and never trusted from the POST.
+        $lessWTax = round((float) ($validated['less_w_tax'] ?? 0), 2);
+        $netPayable = max(0, round($lineTotal - $lessWTax, 2));
 
         $po = PurchaseOrder::create([
             'po_number' => $validated['po_number'],
-            'po_type' => $validated['po_type'],
+            'po_type' => 'STANDARD_REPLENISHMENT',
             'supplier_id' => $supplier?->id,
             'supplier_name' => $supplierName,
             'attention' => $validated['attention'] ?? $supplier?->attention,
@@ -170,11 +202,12 @@ class StockOrderController extends Controller
             'less_w_tax' => $validated['less_w_tax'] ?? 0,
             'net_payable_amount' => $netPayable,
             'prepared_by' => Auth::id(),
-            'request_status' => 'CONFIRMED', // Supplier contract active
+            // A new PO waits on the VP. RECEIVED is this codebase's "pending VP
+            // approval" state and is what the Approvals queue filters on, so
+            // saving here is what puts the PO in front of the VP.
+            'request_status' => 'RECEIVED',
             'status' => 'Pending',
             'requested_by' => Auth::id(),
-            'approved_by' => Auth::id(),
-            'approved_at' => now(),
             'request_date' => now(),
             'date_needed' => $validated['date_needed'] ?? null,
             'requested_products' => $validated['items'],
@@ -199,7 +232,231 @@ class StockOrderController extends Controller
         ]);
 
         return redirect()->route('stock-orders.purchase-orders.index')
-            ->with('success', "Supplier PO #{$po->po_number} created successfully with " . count($validated['items']) . " product line(s).");
+            ->with('success', "Supplier PO #{$po->po_number} created and submitted for VP approval with " . count($validated['items']) . " product line(s).");
+    }
+
+    /**
+     * Save an edit to an existing supplier PO.
+     *
+     * Three rules keep an edit from corrupting the record:
+     *  - the PO type is fixed, because it also says which page raised the PO;
+     *  - volume already drawn by ATLs can never be reduced or removed;
+     *  - an edit to a VP-approved PO sends it back for re-approval rather than
+     *    quietly changing an approved commitment.
+     */
+    public function updateSupplierPo(Request $request, PurchaseOrder $purchaseOrder): RedirectResponse
+    {
+        if (!Auth::user()->canEditStockOrders()) {
+            abort(403);
+        }
+
+        $wasApproved = $purchaseOrder->isVpApproved();
+        $drawnByProduct = $purchaseOrder->drawnByProduct();
+
+        $rules = [
+            'supplier_id' => ['required', Rule::exists('suppliers', 'id')->where('is_active', true)],
+            'date_needed' => ['nullable', 'date'],
+            'warehouse_id' => ['nullable', 'exists:warehouses,id'],
+            'remarks' => ['nullable', 'string', 'max:1000'],
+            'attention' => ['nullable', 'string', 'max:128'],
+            'terms' => ['nullable', 'string', 'max:128'],
+            'po_date' => ['nullable', 'date'],
+            'vatable_sales_amount' => ['nullable', 'numeric', 'min:0'],
+            'vat_amount' => ['nullable', 'numeric', 'min:0'],
+            'less_w_tax' => ['nullable', 'numeric', 'min:0'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.product' => ['required', 'string', 'in:Diesel,Premium,Unleaded'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'items.*.unit' => ['nullable', 'string', 'max:16'],
+            'items.*.unit_price' => ['nullable', 'numeric', 'min:0'],
+        ];
+
+        // Once the VP has approved, the number identifies a document the
+        // supplier already holds, so it is locked rather than revalidated.
+        if ($wasApproved) {
+            $rules['po_number'] = ['nullable', 'string', 'max:64'];
+        } else {
+            // The trailing id excludes the PO being edited, so re-saving it
+            // with its own number still works.
+            $rules['po_number'] = [
+                'required', 'string', 'max:64',
+                Rule::unique('purchase_orders', 'po_number')->ignore($purchaseOrder->id),
+            ];
+        }
+
+        $validated = $request->validate($rules);
+
+        // Collapse the submitted lines to one row per product.
+        $lines = [];
+        foreach ($validated['items'] as $line) {
+            $product = $line['product'];
+            $quantity = (int) $line['quantity'];
+            $lines[$product] = [
+                'quantity' => ($lines[$product]['quantity'] ?? 0) + $quantity,
+                'unit_price' => $line['unit_price'] ?? null,
+            ];
+        }
+
+        // A line that has already been drawn against cannot shrink or vanish.
+        foreach ($drawnByProduct as $product => $drawn) {
+            if (! isset($lines[$product])) {
+                return back()
+                    ->withInput()
+                    ->withErrors(["items" => "{$product} cannot be removed: {$drawn} L has already been drawn from this PO."])
+                    ->with('error', "Cannot remove {$product} because ATLs have already drawn from it.");
+            }
+
+            if ($lines[$product]['quantity'] < $drawn) {
+                return back()
+                    ->withInput()
+                    ->withErrors(["items" => "{$product} cannot drop below the {$drawn} L already drawn from this PO."])
+                    ->with('error', "{$product} has {$drawn} L already drawn, so its quantity cannot go lower.");
+            }
+        }
+
+        $totalQty = array_sum(array_column($lines, 'quantity'));
+
+        $lineTotal = round(collect($lines)->sum(
+            fn (array $l) => $l['quantity'] * (float) ($l['unit_price'] ?? 0)
+        ), 2);
+
+        $lessWTax = round((float) ($validated['less_w_tax'] ?? 0), 2);
+        $netPayable = max(0, round($lineTotal - $lessWTax, 2));
+
+        $supplier = Supplier::find($validated['supplier_id']);
+
+        $attributes = [
+            'supplier_id' => $supplier?->id,
+            'supplier_name' => $supplier?->company_name,
+            'attention' => $validated['attention'] ?? $supplier?->attention,
+            'terms' => $validated['terms'] ?? null,
+            'po_date' => $validated['po_date'] ?? $purchaseOrder->po_date,
+            'warehouse_id' => $validated['warehouse_id'] ?? null,
+            'qty_ordered' => $totalQty,
+            'total_amount' => $lineTotal,
+            'vatable_sales_amount' => $validated['vatable_sales_amount'] ?? 0,
+            'vat_amount' => $validated['vat_amount'] ?? 0,
+            'less_w_tax' => $validated['less_w_tax'] ?? 0,
+            'net_payable_amount' => $netPayable,
+            'date_needed' => $validated['date_needed'] ?? null,
+            'remarks' => $validated['remarks'] ?? null,
+        ];
+
+        // The number only moves while the PO is still unapproved.
+        if (! $wasApproved) {
+            $attributes['po_number'] = $validated['po_number'];
+        }
+
+        // Anything that actually changed on an approved PO puts it back in
+        // the queue, so the signed version always matches what was released.
+        $changed = $this->supplierPoDiffers($purchaseOrder, $attributes, $lines);
+
+        if ($wasApproved && $changed) {
+            $attributes['request_status'] = 'RECEIVED';
+            $attributes['approved_by'] = null;
+            $attributes['approved_at'] = null;
+        }
+
+        $purchaseOrder->update($attributes);
+
+        $this->syncSupplierPoItems($purchaseOrder, $lines);
+
+        AuditLog::create([
+            'admin_id' => Auth::id(),
+            'action' => 'updated',
+            'description' => "Purchasing edited PO #{$purchaseOrder->po_number}."
+                . ($wasApproved && $changed ? ' Returned for VP re-approval.' : ''),
+        ]);
+
+        $message = "Supplier PO #{$purchaseOrder->po_number} updated.";
+
+        if ($wasApproved && $changed) {
+            $message .= ' It has been returned for VP approval.';
+        }
+
+        return redirect()->route('stock-orders.purchase-orders.show', $purchaseOrder->id)
+            ->with('success', $message);
+    }
+
+    /**
+     * Has this edit actually changed anything the VP would care about?
+     *
+     * Compared field by field rather than trusting the form, so an untouched
+     * PO stays approved even if the user simply opened and saved it.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @param  array<string, array{quantity: int, unit_price: mixed}>  $lines
+     */
+    protected function supplierPoDiffers(PurchaseOrder $purchaseOrder, array $attributes, array $lines): bool
+    {
+        foreach ($attributes as $field => $value) {
+            $current = $purchaseOrder->{$field};
+
+            // Dates are stored as date strings on the model.
+            $value = $value instanceof \DateTimeInterface ? $value->format('Y-m-d') : $value;
+            $current = $current instanceof \DateTimeInterface ? $current->format('Y-m-d') : $current;
+
+            if ((float) $value != (float) $current) {
+                return true;
+            }
+        }
+
+        // Compare the product lines themselves, since a quantity or price
+        // change does not show up in the PO-level totals alone.
+        $currentLines = $purchaseOrder->items
+            ->mapWithKeys(fn ($item) => [$item->product => [
+                'quantity' => (int) $item->quantity_ordered,
+                'unit_price' => (float) $item->unit_price,
+            ]])
+            ->all();
+
+        $newLines = collect($lines)->map(fn ($l) => [
+            'quantity' => (int) $l['quantity'],
+            'unit_price' => (float) ($l['unit_price'] ?? 0),
+        ])->all();
+
+        ksort($currentLines);
+        ksort($newLines);
+
+        return $currentLines != $newLines;
+    }
+
+    /**
+     * Bring the PO's product lines in line with the submitted set.
+     *
+     * Items that ATLs have already drawn against are updated in place rather
+     * than deleted, so their allocations stay attached to the same row.
+     *
+     * @param  array<string, array{quantity: int, unit_price: mixed}>  $lines
+     */
+    protected function syncSupplierPoItems(PurchaseOrder $purchaseOrder, array $lines): void
+    {
+        $existing = $purchaseOrder->items()->get()->keyBy('product');
+
+        foreach ($lines as $product => $line) {
+            $item = $existing->get($product);
+
+            if ($item) {
+                $item->update([
+                    'quantity_ordered' => $line['quantity'],
+                    'unit_price' => $line['unit_price'] ?? null,
+                ]);
+            } else {
+                PurchaseOrderItem::create([
+                    'purchase_order_id' => $purchaseOrder->id,
+                    'product' => $product,
+                    'quantity_ordered' => $line['quantity'],
+                    'unit_price' => $line['unit_price'] ?? null,
+                ]);
+            }
+
+            $existing->forget($product);
+        }
+
+        // Whatever is left has already been checked as safe to remove.
+        foreach ($existing as $item) {
+            $item->delete();
+        }
     }
 
     public function createFromSalesOrder(Order $order): View|RedirectResponse
@@ -765,8 +1022,114 @@ class StockOrderController extends Controller
             ->with('success', "Stock order {$purchaseOrder->po_number} prepared and submitted for VP approval.");
     }
 
+    /**
+     * Raise an extra ATL against a PO the VP has already approved.
+     *
+     * This is the repeatable per-truck action that moved off the Purchase
+     * Orders list. Unlike updateRequest it never re-opens the approval flow,
+     * so the PO's own request_status is left exactly as it was.
+     */
+    public function createAtl(PurchaseOrder $purchaseOrder): View
+    {
+        abort_unless(Auth::user()->canEditStockOrders(), 403);
+        abort_unless(
+            $purchaseOrder->isVpApproved(),
+            403,
+            'An ATL can only be raised against a purchase order the VP has approved.'
+        );
+
+        return view('wetstock.stock-orders.form', [
+            'mode' => 'add_atl',
+            'purchaseOrder' => $purchaseOrder,
+            'order' => null,
+            'clients' => Client::orderBy('name')->get(),
+            'warehouses' => Warehouse::orderBy('name')->get(),
+        ]);
+    }
+
+    public function storeAtl(Request $request, PurchaseOrder $purchaseOrder): RedirectResponse
+    {
+        abort_unless(Auth::user()->canEditStockOrders(), 403);
+        abort_unless(
+            $purchaseOrder->isVpApproved(),
+            403,
+            'An ATL can only be raised against a purchase order the VP has approved.'
+        );
+
+        $validated = $request->validate([
+            'order_type' => ['required', 'in:DELIVERY,PICK_UP'],
+            'delivery_channel' => ['required', 'string'],
+            'dr_number' => ['nullable', 'string', 'max:64'],
+            'atl_number' => ['nullable', 'string', 'max:64'],
+            'client_atl_number' => ['nullable', 'string', 'max:64'],
+            'reference_no' => ['nullable', 'string', 'max:64'],
+            'so_number' => ['nullable', 'string', 'max:64'],
+            'product' => ['required', 'string', 'max:64'],
+            'qty_to_receive' => ['required', 'integer', 'min:1'],
+            'receiving_date' => ['required', 'date'],
+            'driver_name' => ['nullable', 'string', 'max:128'],
+            'plate_number' => ['nullable', 'string', 'max:64'],
+            'location' => ['nullable', 'string', 'max:128'],
+            'additional_remarks' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        // The ATL cannot ask for more than the PO still owes.
+        $remaining = $purchaseOrder->getAvailableBalanceForProduct($validated['product']);
+        if ((int) $validated['qty_to_receive'] > $remaining) {
+            return back()->withErrors([
+                'qty_to_receive' => "Only {$remaining} L remain on this PO for {$validated['product']}.",
+            ])->with('error', 'That ATL would draw more than the PO has remaining.');
+        }
+
+        $delivery = PurchaseOrderDelivery::create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'delivery_channel' => $validated['delivery_channel'],
+            'order_type' => $validated['order_type'],
+            'atl_type' => !empty($validated['client_atl_number']) ? 'CLIENT_ATL' : ($validated['order_type'] === 'PICK_UP' ? 'DITC_ATL' : 'NONE'),
+            'dr_number' => $validated['dr_number'] ?? null,
+            'atl_number' => $validated['atl_number'] ?? null,
+            'client_atl_number' => $validated['client_atl_number'] ?? null,
+            'reference_no' => $validated['reference_no'] ?? null,
+            'so_number' => $validated['so_number'] ?? null,
+            'product' => $validated['product'],
+            'qty_to_receive' => $validated['qty_to_receive'],
+            'receiving_date' => $validated['receiving_date'],
+            'driver_name' => $validated['driver_name'] ?? null,
+            'plate_number' => $validated['plate_number'] ?? null,
+            'location' => $validated['location'] ?? null,
+            'additional_remarks' => $validated['additional_remarks'] ?? null,
+            'status' => 'Pending',
+            'prepared_by' => Auth::id(),
+        ]);
+
+        // Record which PO line this ATL drew from, so the detail page can
+        // report the ATL'd volume per product.
+        if ($item = $purchaseOrder->items()->where('product', $validated['product'])->first()) {
+            AtlAllocation::create([
+                'purchase_order_delivery_id' => $delivery->id,
+                'purchase_order_id' => $purchaseOrder->id,
+                'purchase_order_item_id' => $item->id,
+                'product' => $validated['product'],
+                'quantity' => (int) $validated['qty_to_receive'],
+            ]);
+        }
+
+        AuditLog::create([
+            'admin_id' => Auth::id(),
+            'action' => 'created',
+            'description' => "Purchasing raised ATL " . ($validated['atl_number'] ?? '(unnumbered)') . " against PO #{$purchaseOrder->po_number}.",
+        ]);
+
+        return redirect()->route('stock-orders.purchase-orders.show', $purchaseOrder->id)
+            ->with('success', "ATL added to PO #{$purchaseOrder->po_number}.");
+    }
+
     public function approvals(Request $request): View
     {
+        // The queue is a VP/Admin screen. The sidebar already hides it from
+        // everyone else, but the URL has to be closed off too.
+        abort_unless(Auth::user()->canApproveStockOrders(), 403);
+
         // Two queues: Purchase Orders waiting on the VP, and ATLs waiting on
         // the VP. The PO tab stays the default so the existing link is
         // unchanged.
@@ -1020,6 +1383,15 @@ class StockOrderController extends Controller
      */
     public function downloadPoPdf(PurchaseOrder $purchaseOrder)
     {
+        // The PO PDF is the signed commitment, so it is only released once
+        // the VP has approved. Hiding the button is not enough -- this closes
+        // the route itself for anyone who types the URL.
+        abort_unless(
+            $purchaseOrder->isVpApproved(),
+            403,
+            'The PO PDF is only available once the VP has approved this purchase order.'
+        );
+
         $purchaseOrder->load(['items', 'supplier', 'preparer', 'approver', 'requester']);
 
         $supplierName = $purchaseOrder->supplier?->company_name

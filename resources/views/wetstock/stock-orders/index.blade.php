@@ -269,10 +269,13 @@
                                             </a>
                                         @else
                                             <div class="d-inline-flex gap-1 align-items-center">
-                                                <a href="{{ route('stock-orders.po-pdf', $po->id) }}"
-                                                   class="btn btn-sm btn-outline-danger rounded-pill px-2 py-1" title="Download Purchase Order PDF">
-                                                    <i class="bi bi-file-earmark-pdf me-1"></i> PO PDF
-                                                </a>
+                                                {{-- Released only once the VP has approved. --}}
+                                                @if ($po->isVpApproved())
+                                                    <a href="{{ route('stock-orders.po-pdf', $po->id) }}"
+                                                       class="btn btn-sm btn-outline-danger rounded-pill px-2 py-1" title="Download Purchase Order PDF">
+                                                        <i class="bi bi-file-earmark-pdf me-1"></i> PO PDF
+                                                    </a>
+                                                @endif
                                                 <a href="{{ route('stock-orders.show', $po->id) }}" class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-muted">
                                                     <i class="bi bi-arrow-right-circle me-1"></i> Details
                                                 </a>

@@ -201,8 +201,48 @@ class Order extends Model
     }
 
     /**
-     * Get UI-formatted SO identifier.
-     * If Fuel Trade, automatically tags as FT-{number} (e.g. SO-0042 -> FT-0042).
+     * Consumo order: a tag only. It is fulfilled like a regular order
+     * (no ATL, no Fuel Trade rules) but its SO# is shown as CSM-###.
+     */
+    public function isConsumo(): bool
+    {
+        return $this->order_category === 'CONSUMO';
+    }
+
+    /**
+     * SO tag prefix, driven by the New Order form:
+     *   Fuel Trade fulfillment -> "FT"
+     *   Buy Back category      -> "BB"
+     *   Consumo category       -> "CSM"
+     *   Regular SO             -> null (no prefix)
+     * If an order were somehow several of these, Fuel Trade wins, then Buy Back.
+     */
+    public function getSoPrefixAttribute(): ?string
+    {
+        if ($this->isFuelTrade()) {
+            return 'FT';
+        }
+
+        if ($this->isBuyBack()) {
+            return 'BB';
+        }
+
+        if ($this->isConsumo()) {
+            return 'CSM';
+        }
+
+        return null;
+    }
+
+    /**
+     * Get UI-formatted SO identifier:
+     *   Regular SO   -> 6203
+     *   Buy Back SO  -> BB-6203
+     *   Fuel Trade   -> FT-6203
+     *   Consumo      -> CSM-6203
+     *
+     * Any existing SO-/FT-/BB-/CSM- prefix on the stored number is stripped
+     * first so tags never double up (e.g. SO-0042 -> FT-0042, never FT-SO-0042).
      */
     public function getFormattedSoNumberAttribute(): string
     {
@@ -210,17 +250,13 @@ class Order extends Model
             return '—';
         }
 
-        if ($this->isFuelTrade()) {
-            if (preg_match('/^SO-(.+)$/i', $this->so_number, $matches)) {
-                return 'FT-' . $matches[1];
-            }
-            if (!str_starts_with(strtoupper($this->so_number), 'FT-')) {
-                return 'FT-' . $this->so_number;
-            }
-            return $this->so_number;
+        $number = preg_replace('/^(SO|FT|BB|CSM)-/i', '', trim($this->so_number));
+
+        if ($this->so_prefix === null) {
+            return $number;
         }
 
-        return $this->so_number;
+        return $this->so_prefix.'-'.$number;
     }
 
     /**

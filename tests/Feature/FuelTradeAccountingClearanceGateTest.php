@@ -56,11 +56,13 @@ class FuelTradeAccountingClearanceGateTest extends TestCase
         ]);
         $this->assertEquals('FT-999', $ftOrder3->formatted_so_number);
 
+        // A regular order has no prefix, so the legacy SO- is stripped for a
+        // consistent display alongside FT- / BB- / CSM- tags.
         $depotOrder = new Order([
             'so_number' => 'SO-0042',
             'fulfillment_type' => 'DEPOT_DELIVERY',
         ]);
-        $this->assertEquals('SO-0042', $depotOrder->formatted_so_number);
+        $this->assertEquals('0042', $depotOrder->formatted_so_number);
     }
 
     public function test_cannot_access_fuel_trade_po_creation_when_clearance_is_not_approved(): void

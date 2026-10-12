@@ -111,8 +111,9 @@ class SupplierPurchaseOrderTest extends TestCase
         $this->assertEquals(19613000.00, (float) $po->vatable_sales_amount);
         $this->assertEquals(2931950.00, (float) $po->vat_amount);
         $this->assertEquals(1176780.00, (float) $po->less_w_tax);
-        // Manual value wins over the derived default.
-        $this->assertEquals(21368200.00, (float) $po->net_payable_amount);
+        // Net payable is derived, so the submitted 21,368,200.00 is ignored:
+        // 19,613,000.00 total - 1,176,780.00 withholding tax.
+        $this->assertEquals(18436220.00, (float) $po->net_payable_amount);
     }
 
     public function test_supplier_is_required_when_creating_a_purchase_order(): void

@@ -34,40 +34,111 @@
 
         {{-- Fuel Trade Queue Card (if pending SOs exist) --}}
 
-        {{-- Stat cards: this page stands on its own, so there is no separate Dashboard. --}}
-        <div class="row g-3 mb-4">
-            <div class="col-6 col-xl-3">
-                <div class="card card-custom border-0 shadow-sm h-100">
-                    <div class="card-body p-3">
-                        <div class="text-muted small text-uppercase fw-semibold">Total POs</div>
-                        <div class="fs-4 fw-bold text-dark">{{ number_format($stats['total']) }}</div>
+        @php
+            // Product chip colours: U = Unleaded, D = Diesel, P = Premium.
+            // Kept identical to the Orders Dashboard so the two read as one set.
+            $chipStyles = [
+                'U' => 'background:#dcfce7;color:#166534;border:1px solid #bbf7d0;',
+                'D' => 'background:#e0e7ff;color:#3730a3;border:1px solid #c7d2fe;',
+                'P' => 'background:#fee2e2;color:#991b1b;border:1px solid #fecaca;',
+            ];
+
+            $chip = function ($code, $title = '') use ($chipStyles) {
+                $style = $chipStyles[$code] ?? 'background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb;';
+
+                return '<span class="prod-chip" style="'.$style.'" title="'.e($title).'">'.e($code ?: '—').'</span>';
+            };
+
+            $prodRows = [['D', 'Diesel'], ['U', 'Unleaded'], ['P', 'Premium']];
+
+            $statCards = [
+                ['title' => 'Total Qty. Ordered', 'icon' => 'bi-boxes', 'tint' => 'background:#ecfeff;color:#0891b2;', 'data' => $stats['volumes']['ordered']],
+                ['title' => 'Total Qty. Lifted', 'icon' => 'bi-truck', 'tint' => 'background:#f0fdf4;color:#16a34a;', 'data' => $stats['volumes']['lifted']],
+                ['title' => 'Total Qty. Unlifted', 'icon' => 'bi-clock-history', 'tint' => 'background:#fffbeb;color:#d97706;', 'data' => $stats['volumes']['unlifted']],
+            ];
+        @endphp
+        <style>
+            .stat-title {
+                font-size: 0.72rem;
+                font-weight: 700;
+                letter-spacing: 0.05em;
+                text-transform: uppercase;
+                color: #374151;
+            }
+            .stat-icon {
+                width: 46px;
+                height: 46px;
+                border-radius: 0.8rem;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.3rem;
+                flex-shrink: 0;
+            }
+            .stat-row {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                border: 1px solid #e5e7eb;
+                border-radius: 0.6rem;
+                padding: 0.45rem 0.8rem;
+                margin-bottom: 0.45rem;
+                background: #fff;
+            }
+            .stat-row .stat-val { font-weight: 700; color: #111827; }
+            .stat-total {
+                display: flex;
+                justify-content: space-between;
+                padding: 0.25rem 0.3rem 0;
+                color: #6b7280;
+            }
+            .stat-total .stat-val { font-weight: 600; color: #111827; }
+            .stat-big { font-size: 3.6rem; font-weight: 800; line-height: 1; color: #111827; }
+            .prod-chip {
+                display: inline-block;
+                font-size: 0.65rem;
+                font-weight: 700;
+                line-height: 1;
+                padding: 0.2rem 0.4rem;
+                border-radius: 0.35rem;
+                margin: 0 1px;
+            }
+        </style>
+
+        {{-- Stat cards: one headline count, then volume split by product. --}}
+        <div class="row g-4 mb-4">
+            <div class="col-xl-3 col-md-6">
+                <div class="card card-custom p-3 border-0 h-100">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="stat-icon" style="background:#fff1ee;color:#f04a1a;"><i class="bi bi-journal-text"></i></div>
+                        <span class="stat-title">Total Orders</span>
+                    </div>
+                    <div class="d-flex flex-grow-1 align-items-center justify-content-center py-3">
+                        <span class="stat-big">{{ number_format($stats['total']) }}</span>
                     </div>
                 </div>
             </div>
-            <div class="col-6 col-xl-3">
-                <div class="card card-custom border-0 shadow-sm h-100">
-                    <div class="card-body p-3">
-                        <div class="text-muted small text-uppercase fw-semibold">Awaiting Action</div>
-                        <div class="fs-4 fw-bold text-warning">{{ number_format($stats['pending']) }}</div>
+
+            @foreach ($statCards as $card)
+                <div class="col-xl-3 col-md-6">
+                    <div class="card card-custom p-3 border-0 h-100">
+                        <div class="d-flex align-items-center gap-3 mb-3">
+                            <div class="stat-icon" style="{{ $card['tint'] }}"><i class="bi {{ $card['icon'] }}"></i></div>
+                            <span class="stat-title">{{ $card['title'] }}</span>
+                        </div>
+                        @foreach ($prodRows as [$code, $name])
+                            <div class="stat-row">
+                                <span>{!! $chip($code, $name) !!} <span class="ms-2">{{ $name }}</span></span>
+                                <span class="stat-val">{{ number_format($card['data'][$name] ?? 0) }}</span>
+                            </div>
+                        @endforeach
+                        <div class="stat-total">
+                            <span>Total</span>
+                            <span class="stat-val">{{ number_format(array_sum($card['data'])) }}</span>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="col-6 col-xl-3">
-                <div class="card card-custom border-0 shadow-sm h-100">
-                    <div class="card-body p-3">
-                        <div class="text-muted small text-uppercase fw-semibold">For Delivery</div>
-                        <div class="fs-4 fw-bold text-primary">{{ number_format($stats['for_delivery']) }}</div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-6 col-xl-3">
-                <div class="card card-custom border-0 shadow-sm h-100">
-                    <div class="card-body p-3">
-                        <div class="text-muted small text-uppercase fw-semibold">Completed</div>
-                        <div class="fs-4 fw-bold text-success">{{ number_format($stats['fulfilled']) }}</div>
-                    </div>
-                </div>
-            </div>
+            @endforeach
         </div>
 
         {{-- Filter Bar --}}
@@ -80,9 +151,9 @@
                     <div class="col-md-3">
                         <select name="po_type" class="form-select form-select-sm">
                             <option value="">-- All PO Types --</option>
-                            <option value="STANDARD_REPLENISHMENT" {{ request('po_type') === 'STANDARD_REPLENISHMENT' ? 'selected' : '' }}>Standard Replenishment</option>
-                            <option value="FUEL_TRADE" {{ request('po_type') === 'FUEL_TRADE' ? 'selected' : '' }}>Fuel Trade (Direct to Client)</option>
-                            <option value="BUY_BACK" {{ request('po_type') === 'BUY_BACK' ? 'selected' : '' }}>PO Buy Back</option>
+                            @foreach (\App\Models\PurchaseOrder::TYPE_LABELS as $value => $label)
+                                <option value="{{ $value }}" {{ request('po_type') === $value ? 'selected' : '' }}>{{ $label }}</option>
+                            @endforeach
                         </select>
                     </div>
                     <div class="col-md-3">
@@ -110,14 +181,14 @@
                     <table class="table table-hover align-middle mb-0">
                         <thead class="bg-light">
                             <tr>
-                                <th class="ps-3 py-3">PO Number</th>
+                                <th class="ps-3 py-3">PO #</th>
                                 <th class="py-3">Type</th>
-                                <th class="py-3">Supplier / Source</th>
+                                <th class="py-3">Supplier</th>
                                 <th class="py-3">Site / Channel</th>
-                                <th class="py-3 text-end">Volume</th>
-                                <th class="py-3 text-center">Pipeline Status</th>
-                                <th class="py-3 text-center">Computed Status</th>
-                                <th class="py-3">Requester</th>
+                                <th class="py-3 text-end">Qty.</th>
+                                <th class="py-3 text-end">Price</th>
+                                <th class="py-3 text-end">Amount</th>
+                                <th class="py-3 text-center">Status</th>
                                 <th class="pe-3 py-3 text-end">Action</th>
                             </tr>
                         </thead>
@@ -131,13 +202,7 @@
                                         @endif
                                     </td>
                                     <td>
-                                        @if ($po->isFuelTrade())
-                                            <span class="badge bg-warning text-dark border">Fuel Trade</span>
-                                        @elseif ($po->isBuyBack())
-                                            <span class="badge bg-info text-dark border">Buy Back</span>
-                                        @else
-                                            <span class="badge bg-light text-dark border">Standard Replenishment</span>
-                                        @endif
+                                        <span class="badge {{ $po->typeBadgeClass() }}">{{ $po->typeLabel() }}</span>
                                     </td>
                                     <td>
                                         <strong>{{ $po->supplier_name ?: ($po->client->name ?? '—') }}</strong>
@@ -151,19 +216,40 @@
                                             —
                                         @endif
                                     </td>
+                                    {{-- Qty / Price / Amount, broken out per product. Amount is the stored
+                                             total; the line columns are the per-product detail
+                                             behind it. Legacy POs with no item rows fall back
+                                             to the PO's single ordered volume. --}}
                                     <td class="text-end">
-                                        <div class="fw-bold font-monospace">{{ number_format($po->qty_ordered) }} L</div>
                                         @if ($po->items->isNotEmpty())
-                                            <div class="extra-small mt-1">
-                                                @foreach ($po->items as $it)
-                                                    <span class="badge bg-light text-dark border me-1" style="font-size: 0.65rem;" title="{{ $it->product }}: {{ number_format($it->remaining_balance) }}L remaining">
-                                                        {{ $it->product }}: {{ number_format($it->remaining_balance) }}L
-                                                    </span>
-                                                @endforeach
-                                            </div>
+                                            @foreach ($po->items as $it)
+                                                <div class="small font-monospace">
+                                                    {{ \Illuminate\Support\Str::substr($it->product, 0, 1) }} &mdash; {{ number_format($it->quantity_ordered) }}
+                                                </div>
+                                            @endforeach
                                         @else
-                                            <div class="extra-small text-muted">{{ number_format($po->remaining_balance) }} L remaining</div>
+                                            <div class="small font-monospace">{{ number_format($po->qty_ordered) }}</div>
                                         @endif
+                                    </td>
+                                    <td class="text-end">
+                                        @if ($po->items->isNotEmpty())
+                                            @foreach ($po->items as $it)
+                                                <div class="small font-monospace">
+                                                    {{ \Illuminate\Support\Str::substr($it->product, 0, 1) }} &mdash; {{ number_format((float) $it->unit_price, 2) }}
+                                                </div>
+                                            @endforeach
+                                        @else
+                                            <div class="small text-muted">&mdash;</div>
+                                        @endif
+                                    </td>
+                                    <td class="text-end">
+                                        @php
+                                            // Legacy POs predate the stored total, so fall
+                                            // back to summing their own line items.
+                                            $amount = (float) ($po->total_amount
+                                                ?: $po->items->sum(fn ($i) => $i->quantity_ordered * (float) $i->unit_price));
+                                        @endphp
+                                        <div class="fw-bold font-monospace">{{ number_format($amount, 2) }}</div>
                                     </td>
                                     <td class="text-center">
                                         @if ($po->request_status === 'REQUESTED')
@@ -177,30 +263,47 @@
                                         @elseif ($po->request_status === 'COMPLETED')
                                             <span class="badge bg-success-subtle text-success border rounded-pill px-3 py-1">5. COMPLETED</span>
                                         @endif
+                                        <div class="extra-small text-muted mt-1">{{ $po->computed_status }}</div>
                                     </td>
-                                    <td class="text-center">
-                                        <span class="badge bg-light text-dark border rounded-pill px-3 py-1">{{ $po->computed_status }}</span>
-                                    </td>
-                                    <td class="small text-muted">{{ $po->requester->name ?? 'System' }}</td>
                                     <td class="pe-3 text-end">
-                                        @if ($po->request_status === 'REQUESTED' && Auth::user()->canEditStockOrders())
-                                            <a href="{{ route('stock-orders.edit-request', $po->id) }}" class="btn btn-sm btn-primary rounded-pill px-3 py-1">
-                                                Process / ATL
+                                        @php
+                                            // Every row leads with View. ATL processing and
+                                            // approval both start from the PO detail page now,
+                                            // so the list is read-only navigation.
+                                            $canApprove = Auth::user()->canApproveStockOrders();
+                                            $activeDel = $po->deliveries->firstWhere('status', 'Active');
+                                            $atlDel = $po->deliveries->first(fn($d) => $d->requiresAtl());
+                                        @endphp
+                                        <div class="d-inline-flex gap-1 align-items-center flex-wrap justify-content-end">
+                                            <a href="{{ route('stock-orders.purchase-orders.show', $po->id) }}" class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary" title="Open purchase order">
+                                                <i class="bi bi-eye me-1"></i> View
                                             </a>
-                                        @elseif ($po->request_status === 'RECEIVED')
-                                            @if (Auth::user()->canApproveStockOrders())
-                                                <a href="{{ route('stock-orders.approvals') }}" class="btn btn-sm btn-outline-success rounded-pill px-3 py-1" title="Review in Approvals Queue">
-                                                    <i class="bi bi-patch-check me-1"></i> Review for Approval
+
+                                            @if (Auth::user()->canEditStockOrders())
+                                                <a href="{{ route('stock-orders.edit-supplier-po', $po->id) }}" class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary" title="Edit purchase order">
+                                                    <i class="bi bi-pencil me-1"></i> Edit
                                                 </a>
-                                            @else
-                                                <span class="badge bg-warning-subtle text-warning border rounded-pill px-3 py-1">Pending VP</span>
                                             @endif
-                                        @elseif ($po->request_status === 'FOR_DELIVERY')
-                                            @php
-                                                $atlDel = $po->deliveries->first(fn($d) => $d->requiresAtl());
-                                                $activeDel = $po->deliveries->firstWhere('status', 'Active');
-                                            @endphp
-                                            <div class="d-inline-flex gap-1 align-items-center">
+
+                                            {{-- Only released once the VP has approved. --}}
+                                            @if ($po->isVpApproved())
+                                                <a href="{{ route('stock-orders.po-pdf', $po->id) }}"
+                                                   class="btn btn-sm btn-outline-danger rounded-pill px-2 py-1" title="Download Purchase Order PDF">
+                                                    <i class="bi bi-file-earmark-pdf me-1"></i> PO PDF
+                                                </a>
+                                            @endif
+
+                                            @if ($po->request_status === 'REQUESTED' || $po->request_status === 'RECEIVED')
+                                                @if ($canApprove)
+                                                    <a href="{{ route('stock-orders.approvals') }}" class="btn btn-sm btn-outline-success rounded-pill px-3 py-1" title="Review in Approvals Queue">
+                                                        <i class="bi bi-patch-check me-1"></i> Review for Approval
+                                                    </a>
+                                                @else
+                                                    <span class="badge bg-warning-subtle text-warning border rounded-pill px-3 py-1">Pending VP</span>
+                                                @endif
+                                            @endif
+
+                                            @if ($po->request_status === 'FOR_DELIVERY')
                                                 @if ($po->isFuelTrade() && $activeDel && Auth::user()->canEditStockOrders())
                                                     <button type="button" class="btn btn-sm btn-success rounded-pill px-3 py-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#confirmLiftModal{{ $activeDel->id }}">
                                                         <i class="bi bi-check-circle me-1"></i> Mark Picked Up
@@ -219,22 +322,8 @@
                                                 <a href="{{ route('stock-orders.wet-stock-requests.show', $po->id) }}" class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary" title="Open request">
                                                     <i class="bi bi-truck me-1"></i> Track
                                                 </a>
-                                            </div>
-                                        @elseif ($po->request_status === 'COMPLETED')
-                                            <a href="{{ route('stock-orders.purchase-orders.show', $po->id) }}" class="btn btn-sm btn-light border rounded-pill px-3 py-1 text-muted">
-                                                <i class="bi bi-eye me-1"></i> View Record
-                                            </a>
-                                        @else
-                                            <div class="d-inline-flex gap-1 align-items-center">
-                                                <a href="{{ route('stock-orders.po-pdf', $po->id) }}"
-                                                   class="btn btn-sm btn-outline-danger rounded-pill px-2 py-1" title="Download Purchase Order PDF">
-                                                    <i class="bi bi-file-earmark-pdf me-1"></i> PO PDF
-                                                </a>
-                                                <a href="{{ route('stock-orders.purchase-orders.show', $po->id) }}" class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-muted">
-                                                    <i class="bi bi-arrow-right-circle me-1"></i> Details
-                                                </a>
-                                            </div>
-                                        @endif
+                                            @endif
+                                        </div>
                                     </td>
                                 </tr>
                             @empty

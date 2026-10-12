@@ -1,6 +1,8 @@
 @extends('layouts.app')
 
-@section('title', $mode === 'fuel_trade' ? 'Authority to Load (ATL) Issuance' : 'Process Stock Order & ATL')
+@section('title', $mode === 'fuel_trade' ? 'Authority to Load (ATL) Issuance' : ($mode === 'add_atl' ? 'Add ATL to Purchase Order' : 'Process Stock Order & ATL'))
+
+@php $isAddAtl = $mode === 'add_atl'; @endphp
 
 @section('content')
 <div class="row justify-content-center">
@@ -17,6 +19,8 @@
                     <h4 class="fw-bold mb-0 text-dark">
                         @if ($mode === 'fuel_trade')
                             <i class="bi bi-patch-check-fill text-warning me-2"></i>Issue Authority to Load (ATL)
+                        @elseif ($isAddAtl)
+                            <i class="bi bi-plus-circle text-primary me-2"></i>Add ATL to PO {{ $purchaseOrder->po_number }}
                         @else
                             <i class="bi bi-card-checklist text-primary me-2"></i>Assign PO Number & Prepare ATL / DR
                         @endif
@@ -24,6 +28,9 @@
                     <p class="text-muted small mb-0 mt-1">
                         @if ($mode === 'fuel_trade')
                             Draw down volume from Supplier POs and issue ATL for Sales Order <strong>{{ $order->formatted_so_number }}</strong>
+                        @elseif ($isAddAtl)
+                            Approved purchase order for <strong>{{ $purchaseOrder->supplier_name ?: ($purchaseOrder->client->name ?? '—') }}</strong>
+                            ({{ number_format($purchaseOrder->remaining_balance) }} L remaining)
                         @else
                             Stock Request for <strong>{{ optional($purchaseOrder->warehouse)->name }}</strong> (Requested: {{ number_format($purchaseOrder->qty_ordered) }} L)
                         @endif
@@ -55,7 +62,7 @@
                         ? ($order && $order->clearing_status === 'Approved')
                         : true;
                 @endphp
-                <form method="POST" action="{{ $mode === 'fuel_trade' ? route('stock-orders.store-fuel-trade-po', $order->id) : route('stock-orders.update-request', $purchaseOrder->id) }}" id="atlForm">
+                <form method="POST" action="{{ $mode === 'fuel_trade' ? route('stock-orders.store-fuel-trade-po', $order->id) : ($isAddAtl ? route('stock-orders.store-atl', $purchaseOrder->id) : route('stock-orders.update-request', $purchaseOrder->id)) }}" id="atlForm">
                     @csrf
 
                     @if ($errors->any())
@@ -366,13 +373,24 @@
                         {{-- Standard Depot Replenishment Mode --}}
                         <div class="row g-3 mb-3">
                             <div class="col-md-6">
-                                <label for="po_number" class="form-label fw-semibold small">Official PO Number <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control @error('po_number') is-invalid @enderror" id="po_number" name="po_number"
+                                <label for="po_number" class="form-label fw-semibold small">
+                                    Official PO Number
+                                    @unless ($isAddAtl)<span class="text-danger">*</span>@endunless
+                                </label>
+                                <input type="text" class="form-control @error('po_number') is-invalid @enderror @if ($isAddAtl) bg-light @endif" id="po_number" name="po_number"
+                                       @if ($isAddAtl) readonly @endif
                                        placeholder="e.g. PO-2026-0012" value="{{ old('po_number', $purchaseOrder->po_number ?? '') }}" required>
+                                @if ($isAddAtl)
+                                    <div class="form-text extra-small">Already approved, so the PO number is fixed.</div>
+                                @endif
                             </div>
                             <div class="col-md-6">
-                                <label for="supplier_name" class="form-label fw-semibold small">Supplier / Refinery Terminal <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control @error('supplier_name') is-invalid @enderror" id="supplier_name" name="supplier_name"
+                                <label for="supplier_name" class="form-label fw-semibold small">
+                                    Supplier / Refinery Terminal
+                                    @unless ($isAddAtl)<span class="text-danger">*</span>@endunless
+                                </label>
+                                <input type="text" class="form-control @error('supplier_name') is-invalid @enderror @if ($isAddAtl) bg-light @endif" id="supplier_name" name="supplier_name"
+                                       @if ($isAddAtl) readonly @endif
                                        placeholder="e.g. Petron Bataan Refinery" value="{{ old('supplier_name', $purchaseOrder->supplier_name ?? '') }}" required>
                             </div>
                         </div>

@@ -14,6 +14,7 @@ class StorageTank extends Model
         'warehouse_id',
         'name',
         'category', // 'depot' or 'tanker'
+        'product_type', // U / D / P (depots)
         'max_capacity',
         'is_active',
         'is_contaminated',
@@ -64,6 +65,38 @@ class StorageTank extends Model
     public function transfersIn(): HasMany
     {
         return $this->hasMany(StockTransfer::class, 'destination_tank_id');
+    }
+
+    /**
+     * Compartment rows for a tanker. A depot has none.
+     */
+    public function compartments(): HasMany
+    {
+        return $this->hasMany(TankCompartment::class, 'storage_tank_id')->orderBy('compartment_no');
+    }
+
+    /**
+     * Liters written off this tank (sampling, disposal, spillage, correction).
+     */
+    public function adjustments(): HasMany
+    {
+        return $this->hasMany(StockAdjustment::class, 'storage_tank_id');
+    }
+
+    /**
+     * Human-readable product name, e.g. "Diesel". Null when unset.
+     */
+    public function getProductNameAttribute(): ?string
+    {
+        return Order::PRODUCT_TYPES[$this->product_type] ?? null;
+    }
+
+    /**
+     * Liters written off (sampling, disposal, spillage, count correction).
+     */
+    public function getTotalAdjustmentsAttribute(): int
+    {
+        return (int) $this->adjustments()->sum('quantity');
     }
 
     public function isDepot(): bool
@@ -120,13 +153,15 @@ class StorageTank extends Model
             ->sum('quantity');
     }
 
-    /**
-     * Stock currently physically in tank (accounting for Stock IN, Transfers In, Fulfilled Stock Out, Transfers Out).
+/**
+     * Stock currently physically in tank (accounting for Stock IN, Transfers In,
+     * Fulfilled Stock Out, Transfers Out and write-offs).
      */
     public function getStockAvailableAttribute(): int
     {
         $totalIn = $this->total_stock_in + $this->total_transfers_in;
-        $totalOut = $this->stock_out + $this->total_transfers_out;
+        $totalOut = $this->stock_out + $this->total_transfers_out + $this->total_adjustments;
+
         return max(0, $totalIn - $totalOut);
     }
 

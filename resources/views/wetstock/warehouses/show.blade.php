@@ -10,7 +10,10 @@
                 <i class="bi bi-arrow-left me-1"></i> Back to Wet Stock Dashboard
             </a>
             @if (Auth::user()->canEditModule2())
-                <a href="{{ route('wetstock.tanks.create', $warehouse->id) }}" class="btn btn-primary-custom btn-sm">
+                {{-- Tanks are created and edited from the Wet Stock dashboard
+                     modals now, so this page links there rather than to a
+                     dedicated form that no longer exists. --}}
+                <a href="{{ route('wetstock.dashboard') }}" class="btn btn-primary-custom btn-sm">
                     <i class="bi bi-plus-circle me-1"></i> Add Tank / Tanker
                 </a>
             @endif
@@ -32,7 +35,7 @@
                         <i class="bi bi-box-seam display-4 text-muted mb-3 d-block"></i>
                         <p class="text-muted mb-3">No tanks added for {{ $warehouse->name }} yet.</p>
                         @if (Auth::user()->canEditModule2())
-                            <a href="{{ route('wetstock.tanks.create', $warehouse->id) }}" class="btn btn-primary-custom btn-sm">
+                            <a href="{{ route('wetstock.dashboard') }}" class="btn btn-primary-custom btn-sm">
                                 <i class="bi bi-plus-circle me-1"></i> Add First Tank
                             </a>
                         @endif
@@ -105,7 +108,7 @@
                                                         <i class="bi bi-exclamation-triangle me-1"></i> {{ $tank->hasContamination() ? 'Adjust' : 'Flag Contaminated' }}
                                                     </button>
 
-                                                    <a href="{{ route('wetstock.tanks.edit', $tank->id) }}" class="btn btn-sm btn-outline-secondary">
+                                                    <a href="{{ route('wetstock.dashboard') }}" class="btn btn-sm btn-outline-secondary">
                                                         <i class="bi bi-pencil"></i> Edit
                                                     </a>
                                                     <form method="POST" action="{{ route('wetstock.tanks.toggle-active', $tank->id) }}" class="d-inline">

@@ -63,6 +63,40 @@ class OrderController extends Controller
     }
 
     /**
+     * Map the single "Order Category" dropdown (REGULAR / FUEL_TRADE / BUY_BACK / CONSUMO)
+     * onto the existing columns, so isFuelTrade() / isBuyBack() and the Module 3
+     * queries (which look for FUEL_TRADE, or BUY_BACK + DEPOT_PICKUP) keep working:
+     *   REGULAR    -> DELIVERY   + CLIENT_ORDER
+     *   FUEL_TRADE -> FUEL_TRADE + CLIENT_ORDER
+     *   BUY_BACK   -> DEPOT_PICKUP + BUY_BACK
+     *   CONSUMO    -> DELIVERY   + CONSUMO   (tag only, fulfilled like a regular order)
+     * An existing regular order that is already a depot pick-up keeps that setting.
+     */
+    private function resolveOrderType(string $orderType, ?Order $existing = null): array
+    {
+        if ($orderType === 'FUEL_TRADE') {
+            return ['fulfillment_type' => 'FUEL_TRADE', 'order_category' => 'CLIENT_ORDER'];
+        }
+
+        if ($orderType === 'BUY_BACK') {
+            return ['fulfillment_type' => 'DEPOT_PICKUP', 'order_category' => 'BUY_BACK'];
+        }
+
+        if ($orderType === 'CONSUMO') {
+            return ['fulfillment_type' => 'DELIVERY', 'order_category' => 'CONSUMO'];
+        }
+
+        $keepDepotPickup = $existing
+            && $existing->fulfillment_type === 'DEPOT_PICKUP'
+            && $existing->order_category !== 'BUY_BACK';
+
+        return [
+            'fulfillment_type' => $keepDepotPickup ? 'DEPOT_PICKUP' : 'DELIVERY',
+            'order_category' => 'CLIENT_ORDER',
+        ];
+    }
+
+    /**
      * Redirect back to wherever the user actually came from (e.g. Reports with its
      * filters intact), falling back to the Dashboard if none was captured or if the
      * given value isn't actually a page on this site (basic open-redirect guard).
@@ -111,14 +145,12 @@ class OrderController extends Controller
             'po_number' => ['nullable', 'string', 'max:64', 'unique:orders,po_number'],
             'location' => ['required', 'string', 'in:Valenzuela,San Simon'],
             'status' => ['required', 'string', 'in:Active,Cancelled'],
-            'fulfillment_type' => ['nullable', 'string', 'in:DELIVERY,DEPOT_PICKUP,FUEL_TRADE'],
-            'order_category' => ['nullable', 'string', 'in:CLIENT_ORDER,BUY_BACK'],
-            'client_atl_number' => ['nullable', 'string', 'max:64'],
-            'terms' => ['nullable', 'string', 'max:64'],
+            'order_type' => ['required', 'string', 'in:REGULAR,FUEL_TRADE,BUY_BACK,CONSUMO'],
+            'terms' => ['required', 'string', 'max:64'],
         ], $this->itemRules()), $this->itemMessages(), $this->itemAttributes());
 
-        $validated['fulfillment_type'] = $validated['fulfillment_type'] ?? 'DELIVERY';
-        $validated['order_category'] = $validated['order_category'] ?? 'CLIENT_ORDER';
+        $validated = array_merge($validated, $this->resolveOrderType($validated['order_type']));
+        unset($validated['order_type']);
         $validated['created_by'] = Auth::id();
 
         // Product lines -> the Order model writes them to order_items on save and
@@ -131,7 +163,7 @@ class OrderController extends Controller
         AuditLog::create([
             'admin_id' => Auth::id(),
             'action' => 'CREATED',
-            'description' => "Created order #{$order->id} - {$order->account} (SO# {$order->so_number})",
+            'description' => "Created order #{$order->id} - {$order->account} (SO# {$order->formatted_so_number})",
         ]);
 
         // Notify Accounting that a new sales order needs clearance review.
@@ -139,7 +171,7 @@ class OrderController extends Controller
         app(PushNotificationService::class)->sendToRole(
             'accounting',
             'New Sales Order Submitted',
-            "SO# {$order->so_number} — {$order->account} ({$order->location}) needs clearance approval.",
+            "SO# {$order->formatted_so_number} — {$order->account} ({$order->location}) needs clearance approval.",
             ['url' => route('dashboard')]
         );
 
@@ -186,15 +218,13 @@ class OrderController extends Controller
             'po_number' => ['nullable', 'string', 'max:64', 'unique:orders,po_number,' . $order->id],
             'location' => ['required', 'string', 'in:Valenzuela,San Simon'],
             'status' => ['required', 'string', 'in:Active,Cancelled'],
-            'fulfillment_type' => ['nullable', 'string', 'in:DELIVERY,DEPOT_PICKUP,FUEL_TRADE'],
-            'order_category' => ['nullable', 'string', 'in:CLIENT_ORDER,BUY_BACK'],
-            'client_atl_number' => ['nullable', 'string', 'max:64'],
-            'terms' => ['nullable', 'string', 'max:64'],
+            'order_type' => ['required', 'string', 'in:REGULAR,FUEL_TRADE,BUY_BACK,CONSUMO'],
+            'terms' => ['required', 'string', 'max:64'],
             'modification_reason' => ['nullable', 'string', 'max:1000'],
         ], $this->itemRules()), $this->itemMessages(), $this->itemAttributes());
 
-        $validated['fulfillment_type'] = $validated['fulfillment_type'] ?? 'DELIVERY';
-        $validated['order_category'] = $validated['order_category'] ?? 'CLIENT_ORDER';
+        $validated = array_merge($validated, $this->resolveOrderType($validated['order_type'], $order));
+        unset($validated['order_type']);
 
         // Product lines as one readable string, so the approver sees a clear
         // before/after, e.g. "Unleaded (U) 5000 @ 78.00 | Diesel (D) 3000 @ 82.50".
@@ -205,7 +235,7 @@ class OrderController extends Controller
         // Diff changes against existing model attributes.
         // (qty_ordered / price / amount are derived from the product lines.)
         $changes = [];
-        $comparableFields = ['account', 'date', 'products', 'so_number', 'po_number', 'location', 'status', 'fulfillment_type', 'order_category', 'client_atl_number', 'terms'];
+        $comparableFields = ['account', 'date', 'products', 'so_number', 'po_number', 'location', 'status', 'fulfillment_type', 'order_category', 'terms'];
 
         foreach ($comparableFields as $field) {
             $oldVal = $order->{$field};
@@ -224,7 +254,7 @@ class OrderController extends Controller
 
         if (empty($changes)) {
             return $this->redirectToOrigin($returnTo)
-                ->with('info', "No changes detected on SO# {$order->so_number}.");
+                ->with('info', "No changes detected on SO# {$order->formatted_so_number}.");
         }
 
         $modRequest = ModificationRequest::create([
@@ -239,11 +269,11 @@ class OrderController extends Controller
         AuditLog::create([
             'admin_id' => Auth::id(),
             'action' => 'REQUESTED',
-            'description' => "Submitted Modification Request #{$modRequest->id} for SO# {$order->so_number} (" . count($changes) . " field(s) changed)",
+            'description' => "Submitted Modification Request #{$modRequest->id} for SO# {$order->formatted_so_number} (" . count($changes) . " field(s) changed)",
         ]);
 
         return $this->redirectToOrigin($returnTo)
-            ->with('success', "Modification request for SO# {$order->so_number} submitted to the Approvals Queue for HOD / Administrator review.");
+            ->with('success', "Modification request for SO# {$order->formatted_so_number} submitted to the Approvals Queue for HOD / Administrator review.");
     }
 
     /**
@@ -340,7 +370,7 @@ class OrderController extends Controller
     {
         $pushService = app(PushNotificationService::class);
         $title = 'Order Clearance Updated';
-        $body = "SO# {$order->so_number} — {$order->account} was marked {$newStatus} by Accounting.";
+        $body = "SO# {$order->formatted_so_number} — {$order->account} was marked {$newStatus} by Accounting.";
         $data = ['url' => route('dashboard')];
 
         // The specific salesperson who created this order.
@@ -369,7 +399,7 @@ class OrderController extends Controller
                 $pushService->sendToAdmin(
                     $order->created_by,
                     'Order Clearance Updated',
-                    "SO# {$order->so_number} — {$order->account} was marked {$newStatus} by Accounting.",
+                    "SO# {$order->formatted_so_number} — {$order->account} was marked {$newStatus} by Accounting.",
                     $data
                 );
             }

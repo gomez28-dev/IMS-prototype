@@ -126,6 +126,151 @@ class PurchaseOrder extends Model
         return $this->po_type === 'STANDARD_REPLENISHMENT' || empty($this->po_type);
     }
 
+    /**
+     * There are three kinds of purchase order, and each is raised from one
+     * place. The type is therefore also where the PO came from:
+     *
+     *   SO-FT        -> Sales Orders page
+     *   SO-BUY BACK  -> Sales Orders page
+     *   Doyen Stock  -> Wet Stock Requests page
+     *
+     * @var array<string, string>
+     */
+    public const TYPE_LABELS = [
+        'FUEL_TRADE' => 'SO-FT',
+        'BUY_BACK' => 'SO-BUY BACK',
+        'STANDARD_REPLENISHMENT' => 'Doyen Stock',
+    ];
+
+    public function typeLabel(): string
+    {
+        return self::TYPE_LABELS[$this->po_type] ?? 'Doyen Stock';
+    }
+
+    /**
+     * @return array<string, string> Badge colour classes keyed by po_type.
+     */
+    public static function typeBadgeClasses(): array
+    {
+        return [
+            'FUEL_TRADE' => 'bg-warning-subtle text-dark border',
+            'BUY_BACK' => 'bg-info-subtle text-dark border',
+            'STANDARD_REPLENISHMENT' => 'bg-light text-dark border',
+        ];
+    }
+
+    public function typeBadgeClass(): string
+    {
+        return self::typeBadgeClasses()[$this->po_type] ?? 'bg-light text-dark border';
+    }
+
+    /**
+     * Has the VP signed this PO off?
+     *
+     * A PO is only approved once it moves past RECEIVED, which is the state
+     * the Approvals queue waits on. Everything downstream of approval
+     * (FOR_DELIVERY, COMPLETED) is still approved.
+     */
+    public function isVpApproved(): bool
+    {
+        return in_array($this->request_status, ['CONFIRMED', 'FOR_DELIVERY', 'COMPLETED'], true);
+    }
+
+    /**
+     * Volumes already drawn from this PO, keyed by product.
+     *
+     * Aggregated on purchase_order_id + product rather than through the item
+     * rows, because ATLs raised from a Fuel Trade sale store their allocations
+     * without a purchase_order_item_id.
+     *
+     * @return array<string, int>
+     */
+    public function drawnByProduct(): array
+    {
+        return AtlAllocation::query()
+            ->where('purchase_order_id', $this->id)
+            ->whereHas('delivery', fn ($q) => $q->where('status', '!=', 'Cancelled'))
+            ->selectRaw('product, SUM(quantity) AS qty')
+            ->groupBy('product')
+            ->pluck('qty', 'product')
+            ->map(fn ($qty) => (int) $qty)
+            ->all();
+    }
+
+    /**
+     * The three fuel products this module trades, in the order the reports
+     * present them.
+     *
+     * @var array<int, string>
+     */
+    public const PRODUCTS = ['Diesel', 'Unleaded', 'Premium'];
+
+    /**
+     * Volumes ordered, lifted and still unlifted, split by product.
+     *
+     * "Lifted" is volume whose ATL has been loaded; "unlifted" is volume that
+     * already has an ATL issued but has not been loaded yet. Volume that is
+     * merely ordered and never ATL'd falls into neither, which is why the two
+     * do not have to add up to the ordered total.
+     *
+     * Passing a purchase order id narrows every figure to that one PO.
+     *
+     * @return array{ordered: array<string, int>, lifted: array<string, int>, unlifted: array<string, int>}
+     */
+    public static function volumeTotals(?int $purchaseOrderId = null): array
+    {
+        $ordered = PurchaseOrderItem::query()
+            ->selectRaw('product, SUM(quantity_ordered) AS qty')
+            ->groupBy('product');
+
+        // An ATL counts once its delivery has actually been loaded, or is
+        // still outstanding. Cancelled deliveries count as neither.
+        $lifted = self::allocationTotals(PurchaseOrderDelivery::LIFT_LIFTED);
+        $unlifted = self::allocationTotals(PurchaseOrderDelivery::LIFT_UNLIFTED);
+
+        if ($purchaseOrderId !== null) {
+            $ordered->where('purchase_order_id', $purchaseOrderId);
+            $lifted->where('atl_allocations.purchase_order_id', $purchaseOrderId);
+            $unlifted->where('atl_allocations.purchase_order_id', $purchaseOrderId);
+        }
+
+        return [
+            'ordered' => self::normaliseVolumes($ordered->pluck('qty', 'product')->all()),
+            'lifted' => self::normaliseVolumes($lifted->pluck('qty', 'product')->all()),
+            'unlifted' => self::normaliseVolumes($unlifted->pluck('qty', 'product')->all()),
+        ];
+    }
+
+    /**
+     * Allocation volume grouped by product for one delivery lift status.
+     */
+    protected static function allocationTotals(string $liftStatus): \Illuminate\Database\Eloquent\Builder
+    {
+        return AtlAllocation::query()
+            ->join('purchase_order_deliveries', 'atl_allocations.purchase_order_delivery_id', '=', 'purchase_order_deliveries.id')
+            ->where('purchase_order_deliveries.lift_status', $liftStatus)
+            ->where('purchase_order_deliveries.status', '!=', 'Cancelled')
+            ->selectRaw('atl_allocations.product, SUM(atl_allocations.quantity) AS qty')
+            ->groupBy('atl_allocations.product');
+    }
+
+    /**
+     * Give every known product an entry so the cards always show all three,
+     * even where a product has no rows at all.
+     *
+     * @param  array<string, mixed>  $totals
+     * @return array<string, int>
+     */
+    protected static function normaliseVolumes(array $totals): array
+    {
+        $out = [];
+        foreach (self::PRODUCTS as $product) {
+            $out[$product] = (int) ($totals[$product] ?? 0);
+        }
+
+        return $out;
+    }
+
     public function isRevised(): bool
     {
         if ($this->revised_at !== null) {

@@ -20,9 +20,12 @@
                 </h3>
             </div>
             <div class="d-flex gap-2">
-                <a href="{{ route('stock-orders.po-pdf', $purchaseOrder->id) }}" class="btn btn-outline-danger shadow-sm">
-                    <i class="bi bi-file-earmark-pdf me-1"></i> PO PDF
-                </a>
+                {{-- Released only once the VP has approved. --}}
+                @if ($purchaseOrder->isVpApproved())
+                    <a href="{{ route('stock-orders.po-pdf', $purchaseOrder->id) }}" class="btn btn-outline-danger shadow-sm">
+                        <i class="bi bi-file-earmark-pdf me-1"></i> PO PDF
+                    </a>
+                @endif
                 <a href="{{ url()->previous() }}" class="btn btn-outline-secondary">
                     <i class="bi bi-arrow-left me-1"></i> Back
                 </a>

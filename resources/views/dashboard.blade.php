@@ -1,10 +1,10 @@
 @extends('layouts.app')
 
-@section('title', 'Dashboard')
+@section('title', 'Orders Dashboard')
 
 @section('content')
 @php
-    // Product chip colors (used on mobile cards only): U = Unleaded, D = Diesel, P = Premium
+    // Product chip colors: U = Unleaded, D = Diesel, P = Premium
     $chipStyles = [
         'U' => 'background:#dcfce7;color:#166534;border:1px solid #bbf7d0;',
         'D' => 'background:#e0e7ff;color:#3730a3;border:1px solid #c7d2fe;',
@@ -15,6 +15,29 @@
         $style = $chipStyles[$type] ?? 'background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb;';
         $label = $type ?: '—';
         return '<span class="prod-chip" style="' . $style . '" title="' . e($title) . '">' . e($label) . '</span>';
+    };
+
+    // SO# badge: Buy Back = purple, Fuel Trade = amber, regular = gray, cancelled = red
+    $soBadge = function ($order) {
+        $style = '';
+        if ($order->status === 'Cancelled') {
+            $cls = 'bg-danger text-white';
+        } elseif ($order->so_prefix === 'BB') {
+            $cls = '';
+            $style = 'background:#ede9fe;color:#5b21b6;border:1px solid #ddd6fe;';
+        } elseif ($order->so_prefix === 'FT') {
+            $cls = '';
+            $style = 'background:#fef3c7;color:#92400e;border:1px solid #fde68a;';
+                } elseif ($order->so_prefix === 'CSM') {
+            $cls = '';
+            $style = 'background:#ccfbf1;color:#115e59;border:1px solid #99f6e4;';
+        } else {
+            $cls = 'bg-light text-dark border';
+        }
+
+        $title = $order->isFuelTrade() ? 'Fuel Trade (Refinery Direct Pick-up)' : ($order->isBuyBack() ? 'Buy Back' : ($order->isConsumo() ? 'Consumo' : ''));
+        
+        return '<span class="badge ' . $cls . '" style="' . $style . '" title="' . e($title) . '">' . e($order->formatted_so_number) . '</span>';
     };
 
     // Price shown on mobile cards: one price, or a range when an order has several products
@@ -41,8 +64,54 @@
 
         return ['text' => $p > 0 ? '₱' . number_format($p, 2) : null, 'sub' => null];
     };
+
+    // Summary cards: ordered / delivered / undelivered, each split by product
+    $prodRows = [['D', 'Diesel'], ['U', 'Unleaded'], ['P', 'Premium']];
+    $statCards = [
+        ['title' => 'Total Qty. Ordered', 'icon' => 'bi-boxes', 'tint' => 'background:#ecfeff;color:#0891b2;', 'data' => $productStats['ordered']],
+        ['title' => 'Total Qty. Delivered', 'icon' => 'bi-truck', 'tint' => 'background:#f0fdf4;color:#16a34a;', 'data' => $productStats['delivered']],
+        ['title' => 'Total Qty. Undelivered', 'icon' => 'bi-clock-history', 'tint' => 'background:#fffbeb;color:#d97706;', 'data' => $productStats['undelivered']],
+    ];
 @endphp
 <style>
+    /* ---- Summary cards ---- */
+    .stat-title {
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: #374151;
+    }
+    .stat-icon {
+        width: 46px;
+        height: 46px;
+        border-radius: 0.8rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.3rem;
+        flex-shrink: 0;
+    }
+    .stat-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.6rem;
+        padding: 0.45rem 0.8rem;
+        margin-bottom: 0.45rem;
+        background: #fff;
+    }
+    .stat-row .stat-val { font-weight: 700; color: #111827; }
+    .stat-total {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.25rem 0.3rem 0;
+        color: #6b7280;
+    }
+    .stat-total .stat-val { font-weight: 600; color: #111827; }
+    .stat-big { font-size: 3.6rem; font-weight: 800; line-height: 1; color: #111827; }
+
     /* ---- Compact orders table (fits without side scrolling) ---- */
     #ordersTable { width: 100%; }
     #ordersTable thead th {
@@ -120,7 +189,7 @@
         color: #111827;
     }
 
-    /* Mobile chips */
+    /* Product chips */
     .prod-chip {
         display: inline-block;
         font-size: 0.65rem;
@@ -131,22 +200,6 @@
         margin: 0 1px;
     }
 </style>
-<!-- Header Section -->
-<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-5 gap-3">
-    <div>
-        <h2 class="fw-bold text-dark mb-1">Orders Dashboard</h2>
-        <p class="text-muted small mb-0">Manage customer accounts, sales orders, and delivery statuses.</p>
-    </div>
-    <div class="row g-2">
-        @if (Auth::user()->canEditModule1())
-        <div class="col-12 col-md-auto">
-            <a href="{{ route('order.create') }}" class="btn btn-primary-custom shadow-sm d-flex align-items-center justify-content-center w-100">
-                <i class="bi bi-plus-lg me-2"></i> New Order
-            </a>
-        </div>
-        @endif
-    </div>
-</div>
 
 <!-- Stats Overview Cards -->
 <div class="d-flex align-items-center gap-2 mb-3">
@@ -154,67 +207,46 @@
         <i class="bi bi-calendar3 me-1"></i> Monthly Summary &mdash; {{ $now->format('F Y') }}
     </span>
 </div>
-<div class="row g-4 mb-5">
+<div class="row g-4 mb-4">
+    <div class="col-xl-3 col-md-6">
+        <div class="card card-custom p-3 border-0 h-100">
+            <div class="d-flex align-items-center gap-3">
+                <div class="stat-icon" style="background:#fff1ee;color:#f04a1a;"><i class="bi bi-journal-text"></i></div>
+                <span class="stat-title">Total Orders</span>
+            </div>
+            <div class="d-flex flex-grow-1 align-items-center justify-content-center py-3">
+                <span class="stat-big">{{ number_format($totalOrders) }}</span>
+            </div>
+        </div>
+    </div>
 
-    <div class="col-md-3 col-sm-6">
-        <div class="card card-custom p-3 border-0">
-            <div class="d-flex align-items-center">
-                    <div class="rounded-3 p-3 bg-primary bg-opacity-10 text-primary me-3">
-                    <i class="bi bi-journal-text fs-4"></i>
-                </div>
-                <div>
-                    <span class="text-muted small d-block">Total Orders</span>
-                    <h4 class="fw-bold mb-0 text-dark">{{ number_format($totalOrders) }}</h4>
-                </div>
+    @foreach ($statCards as $card)
+    <div class="col-xl-3 col-md-6">
+        <div class="card card-custom p-3 border-0 h-100">
+            <div class="d-flex align-items-center gap-3 mb-3">
+                <div class="stat-icon" style="{{ $card['tint'] }}"><i class="bi {{ $card['icon'] }}"></i></div>
+                <span class="stat-title">{{ $card['title'] }}</span>
+            </div>
+            @foreach ($prodRows as [$code, $name])
+            <div class="stat-row">
+                <span>{!! $chip($code, $name) !!} <span class="ms-2">{{ $name }}</span></span>
+                <span class="stat-val">{{ number_format($card['data'][$code]) }}</span>
+            </div>
+            @endforeach
+            <div class="stat-total">
+                <span>Total</span>
+                <span class="stat-val">{{ number_format(array_sum($card['data'])) }}</span>
             </div>
         </div>
     </div>
-    <div class="col-md-3 col-sm-6">
-        <div class="card card-custom p-3 border-0">
-            <div class="d-flex align-items-center">
-                <div class="rounded-3 p-3 bg-info bg-opacity-10 text-info me-3" style="background-color: #ecfeff !important; color: #0891b2 !important;">
-                    <i class="bi bi-boxes fs-4"></i>
-                </div>
-                <div>
-                    <span class="text-muted small d-block">Qty Ordered</span>
-                    <h4 class="fw-bold mb-0 text-dark">{{ number_format($totalQtyOrdered) }}</h4>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3 col-sm-6">
-        <div class="card card-custom p-3 border-0">
-            <div class="d-flex align-items-center">
-                <div class="rounded-3 p-3 bg-success bg-opacity-10 text-success me-3" style="background-color: #f0fdf4 !important; color: #16a34a !important;">
-                    <i class="bi bi-truck fs-4"></i>
-                </div>
-                <div>
-                    <span class="text-muted small d-block">Qty Delivered</span>
-                    <h4 class="fw-bold mb-0 text-dark">{{ number_format($totalQtyDelivered) }}</h4>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3 col-sm-6">
-        <div class="card card-custom p-3 border-0">
-            <div class="d-flex align-items-center">
-                <div class="rounded-3 p-3 bg-warning bg-opacity-10 text-warning me-3" style="background-color: #fffbeb !important; color: #d97706 !important;">
-                    <i class="bi bi-clock-history fs-4"></i>
-                </div>
-                <div>
-                    <span class="text-muted small d-block">Remaining Bal</span>
-                    <h4 class="fw-bold mb-0 text-dark">{{ number_format($totalRemaining) }}</h4>
-                </div>
-            </div>
-        </div>
-    </div>
+    @endforeach
 </div>
 
 <!-- Search & Filtering -->
 <div class="mb-4">
     <form method="GET" action="{{ route('dashboard') }}" class="row g-2 align-items-center">
         <input type="hidden" name="tab" value="{{ $activeTab }}">
-        <div class="col-md-6 col-sm-8 col-10">
+        <div class="col-md-7 col-sm-8 col-12">
             <div class="input-group">
                 <span class="input-group-text bg-white border-end-0">
                     <i class="bi bi-search text-muted"></i>
@@ -228,6 +260,13 @@
                 <a href="{{ route('dashboard', ['clear' => 1]) }}" class="btn btn-secondary-custom">Clear</a>
             @endif
         </div>
+        @if (Auth::user()->canEditModule1())
+        <div class="col-auto ms-md-auto">
+            <a href="{{ route('order.create') }}" class="btn btn-primary-custom shadow-sm d-flex align-items-center justify-content-center">
+                <i class="bi bi-plus-lg me-2"></i> New Order
+            </a>
+        </div>
+        @endif
     </form>
 </div>
 
@@ -355,11 +394,7 @@
                                 @endif
                             </td>
                             <td class="text-center">
-                                @if ($order->isFuelTrade())
-                                    <span class="badge bg-light text-dark border" title="Fuel Trade (Refinery Direct Pick-up)">{{ $order->formatted_so_number }}</span>
-                                @else
-                                    <span class="badge {{ $order->status === 'Cancelled' ? 'bg-danger text-white' : 'bg-light text-dark border' }}">{{ $order->formatted_so_number }}</span>
-                                @endif
+                                {!! $soBadge($order) !!}
                                 @if ($order->isCarryOver($now))
                                     <div class="mt-1">
                                         <span class="badge bg-secondary-subtle text-secondary border rounded-pill" style="font-size: 0.6rem;" title="Unfulfilled order from previous month">
@@ -539,11 +574,7 @@
                             @endif
                             </h5>
                             @endif
-                            @if ($order->isFuelTrade())
-                                <span class="badge bg-light text-dark border" title="Fuel Trade">{{ $order->formatted_so_number }}</span>
-                            @else
-                                <span class="badge {{ $order->status === 'Cancelled' ? 'bg-danger text-white' : 'bg-light text-dark border' }}">{{ $order->formatted_so_number }}</span>
-                            @endif
+                            {!! $soBadge($order) !!}
                         </div>
                         <p class="text-muted small mb-1"><span class="fw-medium">PO#:</span> {{ $order->po_number }}</p>
                         <div class="row mb-3 small text-muted">

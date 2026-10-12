@@ -3,6 +3,45 @@
 @section('title', 'Reports')
 
 @section('content')
+@php
+    // SO# tag (same as the Orders Dashboard): regular = 6203, Buy Back = BB-6203 (violet),
+    // Fuel Trade = FT-6203 (yellow). The prefix comes from Order::formatted_so_number.
+    $soBadge = function ($order) {
+        $prefix = $order->so_prefix;
+        $cancelled = $order->status === 'Cancelled';
+
+        if ($prefix === 'FT') {
+            $class = 'badge so-pill';
+            $style = 'background-color:#fef08a;color:#854d0e;border:1px solid #facc15;';
+            $title = 'Fuel Trade (Refinery Direct Pick-up)';
+        } elseif ($cancelled) {
+            $class = 'badge so-pill bg-danger text-white';
+            $style = '';
+            $title = $prefix === 'BB' ? 'Buy Back (Cancelled)' : 'Cancelled';
+        } elseif ($prefix === 'BB') {
+            $class = 'badge so-pill';
+            $style = 'background-color:#ede9fe;color:#5b21b6;border:1px solid #ddd6fe;';
+            $title = 'Buy Back';
+        } else {
+            $class = 'badge so-pill bg-light text-dark border';
+            $style = '';
+            $title = '';
+        }
+
+        return '<span class="' . $class . '"' . ($style ? ' style="' . $style . '"' : '') . ($title ? ' title="' . e($title) . '"' : '') . '>' . e($order->formatted_so_number) . '</span>';
+    };
+@endphp
+<style>
+    /* Labels/badges sized like the Orders Dashboard list */
+    #reportsTable .badge {
+        font-size: 0.7rem;
+        font-weight: 500;
+    }
+    .so-pill {
+        white-space: nowrap;
+        letter-spacing: 0.01em;
+    }
+</style>
 <div class="mb-3">
     <a href="{{ route('dashboard') }}" class="text-decoration-none text-secondary small">
         <i class="bi bi-arrow-left me-1"></i> Back to Dashboard
@@ -190,7 +229,7 @@
         <div class="card-body p-0">
             <!-- Desktop table -->
             <div class="table-responsive d-none d-md-block">
-                <table class="table table-custom table-hover align-middle mb-0">
+                <table id="reportsTable" class="table table-custom table-hover align-middle mb-0">
                     <thead>
                         <tr>
                             <th class="ps-4">Account</th>
@@ -212,7 +251,7 @@
                                     @if ($order->status === 'Cancelled')
                                         <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill me-1"><i class="bi bi-x-circle me-1"></i>CANCELLED</span>
                                     @endif
-                                    <span class="badge {{ $order->status === 'Cancelled' ? 'bg-danger text-white' : 'bg-light text-dark border' }}">{{ $order->so_number }}</span>
+                                    {!! $soBadge($order) !!}
                                 </td>
                                 <td class="text-end fw-medium">{{ number_format($order->effective_qty_ordered) }}</td>
                                 <td class="text-end fw-medium text-secondary">{{ number_format($order->total_qty_out) }}</td>
@@ -258,7 +297,7 @@
                                     @if ($order->status === 'Cancelled')
                                         <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill me-1"><i class="bi bi-x-circle me-1"></i>CANCELLED</span>
                                     @endif
-                                    <span class="badge {{ $order->status === 'Cancelled' ? 'bg-danger text-white' : 'bg-light text-dark border' }}">{{ $order->so_number }}</span>
+                                    {!! $soBadge($order) !!}
                                 </span>
                             </div>
                             <div class="row mb-3 small text-muted">

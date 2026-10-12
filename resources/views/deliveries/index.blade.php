@@ -3,6 +3,162 @@
 @section('title', 'Deliveries for ' . $order->formatted_so_number)
 
 @section('content')
+<style>
+    /* ---- Deliveries table (aligned with the Orders Dashboard list) ---- */
+    #deliveriesTable { width: 100%; }
+    #deliveriesTable thead th {
+        vertical-align: middle !important;
+        text-align: center !important;
+        font-size: 0.7rem !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #475569;
+        background-color: #f8fafc !important;
+        padding: 0.85rem 0.5rem !important;
+        line-height: 1.2;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    #deliveriesTable tbody td {
+        padding: 0.75rem 0.5rem !important;
+        font-size: 0.82rem;
+        font-weight: 400 !important;
+        text-align: center;
+        vertical-align: middle;
+    }
+    #deliveriesTable tbody td[colspan] {
+        padding: 3rem 0.5rem !important;
+    }
+    #deliveriesTable .badge {
+        font-size: 0.7rem;
+        font-weight: 500;
+    }
+    #deliveriesTable .btn-sm {
+        font-size: 0.75rem;
+    }
+
+    /* DR# / PO# pill (same look as the SO# pill on the dashboard) */
+    .id-pill {
+        display: inline-block;
+        border: 1px solid #d1d5db;
+        background: #f8fafc;
+        color: #1f2937;
+        border-radius: 0.4rem;
+        padding: 0.15rem 0.6rem;
+        font-size: 0.78rem;
+        font-weight: 500;
+        letter-spacing: 0.01em;
+    }
+
+    /* Icon-only square action buttons (same as the dashboard edit/delete buttons) */
+    .action-icon {
+        width: 2rem;
+        height: 2rem;
+        padding: 0 !important;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0.5rem !important;
+    }
+
+    /* Per-product lines: "U - 3,000" (block is centered, lines stay aligned) */
+    .pl-block {
+        display: inline-block;
+        text-align: left;
+        white-space: nowrap;
+    }
+    .pl-row { line-height: 1.7; }
+    .pl-key {
+        display: inline-block;
+        min-width: 1rem;
+        text-align: center;
+        font-weight: 400;
+    }
+
+    /* Buttons: same size as the Orders Dashboard */
+    .compact-bar .btn {
+        font-size: 0.82rem;
+        padding: 0.4rem 0.9rem;
+    }
+
+    /* ---- Stat cards (same pattern as the dashboard's Total Qty cards) ---- */
+    .stat-card {
+        background: #fff;
+        border-radius: 1rem;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+        padding: 1rem 1.1rem;
+        height: 100%;
+    }
+    .stat-head {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        margin-bottom: 0.8rem;
+    }
+    .stat-icon {
+        width: 2.25rem;
+        height: 2.25rem;
+        border-radius: 0.65rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.05rem;
+        flex-shrink: 0;
+    }
+    .stat-title {
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #334155;
+    }
+    .stat-row {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.6rem;
+        padding: 0.4rem 0.7rem;
+        margin-bottom: 0.4rem;
+        font-size: 0.85rem;
+    }
+    .stat-row .stat-name { flex: 1; color: #475569; }
+    .stat-row .stat-val { font-weight: 700; color: #0f172a; }
+    .stat-total {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.25rem 0.2rem 0;
+        font-size: 0.85rem;
+        color: #475569;
+    }
+    .stat-total .stat-val { font-weight: 700; color: #0f172a; }
+    .stat-big {
+        font-size: 1.6rem;
+        font-weight: 800;
+        text-align: center;
+        padding: 0.4rem 0;
+    }
+    .pbadge {
+        width: 1.45rem;
+        height: 1.45rem;
+        border-radius: 0.4rem;
+        font-size: 0.7rem;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #f1f5f9;
+        color: #475569;
+        flex-shrink: 0;
+    }
+    .pbadge-D { background: #e0e7ff; color: #4338ca; }
+    .pbadge-U { background: #dcfce7; color: #15803d; }
+    .pbadge-P { background: #fee2e2; color: #b91c1c; }
+
+    /* Order info card */
+    .order-info-card h4 { font-size: 1.05rem; line-height: 1.3; }
+</style>
+
 <div class="mb-3">
     @if (str_contains(url()->previous(), '/reports'))
     @php $filters = session('report_filters', []); @endphp
@@ -17,89 +173,104 @@
 </div>
 
 @php
-    // Per-product lines only make sense when the SO has more than one product
     $productSummary = $productSummary ?? [];
-    $showBreakdown = count($productSummary) > 1;
+    $hasProducts = count($productSummary) > 0;
+
+    // Stat cards: title, icon, colors, overall total, and the per-product value
+    $statCards = [
+        [
+            'title'   => 'Qty Ordered',
+            'icon'    => 'bi-box-seam',
+            'bg'      => '#e0f7fa',
+            'fg'      => '#0e9aa7',
+            'total'   => $order->effective_qty_ordered,
+            'rows'    => $hasProducts,
+            'value'   => fn ($p) => $p['ordered'] - $p['cancelled'],
+            'class'   => 'text-dark',
+        ],
+        [
+            'title'   => 'Total Out',
+            'icon'    => 'bi-truck',
+            'bg'      => '#dcfce7',
+            'fg'      => '#16a34a',
+            'total'   => $order->total_qty_out,
+            'rows'    => $hasProducts && !$order->isFuelTrade(),
+            'value'   => fn ($p) => $p['fulfilled'],
+            'class'   => 'text-primary',
+        ],
+        [
+            'title'   => 'Remaining',
+            'icon'    => 'bi-clock-history',
+            'bg'      => '#fef3c7',
+            'fg'      => '#d97706',
+            'total'   => $order->remaining_balance,
+            'rows'    => $hasProducts && !$order->isFuelTrade(),
+            'value'   => fn ($p) => $p['remaining'],
+            'class'   => $order->remaining_balance == 0 ? 'text-success' : 'text-warning-emphasis',
+        ],
+    ];
 @endphp
 
-<!-- Order Summary Header Card -->
-<div class="card card-custom mb-5 border-0 border-start border-5 {{ $order->isFuelTrade() ? 'border-warning' : 'border-primary' }}">
-    <div class="card-body p-4">
-        <div class="row align-items-center">
-            <div class="col-md-6 mb-3 mb-md-0">
-                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                    @if ($order->status === 'Cancelled')
-                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill fw-semibold px-3 py-2"><i class="bi bi-x-circle me-1"></i>CANCELLED ORDER</span>
-                    @endif
-                    @if ($order->isFuelTrade())
-                        <span class="badge fw-semibold px-3 py-2" style="background-color: #fef08a; color: #854d0e; border: 1px solid #facc15;">
-                            <i class="bi bi-fuel-pump me-1"></i>SO# {{ $order->formatted_so_number }}
-                        </span>
-                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-3 py-2">
-                            FUEL TRADE
-                        </span>
-                    @else
-                        <span class="badge {{ $order->status === 'Cancelled' ? 'bg-danger text-white' : 'bg-primary bg-opacity-10 text-primary' }} fw-semibold px-3 py-2">
-                            SO# {{ $order->formatted_so_number }}
-                        </span>
-                    @endif
-                </div>
-                <h3 class="fw-bold mb-1 text-dark">{{ $order->account }}</h3>
-                <p class="text-muted small mb-0">
-                    <i class="bi bi-calendar3 me-1"></i> Order Date: {{ $order->date ? $order->date->format('F d, Y') : '' }}
-                </p>
+<!-- Order Summary: info card + 3 stat cards (same layout as the Orders Dashboard) -->
+<div class="deliv-summary row g-3 mb-4">
+    <div class="col-md-6 col-lg-3">
+        <div class="stat-card order-info-card">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                @if ($order->status === 'Cancelled')
+                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill fw-semibold px-2 py-1" style="font-size: 0.72rem;"><i class="bi bi-x-circle me-1"></i>CANCELLED ORDER</span>
+                @endif
+                @if ($order->isFuelTrade())
+                    <span class="badge fw-semibold px-2 py-1" style="font-size: 0.72rem; background-color: #fef08a; color: #854d0e; border: 1px solid #facc15;">
+                        <i class="bi bi-fuel-pump me-1"></i>SO# {{ $order->formatted_so_number }}
+                    </span>
+                    <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-2 py-1" style="font-size: 0.72rem;">
+                        FUEL TRADE
+                    </span>
+                @else
+                    <span class="badge {{ $order->status === 'Cancelled' ? 'bg-danger text-white' : 'bg-primary bg-opacity-10 text-primary' }} fw-semibold px-2 py-1" style="font-size: 0.72rem;">
+                        SO# {{ $order->formatted_so_number }}
+                    </span>
+                @endif
             </div>
-            <div class="col-md-6">
-                <div class="row text-center g-2">
-                    <div class="col-4">
-                        <div class="p-3 bg-light rounded border border-light-subtle h-100">
-                            <div class="text-muted extra-small uppercase fw-semibold mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">QTY ORDERED</div>
-                            <div class="fs-5 fw-bold text-dark">{{ number_format($order->effective_qty_ordered) }}</div>
-                            @if ($showBreakdown)
-                                <div class="small text-muted mt-1">
-                                    @foreach ($productSummary as $code => $p)
-                                        <div title="{{ $p['name'] }}">{{ $code }} &middot; {{ number_format($p['ordered'] - $p['cancelled']) }} L</div>
-                                    @endforeach
-                                </div>
-                            @endif
-                        </div>
-                    </div>
-                    <div class="col-4">
-                        <div class="p-3 bg-light rounded border border-light-subtle h-100">
-                            <div class="text-muted extra-small uppercase fw-semibold mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">TOTAL OUT</div>
-                            <div class="fs-5 fw-bold text-primary">{{ number_format($order->total_qty_out) }}</div>
-                            @if ($showBreakdown && !$order->isFuelTrade())
-                                <div class="small text-muted mt-1">
-                                    @foreach ($productSummary as $code => $p)
-                                        <div title="{{ $p['name'] }}">{{ $code }} &middot; {{ number_format($p['fulfilled']) }} L</div>
-                                    @endforeach
-                                </div>
-                            @endif
-                        </div>
-                    </div>
-                    <div class="col-4">
-                        <div class="p-3 bg-light rounded border border-light-subtle h-100">
-                            <div class="text-muted extra-small uppercase fw-semibold mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">REMAINING</div>
-                            <div class="fs-5 fw-bold {{ $order->remaining_balance == 0 ? 'text-success' : 'text-warning-emphasis' }}">
-                                {{ number_format($order->remaining_balance) }}
-                            </div>
-                            @if ($showBreakdown && !$order->isFuelTrade())
-                                <div class="small text-muted mt-1">
-                                    @foreach ($productSummary as $code => $p)
-                                        <div title="{{ $p['name'] }}">{{ $code }} &middot; {{ number_format($p['remaining']) }} L</div>
-                                    @endforeach
-                                </div>
-                            @endif
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <h4 class="fw-bold mb-2 text-dark">{{ $order->account }}</h4>
+            <p class="text-muted small mb-0">
+                <i class="bi bi-calendar3 me-1"></i> Order Date: {{ $order->date ? $order->date->format('F d, Y') : '' }}
+            </p>
         </div>
     </div>
+
+    @foreach ($statCards as $card)
+    <div class="col-md-6 col-lg-3">
+        <div class="stat-card">
+            <div class="stat-head">
+                <div class="stat-icon" style="background: {{ $card['bg'] }}; color: {{ $card['fg'] }};">
+                    <i class="bi {{ $card['icon'] }}"></i>
+                </div>
+                <span class="stat-title">{{ $card['title'] }}</span>
+            </div>
+
+            @if ($card['rows'])
+                @foreach ($productSummary as $code => $p)
+                    <div class="stat-row" title="{{ $p['name'] }}">
+                        <span class="pbadge pbadge-{{ $code }}">{{ $code }}</span>
+                        <span class="stat-name">{{ $p['name'] }}</span>
+                        <span class="stat-val">{{ number_format($card['value']($p)) }}</span>
+                    </div>
+                @endforeach
+                <div class="stat-total">
+                    <span>Total</span>
+                    <span class="stat-val {{ $card['class'] }}">{{ number_format($card['total']) }}</span>
+                </div>
+            @else
+                <div class="stat-big {{ $card['class'] }}">{{ number_format($card['total']) }}</div>
+            @endif
+        </div>
+    </div>
+    @endforeach
 </div>
 
 @if ($order->clearing_status !== 'Approved')
-<div class="alert alert-warning d-flex align-items-center rounded-4 shadow-sm mb-4 p-3 border-0" style="background-color: #fef3c7; color: #92400e;">
+<div class="alert alert-warning d-flex align-items-center rounded-4 shadow-sm mb-3 p-3 border-0" style="background-color: #fef3c7; color: #92400e;">
     <i class="bi bi-clock-history me-2 fs-5"></i>
     <div>
         <strong>Waiting for Accounting clearance.</strong> This order's clearance status is <span class="badge rounded-pill px-2 py-0" style="background-color: #d97706; color: #fff;">{{ $order->clearing_status }}</span>. 
@@ -116,11 +287,11 @@
 @php
     $ftDelivery = $order->linkedPurchaseOrder?->deliveries?->first();
 @endphp
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h4 class="fw-bold mb-0 text-dark">
+<div class="compact-bar d-flex justify-content-between align-items-center mb-3">
+    <h5 class="fw-bold mb-0 text-dark">
         <i class="bi {{ $order->isFuelTrade() ? 'bi-fuel-pump' : 'bi-truck' }} me-2 text-primary"></i>
         {{ $order->isFuelTrade() ? 'Fuel Trade Pick Up & ATL' : 'Deliveries' }}
-    </h4>
+    </h5>
     @if ($order->isFuelTrade())
         <div class="d-flex gap-2">
             @if ($ftDelivery)
@@ -163,16 +334,16 @@
     <div class="card-body p-0">
         <!-- Desktop table -->
         <div class="table-responsive d-none d-md-block">
-            <table class="table table-custom table-hover align-middle mb-0">
+            <table id="deliveriesTable" class="table table-custom table-hover align-middle mb-0">
                 <thead>
                     <tr>
-                        <th class="ps-4">{{ $order->isFuelTrade() ? 'PO#' : 'DR#' }}</th>
+                        <th>{{ $order->isFuelTrade() ? 'PO#' : 'DR#' }}</th>
                         <th>ATL#</th>
                         <th>{{ $order->isFuelTrade() ? 'Pick Up Date' : 'Delivery Date' }}</th>
-                        <th class="text-end">Qty Out</th>
-                        <th class="text-center">Status</th>
-                        <th class="text-center">Type</th>
-                        <th class="text-end pe-4">Action</th>
+                        <th>Qty Out</th>
+                        <th>Status</th>
+                        <th>Type</th>
+                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -180,33 +351,33 @@
                         @if ($order->linkedPurchaseOrder && $order->linkedPurchaseOrder->deliveries->isNotEmpty())
                             @foreach ($order->linkedPurchaseOrder->deliveries as $delivery)
                             <tr>
-                                <td class="ps-4 fw-bold text-primary">{{ $order->linkedPurchaseOrder->po_number }}</td>
-                                <td class="fw-semibold text-dark">{{ $delivery->atl_number ?: ($delivery->client_atl_number ?: 'Pending') }}</td>
+                                <td><span class="id-pill">{{ $order->linkedPurchaseOrder->po_number }}</span></td>
+                                <td class="text-dark">{{ $delivery->atl_number ?: ($delivery->client_atl_number ?: 'Pending') }}</td>
                                 <td>{{ $delivery->receiving_date ? $delivery->receiving_date->format('Y-m-d') : '—' }}</td>
-                                <td class="text-end fw-medium">{{ number_format($delivery->qty_to_receive) }}</td>
-                                <td class="text-center">
+                                <td>{{ number_format($delivery->qty_to_receive) }}</td>
+                                <td>
                                     @if ($delivery->status === 'Completed')
-                                        <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1">FULFILLED / LIFTED</span>
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1">FULFILLED / LIFTED</span>
                                     @elseif ($delivery->status === 'Active')
-                                        <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle rounded-pill px-3 py-1">FOR PICK UP</span>
+                                        <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle rounded-pill px-2 py-1">FOR PICK UP</span>
                                     @else
-                                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-3 py-1">PENDING PICK UP</span>
+                                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-2 py-1">PENDING PICK UP</span>
                                     @endif
                                 </td>
-                                <td class="text-center">
-                                    <span class="badge rounded-pill px-3 py-1" style="background-color: #fef08a; color: #854d0e; border: 1px solid #facc15;">FT</span>
+                                <td>
+                                    <span class="badge rounded-pill px-2 py-1" style="background-color: #fef08a; color: #854d0e; border: 1px solid #facc15;">FT</span>
                                 </td>
-                                <td class="text-end pe-4">
-                                    <div class="d-flex justify-content-end gap-2">
+                                <td>
+                                    <div class="d-flex justify-content-center gap-1">
                                         @if ($delivery->hasScannedDocs())
                                             <a href="{{ $delivery->scanned_doc_url }}" class="btn btn-sm btn-outline-success rounded-3 px-2 py-1" target="_blank" title="View Scanned Documents on Google Drive">
                                                 <i class="bi bi-google me-1"></i> Docs
                                             </a>
                                         @endif
-                                        <button type="button" class="btn btn-sm btn-outline-primary rounded-3 px-3 py-1" data-bs-toggle="modal" data-bs-target="#atlDetailModal">
+                                        <button type="button" class="btn btn-sm btn-outline-primary rounded-3 px-2 py-1" data-bs-toggle="modal" data-bs-target="#atlDetailModal">
                                             <i class="bi bi-eye me-1"></i> View ATL
                                         </button>
-                                        <a href="{{ route('stock-orders.atl-pdf', $delivery->id) }}" class="btn btn-sm btn-outline-secondary rounded-3 px-3 py-1" target="_blank" title="Download ATL PDF">
+                                        <a href="{{ route('stock-orders.atl-pdf', $delivery->id) }}" class="btn btn-sm btn-outline-secondary action-icon" target="_blank" title="Download ATL PDF">
                                             <i class="bi bi-file-earmark-pdf"></i>
                                         </a>
                                     </div>
@@ -241,49 +412,52 @@
                         @if ($deliveries->isNotEmpty())
                             @foreach ($deliveries as $delivery)
                             <tr class="{{ $delivery->status == 'CANCELLED' ? 'delivery-cancelled' : '' }}">
-                                <td class="ps-4 fw-semibold">{{ $delivery->dr_number }}</td>
-                                <td class="text-muted small">{{ $delivery->atl_number ?: '—' }}</td>
+                                <td><span class="id-pill">{{ $delivery->dr_number }}</span></td>
+                                <td class="text-muted">{{ $delivery->atl_number ?: '—' }}</td>
                                 <td>{{ $delivery->delivery_date ? $delivery->delivery_date->format('Y-m-d') : '' }}</td>
-                                <td class="text-end fw-medium">
-                                    {{ number_format($delivery->qty_out) }}
-                                    @if ($delivery->items->isNotEmpty())
-                                        <div class="small text-muted fw-normal">
-                                            @foreach ($delivery->items as $line)
-                                                <div title="{{ $line->product_name }}">{{ $line->product_type ?: '-' }} &middot; {{ number_format($line->qty_out) }} L</div>
-                                            @endforeach
-                                        </div>
-                                    @endif
+
+                                {{-- Qty Out: one line per product, e.g. "U - 2,000" --}}
+                                <td>
+                                    <div class="pl-block">
+                                        @forelse ($delivery->items as $line)
+                                            <div class="pl-row" title="{{ $line->product_name }}">
+                                                <span class="pl-key">{{ $line->product_type ?: '—' }}</span> - {{ number_format($line->qty_out) }}
+                                            </div>
+                                        @empty
+                                            <div class="pl-row">{{ number_format($delivery->qty_out) }}</div>
+                                        @endforelse
+                                    </div>
                                 </td>
-                                <td class="text-center">
+                                <td>
                                     @if ($delivery->status == 'FULFILLED')
-                                        <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1">FULFILLED</span>
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1">FULFILLED</span>
                                     @elseif ($delivery->status == 'PENDING')
-                                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-3 py-1">PENDING</span>
+                                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-2 py-1">PENDING</span>
                                     @elseif ($delivery->status == 'CANCELLED')
-                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-3 py-1">CANCELLED</span>
+                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2 py-1">CANCELLED</span>
                                     @else
                                         <span class="badge bg-secondary rounded-pill">{{ $delivery->status }}</span>
                                     @endif
                                 </td>
-                                <td class="text-center">
+                                <td>
                                     @if ($delivery->type === 'PICK-UP')
-                                        <span class="badge badge-type-pickup rounded-pill px-3 py-1">PICK-UP</span>
+                                        <span class="badge badge-type-pickup rounded-pill px-2 py-1">PICK-UP</span>
                                     @elseif ($delivery->type === 'SMALL TANKER')
-                                        <span class="badge badge-type-small-tanker rounded-pill px-3 py-1">SMALL TANKER</span>
+                                        <span class="badge badge-type-small-tanker rounded-pill px-2 py-1">SMALL TANKER</span>
                                     @else
-                                        <span class="badge badge-type-big-tanker rounded-pill px-3 py-1">BIG TANKER</span>
+                                        <span class="badge badge-type-big-tanker rounded-pill px-2 py-1">BIG TANKER</span>
                                     @endif
                                 </td>
                                 @if (Auth::user()->canEditModule1())
-                                <td class="text-end pe-4">
-                                    <div class="d-flex justify-content-end gap-2">
-                                        <a href="{{ route('delivery.edit', $delivery->id) }}" class="btn btn-sm btn-outline-secondary rounded-3 px-3 py-1">
-                                            <i class="bi bi-pencil me-1"></i> Edit
+                                <td>
+                                    <div class="d-flex justify-content-center gap-1">
+                                        <a href="{{ route('delivery.edit', $delivery->id) }}" class="btn btn-sm btn-outline-secondary action-icon" title="Edit Delivery">
+                                            <i class="bi bi-pencil"></i>
                                         </a>
                                         @if (Auth::user()->isAdmin())
                                         <form method="POST" action="{{ route('delivery.delete', $delivery->id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this delivery?');">
                                             @csrf
-                                            <button type="submit" class="btn btn-sm btn-outline-danger rounded-3 px-3 py-1" title="Delete Delivery">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger action-icon" title="Delete Delivery">
                                                 <i class="bi bi-trash"></i>
                                             </button>
                                         </form>
@@ -291,7 +465,7 @@
                                     </div>
                                 </td>
                                 @else
-                                <td class="text-end pe-4">—</td>
+                                <td>—</td>
                                 @endif
                             </tr>
                             @endforeach
