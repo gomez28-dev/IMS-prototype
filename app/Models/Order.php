@@ -23,9 +23,65 @@ class Order extends Model
         'P' => 'Premium',
     ];
 
+    /** fulfillment_type values */
+    public const FULFILLMENT_DELIVERY = 'DELIVERY';
+
+    public const FULFILLMENT_PICKUP = 'DEPOT_PICKUP';
+
+    public const FULFILLMENT_FUEL_TRADE = 'FUEL_TRADE';
+
+    /** order_category values */
+    public const CATEGORY_CLIENT_ORDER = 'CLIENT_ORDER';
+
+    public const CATEGORY_BUY_BACK = 'BUY_BACK';
+
+    public const CATEGORY_CONSUMO = 'CONSUMO';
+
+    /** How a Buy Back order brings fuel in, as chosen on the New Order form. */
+    public const BUY_BACK_FULFILLMENT_PICKUP = 'PICKUP';
+
+    public const BUY_BACK_FULFILLMENT_DELIVERY = 'DELIVERY';
+
+    /**
+     * A Buy Back order that is delivered rather than collected at a depot.
+     *
+     * This is the one combination that routes to Module 2 Stock Requests
+     * instead of Module 3, so it is the single place that rule lives.
+     */
+    public function isBuyBackDelivery(): bool
+    {
+        return $this->order_category === self::CATEGORY_BUY_BACK
+            && $this->fulfillment_type === self::FULFILLMENT_DELIVERY;
+    }
+
+    /**
+     * Scope to the orders Module 3 handles.
+     *
+     * Everything reaches Module 3 except a Buy Back order that is delivered,
+     * which belongs on the Module 2 Stock Requests list.
+     */
+    public function scopeForModuleThree(Builder $query): Builder
+    {
+        return $query->where(function ($q) {
+            $q->where('order_category', '!=', self::CATEGORY_BUY_BACK)
+                ->orWhere('fulfillment_type', '!=', self::FULFILLMENT_DELIVERY);
+        });
+    }
+
+    /**
+     * Scope to the Buy Back orders that are delivered, handled by Module 2.
+     */
+    public function scopeBuyBackDelivery(Builder $query): Builder
+    {
+        return $query
+            ->where('order_category', self::CATEGORY_BUY_BACK)
+            ->where('fulfillment_type', self::FULFILLMENT_DELIVERY);
+    }
+
     protected $fillable = [
         'account',
         'date',
+        'date_needed',
         'qty_ordered',
         'price',
         'so_number',
@@ -48,6 +104,7 @@ class Order extends Model
 
     protected $casts = [
         'date' => 'datetime',
+        'date_needed' => 'date',
         'revised_at' => 'datetime',
         'qty_ordered' => 'integer',
         'price' => 'decimal:2',
@@ -299,6 +356,12 @@ class Order extends Model
      */
     public function canPrepareAtl(): bool
     {
+        // A Buy Back order that is delivered lives in Module 2, so it must not
+        // be able to raise a Module 3 ATL.
+        if ($this->isBuyBackDelivery()) {
+            return false;
+        }
+
         return ($this->isFuelTrade() || $this->isBuyBack()) && $this->status !== 'Cancelled';
     }
 

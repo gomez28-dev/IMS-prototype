@@ -159,4 +159,18 @@ class PurchaseOrderActionColumnTest extends TestCase
             ->assertStatus(200)
             ->assertSee(route('stock-orders.purchase-orders.show', $po->id), false);
     }
+
+    public function test_mark_picked_up_is_no_longer_offered_from_the_purchase_order_list(): void
+    {
+        $this->po('FOR_DELIVERY', '-LIFT');
+
+        $response = $this->actingAs($this->purchasing)
+            ->get(route('stock-orders.purchase-orders.index'));
+
+        $response->assertStatus(200);
+        $response->assertDontSee('Mark Picked Up');
+        // The lift modal came out with the button.
+        $response->assertDontSee('confirmLiftModal', false);
+        $response->assertDontSee('Confirm Refinery Pick Up / Lift');
+    }
 }

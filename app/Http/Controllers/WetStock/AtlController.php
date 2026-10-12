@@ -23,16 +23,11 @@ class AtlController extends Controller
     {
         $this->authorizeAccess();
 
+        // This controller is no longer routed (/atls redirects to Sales Orders).
+        // Kept in step with SalesOrderController@index.
         $query = Order::query()
             ->where('status', '!=', 'Cancelled')
-            ->where(function ($q) {
-                $q->where('fulfillment_type', 'FUEL_TRADE')
-                    ->orWhere(function ($buyBack) {
-                        // Buy Back qualifies only when the client picks it up.
-                        $buyBack->where('order_category', 'BUY_BACK')
-                            ->where('fulfillment_type', 'DEPOT_PICKUP');
-                    });
-            });
+            ->forModuleThree();
 
         $search = trim($request->input('search', ''));
         if ($search !== '') {

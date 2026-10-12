@@ -25,12 +25,14 @@ class AtlListingTest extends TestCase
         ]);
     }
 
-    public function test_atl_list_shows_only_fuel_trade_and_buy_back_pickup_orders(): void
+    public function test_sales_orders_shows_every_category_except_delivered_buy_back(): void
     {
         $fuelTrade = $this->order('FT-1', 'FUEL_TRADE', 'CLIENT_ORDER');
         $buyBack = $this->order('BB-1', 'DEPOT_PICKUP', 'BUY_BACK');
-        // Neither qualifies: a plain delivery, and a buy back we deliver ourselves.
-        $this->order('PLAIN-1', 'DELIVERY', 'CLIENT_ORDER');
+        // Every category reaches Module 3. Only a delivered Buy Back does not:
+        // it routes to the Module 2 Stock Requests list instead.
+        $plainDelivery = $this->order('PLAIN-1', 'DELIVERY', 'CLIENT_ORDER');
+        $consumo = $this->order('CONSUMO-1', 'DELIVERY', 'CONSUMO');
         $this->order('BB-DELIVERED', 'DELIVERY', 'BUY_BACK');
 
         $response = $this->actingAs($this->purchasing)->get(route('stock-orders.sales-orders.index'));
@@ -38,7 +40,8 @@ class AtlListingTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee($fuelTrade->so_number);
         $response->assertSee($buyBack->so_number);
-        $response->assertDontSee('PLAIN-1');
+        $response->assertSee($plainDelivery->so_number);
+        $response->assertSee($consumo->so_number);
         $response->assertDontSee('BB-DELIVERED');
     }
 

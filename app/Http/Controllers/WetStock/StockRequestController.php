@@ -4,6 +4,7 @@ namespace App\Http\Controllers\WetStock;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\Order;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderDelivery;
 use App\Models\StockIn;
@@ -51,7 +52,19 @@ class StockRequestController extends Controller
         $incomingDeliveries = $deliveriesQuery->latest()->get();
         $warehouses = Warehouse::with('tanks')->orderBy('name')->get();
 
-        return view('wetstock.stock-requests.index', compact('stockRequests', 'incomingDeliveries', 'warehouses', 'warehouseId'));
+        // Buy Back orders raised in Sales Documentation that are delivered
+        // rather than collected. They route here instead of to Module 3, so
+        // they are listed alongside the depot's own replenishment requests.
+        $buyBackDeliveries = Order::query()
+            ->buyBackDelivery()
+            ->where('status', '!=', 'Cancelled')
+            ->with('items')
+            ->latest()
+            ->paginate(10);
+
+        return view('wetstock.stock-requests.index', compact(
+            'stockRequests', 'incomingDeliveries', 'buyBackDeliveries', 'warehouses', 'warehouseId'
+        ));
     }
 
     /**

@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderDelivery;
-use App\Models\StorageTank;
 use App\Models\Warehouse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -59,17 +58,10 @@ class PurchaseOrderController extends Controller
         $warehouses = Warehouse::orderBy('name')->get();
         $clients = Client::orderBy('name')->get();
 
-        // The dispatch modal offers the tanker a pickup can be received into.
-        $mobileTankers = StorageTank::where('category', 'tanker')
-            ->where('is_active', true)
-            ->with('warehouse')
-            ->get();
-
         return view('wetstock.purchase-orders.index', [
             'purchaseOrders' => $purchaseOrders,
             'warehouses' => $warehouses,
             'clients' => $clients,
-            'mobileTankers' => $mobileTankers,
             'stats' => $this->stats(),
         ]);
     }

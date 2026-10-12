@@ -152,6 +152,57 @@
                 {{ $stockRequests->links() }}
             </div>
         </div>
+
+        {{-- Buy Back orders from Sales Documentation that are delivered rather
+             than collected. These route to Module 2 instead of Module 3, so they
+             are surfaced here rather than disappearing from the system. --}}
+        <div class="card card-custom border-0 shadow-sm mt-4">
+            <div class="card-header bg-white border-0 py-3">
+                <h5 class="fw-bold text-dark mb-0"><i class="bi bi-arrow-left-right text-warning me-2"></i>Buy Back Orders Routed to Module 2</h5>
+                <small class="text-muted">Sales Documentation orders marked Buy Back + Delivery.</small>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="ps-3">SO Number</th>
+                            <th>Account</th>
+                            <th>Site</th>
+                            <th class="text-end">Qty. Requested</th>
+                            <th>Date Needed</th>
+                            <th>Status</th>
+                            <th>Requested By</th>
+                            <th>Remarks</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse ($buyBackDeliveries as $bb)
+                            <tr>
+                                <td class="ps-3 fw-bold text-dark">{{ $bb->formatted_so_number }}</td>
+                                <td class="small">{{ $bb->account }}</td>
+                                <td class="small">{{ $bb->location }}</td>
+                                <td class="text-end fw-bold">{{ number_format($bb->qty_ordered) }} L</td>
+                                <td class="small">{{ $bb->date_needed ? $bb->date_needed->format('M d, Y') : '—' }}</td>
+                                <td>
+                                    <span class="badge bg-warning text-dark px-2 py-1">{{ $bb->status }}</span>
+                                </td>
+                                <td class="small text-muted">{{ $bb->creator?->name ?? 'Sales' }}</td>
+                                <td class="small text-muted">{{ $bb->remarks ?? '—' }}</td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="8" class="text-center text-muted py-4">No Buy Back delivery orders yet.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+            @if ($buyBackDeliveries->hasPages())
+                <div class="p-3">
+                    {{ $buyBackDeliveries->links() }}
+                </div>
+            @endif
+        </div>
     </div>
 </div>
 

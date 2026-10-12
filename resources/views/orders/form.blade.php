@@ -69,6 +69,12 @@
                         if ($order) {
                             $currentOrderType = $order->isFuelTrade() ? 'FUEL_TRADE' : ($order->isBuyBack() ? 'BUY_BACK' : ($order->isConsumo() ? 'CONSUMO' : 'REGULAR'));
                         }
+
+                        // A Buy Back order picks how the fuel arrives. Delivered
+                        // Buy Backs route to Module 2 Stock Requests instead of Module 3.
+                        $currentBuyBackFulfillment = $order && $order->isBuyBackDelivery()
+                            ? \App\Models\Order::BUY_BACK_FULFILLMENT_DELIVERY
+                            : \App\Models\Order::BUY_BACK_FULFILLMENT_PICKUP;
                     @endphp
                     <div class="mb-3">
                         <label for="order_type" class="form-label fw-medium text-secondary small">Order Category <span class="text-danger">*</span></label>
@@ -79,6 +85,22 @@
                             <option value="CONSUMO" {{ old('order_type', $currentOrderType) === 'CONSUMO' ? 'selected' : '' }}>Consumo</option>
                         </select>
                         @error('order_type')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    {{-- Only a Buy Back order needs to say how the fuel arrives.
+                         Hidden and cleared for every other category. --}}
+                    <div class="mb-3" id="buyBackFulfillmentWrap" @if (old('order_type', $currentOrderType) !== 'BUY_BACK') style="display:none;" @endif>
+                        <label for="buy_back_fulfillment" class="form-label fw-medium text-secondary small">Fulfillment Type <span class="text-danger">*</span></label>
+                        <select name="buy_back_fulfillment" id="buy_back_fulfillment" class="form-control form-select @error('buy_back_fulfillment') is-invalid @enderror" @if (old('order_type', $currentOrderType) !== 'BUY_BACK') disabled @endif>
+                            <option value="PICKUP" {{ old('buy_back_fulfillment', $currentBuyBackFulfillment) === 'PICKUP' ? 'selected' : '' }}>Pick-up</option>
+                            <option value="DELIVERY" {{ old('buy_back_fulfillment', $currentBuyBackFulfillment) === 'DELIVERY' ? 'selected' : '' }}>Delivery</option>
+                        </select>
+                        <div class="form-text extra-small">
+                            Delivery sends this order to the Module 2 Stock Requests list. Pick-up keeps it in Module 3.
+                        </div>
+                        @error('buy_back_fulfillment')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
                     </div>
@@ -98,6 +120,16 @@
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
+                    </div>
+
+                    {{-- Optional on every category, and saved empty when blank. --}}
+                    <div class="mb-3">
+                        <label for="date_needed" class="form-label fw-medium text-secondary small">Date Needed</label>
+                        <input type="date" name="date_needed" id="date_needed" class="form-control @error('date_needed') is-invalid @enderror" value="{{ old('date_needed', $order && $order->date_needed ? $order->date_needed->format('Y-m-d') : '') }}">
+                        <div class="form-text extra-small">When the fuel is required on site. Leave blank if not set.</div>
+                        @error('date_needed')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
                     </div>
 
                     <div class="mb-4">
@@ -273,6 +305,28 @@ document.addEventListener('DOMContentLoaded', function () {
     Object.keys(initialItems).forEach(function (key) {
         addRow(initialItems[key], key);
     });
+
+    // Fulfillment Type belongs to Buy Back alone. It is hidden and cleared for
+    // every other category so a stale choice can never be submitted.
+    const orderTypeEl = document.getElementById('order_type');
+    const buyBackWrap = document.getElementById('buyBackFulfillmentWrap');
+    const buyBackSelect = document.getElementById('buy_back_fulfillment');
+
+    function syncBuyBackFulfillment() {
+        const isBuyBack = orderTypeEl.value === 'BUY_BACK';
+
+        buyBackWrap.style.display = isBuyBack ? '' : 'none';
+        buyBackSelect.disabled = !isBuyBack;
+
+        if (!isBuyBack) {
+            buyBackSelect.value = '';
+        } else if (!buyBackSelect.value) {
+            buyBackSelect.value = 'PICKUP';
+        }
+    }
+
+    orderTypeEl.addEventListener('change', syncBuyBackFulfillment);
+    syncBuyBackFulfillment();
 });
 </script>
 @endsection

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\WetStock;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\PurchaseOrderDelivery;
+use App\Models\StorageTank;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -21,16 +22,12 @@ class SalesOrderController extends Controller
 {
     public function index(Request $request): View
     {
+        // Module 3 handles every order category except a Buy Back that is
+        // delivered, which routes to the Module 2 Stock Requests list instead.
         $query = Order::query()
             ->with('items')
             ->where('status', '!=', 'Cancelled')
-            ->where(function ($q) {
-                $q->where('fulfillment_type', 'FUEL_TRADE')
-                  ->orWhere(function ($buyBack) {
-                      $buyBack->where('order_category', 'BUY_BACK')
-                          ->where('fulfillment_type', 'DEPOT_PICKUP');
-                  });
-            });
+            ->forModuleThree();
 
         if ($request->filled('search')) {
             $term = '%' . $request->search . '%';
@@ -97,7 +94,22 @@ class SalesOrderController extends Controller
 
         $order->load('items');
 
-        return view('wetstock.sales-orders.show', compact('order', 'atls', 'totals', 'atlByProduct'));
+        // Mark Picked Up lives here now, so the lift modal needs the tanker
+        // list the destination of a tanker pick-up is chosen from.
+        $mobileTankers = StorageTank::where('category', 'tanker')
+            ->where('is_active', true)
+            ->with('warehouse')
+            ->orderBy('name')
+            ->get();
+
+        // The delivery that can still be lifted: active and not yet lifted.
+        // Legacy rows carry a null lift_status, which counts as not lifted.
+        $liftableDelivery = $atls->first(fn ($atl) => $atl->status === 'Active'
+            && $atl->lift_status !== PurchaseOrderDelivery::LIFT_LIFTED);
+
+        return view('wetstock.sales-orders.show', compact(
+            'order', 'atls', 'totals', 'atlByProduct', 'mobileTankers', 'liftableDelivery'
+        ));
     }
 
     /**

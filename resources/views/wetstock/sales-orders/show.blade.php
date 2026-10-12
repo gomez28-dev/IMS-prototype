@@ -20,6 +20,14 @@
                 <p class="text-muted small mb-0 mt-1">{{ $order->account }}</p>
             </div>
             <div class="d-flex gap-2">
+                {{-- Mark Picked Up moved here from the Purchase Orders list,
+                     which now shows created POs only and no longer carries the
+                     lift action. --}}
+                @if ($liftableDelivery && Auth::user()->canMarkAtlLifted())
+                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#confirmLiftModal{{ $liftableDelivery->id }}">
+                        <i class="bi bi-check-circle me-1"></i> Mark Picked Up
+                    </button>
+                @endif
                 @if ($order->canBeIssuedAtl() && Auth::user()->canEditStockOrders())
                     <a href="{{ route('stock-orders.create-fuel-trade-po', $order->id) }}" class="btn btn-primary-custom">
                         <i class="bi bi-plus-lg me-1"></i> Create ATL
@@ -211,4 +219,80 @@
         </div>
     </div>
 </div>
+
+@if ($liftableDelivery)
+    <div class="modal fade" id="confirmLiftModal{{ $liftableDelivery->id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content rounded-4 border-0 shadow">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold text-dark">
+                        <i class="bi bi-patch-check-fill text-success me-1"></i> Confirm Pick Up / Lift
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="POST" action="{{ route('stock-orders.complete-fuel-trade', $liftableDelivery->id) }}">
+                    @csrf
+                    <div class="modal-body pt-3">
+                        <div class="p-3 bg-light rounded-3 mb-3">
+                            <div class="d-flex justify-content-between small text-muted mb-1">
+                                <span>SO {{ $order->formatted_so_number }}</span>
+                                <span class="badge bg-secondary-subtle text-secondary">{{ $liftableDelivery->channel_label }}</span>
+                            </div>
+                            <div class="fw-bold fs-5 text-primary mb-1">{{ number_format($liftableDelivery->qty_to_receive) }} L of {{ $liftableDelivery->product }}</div>
+                            <div class="small text-muted">
+                                Client: <span class="fw-semibold text-dark">{{ $order->account }}</span>
+                            </div>
+                        </div>
+
+                        @if ($liftableDelivery->isTankerPickup())
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold">Target Mobile Tanker Truck <span class="text-danger">*</span></label>
+                                <select name="storage_tank_id" class="form-select" required>
+                                    <option value="">Select DITC Tanker to receive fuel...</option>
+                                    @foreach ($mobileTankers as $tank)
+                                        <option value="{{ $tank->id }}" {{ $liftableDelivery->storage_tank_id == $tank->id ? 'selected' : '' }}>
+                                            {{ $tank->name }} ({{ $tank->warehouse->name ?? 'Depot' }}) — Remaining: {{ number_format($tank->remaining_capacity) }}L / Max: {{ number_format($tank->max_capacity) }}L
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <div class="form-text text-primary extra-small" style="font-size: 0.75rem;">
+                                    <i class="bi bi-info-circle me-1"></i>Volume will automatically stock into this tanker in Module 2.
+                                </div>
+                            </div>
+                        @else
+                            <div class="alert alert-info border-0 rounded-3 small py-2 mb-3">
+                                <i class="bi bi-info-circle me-1"></i><strong>Direct Client Rack Lift:</strong> This order will be marked as fulfilled directly. No wet stock movements required.
+                            </div>
+                        @endif
+
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold">Supplier SO #</label>
+                                <input type="text" name="supplier_so_number" class="form-control form-control-sm" placeholder="e.g. SO-8842" value="{{ $liftableDelivery->supplier_so_number }}">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold">Supplier Rack DR #</label>
+                                <input type="text" name="supplier_dr_number" class="form-control form-control-sm" placeholder="e.g. DR-9901" value="{{ $liftableDelivery->supplier_dr_number }}">
+                            </div>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold">
+                                <i class="bi bi-google text-danger me-1"></i>Google Drive Scanned Document Link
+                            </label>
+                            <input type="url" name="scanned_doc_url" class="form-control form-control-sm" placeholder="https://drive.google.com/..." value="{{ $liftableDelivery->scanned_doc_url }}">
+                            <div class="form-text text-muted extra-small" style="font-size: 0.75rem;">Shareable link to signed DR and dip inspection tickets.</div>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0 pt-0">
+                        <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success rounded-pill px-4">
+                            <i class="bi bi-check-circle me-1"></i> Confirm Pick Up
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+@endif
 @endsection
