@@ -6,7 +6,15 @@
 <div class="container-fluid py-2">
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
         <div>
-            <h2 class="fw-bold text-dark mb-1">Stock Requests</h2>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-1 small">
+                    <li class="breadcrumb-item"><a href="{{ route('portal') }}" class="text-decoration-none text-secondary">Portal</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Stock Requests</li>
+                </ol>
+            </nav>
+            <h3 class="fw-bold text-dark mb-1">
+                <i class="bi bi-file-earmark-text text-primary me-2"></i>Stock Requests
+            </h3>
             <p class="text-muted small mb-0">Replenishment requests raised by depots, and Buy Back orders routed here from Sales Documentation.</p>
         </div>
         <div class="d-flex gap-2">
@@ -36,36 +44,114 @@
     @endif
 
     {{-- Stat cards. These total the same product lines the table below shows,
-     so the two always reconcile. Routed Buy Back orders are excluded. --}}
-<div class="row g-3 mb-4">
-    <div class="col-md-3">
-        <div class="card card-custom border-0 shadow-sm h-100">
-            <div class="card-body p-3">
-                <div class="text-muted extra-small fw-semibold text-uppercase mb-1">Total Requests</div>
-                <div class="fs-4 fw-bold text-dark">{{ number_format($stats['requests']) }}</div>
-            </div>
-        </div>
-    </div>
-    @foreach ([
-        ['label' => 'Total Qty. Requested', 'totals' => $stats['requested'], 'tone' => 'text-primary'],
-        ['label' => 'Total Qty. Received', 'totals' => $stats['received'], 'tone' => 'text-success'],
-        ['label' => 'Total Qty. Pending', 'totals' => $stats['pending'], 'tone' => 'text-warning-emphasis'],
-    ] as $card)
-        <div class="col-md-3">
-            <div class="card card-custom border-0 shadow-sm h-100">
-                <div class="card-body p-3">
-                    <div class="text-muted extra-small fw-semibold text-uppercase mb-2">{{ $card['label'] }}</div>
-                    @foreach ($card['totals'] as $product => $total)
-                        <div class="d-flex justify-content-between small mb-1">
-                            <span class="text-secondary">{{ $product }}</span>
-                            <span class="fw-bold font-monospace {{ $card['tone'] }}">{{ number_format($total) }}</span>
-                        </div>
-                    @endforeach
+     so the two always reconcile. Routed Buy Back orders are excluded.
+     Markup and colours match the Purchase Orders page so all three pages
+     read as one set. --}}
+    @php
+        // Product chip colours: U = Unleaded, D = Diesel, P = Premium.
+        // Kept identical to the Orders Dashboard and Purchase Orders.
+        $chipStyles = [
+            'U' => 'background:#dcfce7;color:#166534;border:1px solid #bbf7d0;',
+            'D' => 'background:#e0e7ff;color:#3730a3;border:1px solid #c7d2fe;',
+            'P' => 'background:#fee2e2;color:#991b1b;border:1px solid #fecaca;',
+        ];
+
+        $chip = function ($code, $title = '') use ($chipStyles) {
+            $style = $chipStyles[$code] ?? 'background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb;';
+
+            return '<span class="prod-chip" style="'.$style.'" title="'.e($title).'">'.e($code ?: '—').'</span>';
+        };
+
+        $prodRows = [['D', 'Diesel'], ['U', 'Unleaded'], ['P', 'Premium']];
+
+        $statCards = [
+            ['title' => 'Total Qty. Requested', 'icon' => 'bi-boxes', 'tint' => 'background:#ecfeff;color:#0891b2;', 'data' => $stats['requested']],
+            ['title' => 'Total Qty. Received', 'icon' => 'bi-truck', 'tint' => 'background:#f0fdf4;color:#16a34a;', 'data' => $stats['received']],
+            ['title' => 'Total Qty. Pending', 'icon' => 'bi-clock-history', 'tint' => 'background:#fffbeb;color:#d97706;', 'data' => $stats['pending']],
+        ];
+    @endphp
+    <style>
+        .stat-title {
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: #374151;
+        }
+        .stat-icon {
+            width: 46px;
+            height: 46px;
+            border-radius: 0.8rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            flex-shrink: 0;
+        }
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.6rem;
+            padding: 0.45rem 0.8rem;
+            margin-bottom: 0.45rem;
+            background: #fff;
+        }
+        .stat-row .stat-val { font-weight: 700; color: #111827; }
+        .stat-total {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.25rem 0.3rem 0;
+            color: #6b7280;
+        }
+        .stat-total .stat-val { font-weight: 600; color: #111827; }
+        .stat-big { font-size: 3.6rem; font-weight: 800; line-height: 1; color: #111827; }
+        .prod-chip {
+            display: inline-block;
+            font-size: 0.65rem;
+            font-weight: 700;
+            line-height: 1;
+            padding: 0.2rem 0.4rem;
+            border-radius: 0.35rem;
+            margin: 0 1px;
+        }
+    </style>
+
+    <div class="row g-4 mb-4">
+        <div class="col-xl-3 col-md-6">
+            <div class="card card-custom p-3 border-0 h-100">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="stat-icon" style="background:#fff1ee;color:#f04a1a;"><i class="bi bi-file-earmark-text"></i></div>
+                    <span class="stat-title">Total Requests</span>
+                </div>
+                <div class="d-flex flex-grow-1 align-items-center justify-content-center py-3">
+                    <span class="stat-big">{{ number_format($stats['requests']) }}</span>
                 </div>
             </div>
         </div>
-    @endforeach
-</div>
+
+        @foreach ($statCards as $card)
+            <div class="col-xl-3 col-md-6">
+                <div class="card card-custom p-3 border-0 h-100">
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                        <div class="stat-icon" style="{{ $card['tint'] }}"><i class="bi {{ $card['icon'] }}"></i></div>
+                        <span class="stat-title">{{ $card['title'] }}</span>
+                    </div>
+                    @foreach ($prodRows as [$code, $name])
+                        <div class="stat-row">
+                            <span>{!! $chip($code, $name) !!} <span class="ms-2">{{ $name }}</span></span>
+                            <span class="stat-val">{{ number_format($card['data'][$name] ?? 0) }}</span>
+                        </div>
+                    @endforeach
+                    <div class="stat-total">
+                        <span>Total</span>
+                        <span class="stat-val">{{ number_format(array_sum($card['data'])) }}</span>
+                    </div>
+                </div>
+            </div>
+        @endforeach
+    </div>
 
 {{-- Search engine --}}
 <div class="card card-custom border-0 shadow-sm mb-4">

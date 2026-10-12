@@ -418,6 +418,29 @@ class StockRequestPageTest extends TestCase
 
     // ---- Findability ------------------------------------------------------
 
+    public function test_the_stat_cards_match_the_purchase_orders_cards(): void
+    {
+        $this->request([
+            ['product' => 'Diesel', 'qty' => 10000],
+            ['product' => 'Premium', 'qty' => 5000],
+        ]);
+
+        $html = $this->page();
+
+        // Same building blocks as the Purchase Orders page: icon tile, product
+        // chips in their own rows, and a Total footer.
+        $this->assertStringContainsString('stat-icon', $html);
+        $this->assertStringContainsString('stat-title', $html);
+        $this->assertStringContainsString('stat-row', $html);
+        $this->assertStringContainsString('stat-total', $html);
+        $this->assertStringContainsString('stat-big', $html);
+        $this->assertStringContainsString('prod-chip', $html);
+
+        // Nothing has arrived, so Requested and Pending both total 15,000
+        // while Received totals 0.
+        $this->assertSame(2, substr_count($html, '<span class="stat-val">15,000</span>'));
+    }
+
     public function test_the_page_has_its_own_title_and_sidebar_entry(): void
     {
         $html = $this->page();
