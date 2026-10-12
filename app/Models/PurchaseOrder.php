@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -111,7 +112,37 @@ class PurchaseOrder extends Model
         return $this->morphMany(ModificationRequest::class, 'requestable');
     }
 
-    public function isFuelTrade(): bool
+    /**
+ * Purchase orders that were actually raised against a supplier.
+ *
+ * The table also holds two kinds of placeholder row that are not purchase
+ * orders:
+ *
+ *  - Module 2 stock requests, created by StockRequestController with no PO
+ *    number, no supplier and no value. They live on Wet Stock Requests until
+ *    Purchasing turns one into a real PO, at which point it gains a PO number
+ *    and this scope starts picking it up.
+ *  - Module 1 Sales Order drawdown rows (SO-FT / SO-BB), created by
+ *    storeFuelTradePo. They track fuel issued to a client order rather than a
+ *    commitment to buy, and belong to the Sales Orders page.
+ *
+ * A created PO therefore has a PO number and is not a Fuel Trade drawdown.
+ *
+ * Named createdPos rather than created to avoid colliding with Eloquent's
+ * created() model event.
+ *
+ * @param  Builder  $query
+ * @return Builder
+ */
+public function scopeCreatedPos(Builder $query): Builder
+{
+    return $query
+        ->whereNotNull('po_number')
+        ->where('po_number', '!=', '')
+        ->where('po_type', '!=', self::TYPE_FUEL_TRADE);
+}
+
+public function isFuelTrade(): bool
     {
         return $this->po_type === 'FUEL_TRADE';
     }
@@ -126,6 +157,12 @@ class PurchaseOrder extends Model
         return $this->po_type === 'STANDARD_REPLENISHMENT' || empty($this->po_type);
     }
 
+    public const TYPE_FUEL_TRADE = 'FUEL_TRADE';
+
+    public const TYPE_BUY_BACK = 'BUY_BACK';
+
+    public const TYPE_STANDARD_REPLENISHMENT = 'STANDARD_REPLENISHMENT';
+
     /**
      * There are three kinds of purchase order, and each is raised from one
      * place. The type is therefore also where the PO came from:
@@ -137,9 +174,9 @@ class PurchaseOrder extends Model
      * @var array<string, string>
      */
     public const TYPE_LABELS = [
-        'FUEL_TRADE' => 'SO-FT',
-        'BUY_BACK' => 'SO-BUY BACK',
-        'STANDARD_REPLENISHMENT' => 'Doyen Stock',
+        self::TYPE_FUEL_TRADE => 'SO-FT',
+        self::TYPE_BUY_BACK => 'SO-BUY BACK',
+        self::TYPE_STANDARD_REPLENISHMENT => 'Doyen Stock',
     ];
 
     public function typeLabel(): string
@@ -153,9 +190,9 @@ class PurchaseOrder extends Model
     public static function typeBadgeClasses(): array
     {
         return [
-            'FUEL_TRADE' => 'bg-warning-subtle text-dark border',
-            'BUY_BACK' => 'bg-info-subtle text-dark border',
-            'STANDARD_REPLENISHMENT' => 'bg-light text-dark border',
+            self::TYPE_FUEL_TRADE => 'bg-warning-subtle text-dark border',
+            self::TYPE_BUY_BACK => 'bg-info-subtle text-dark border',
+            self::TYPE_STANDARD_REPLENISHMENT => 'bg-light text-dark border',
         ];
     }
 

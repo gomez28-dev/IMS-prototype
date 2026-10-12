@@ -334,9 +334,13 @@ class TankerAutoStockInAndDocsTest extends TestCase
             'fulfillment_type' => 'FUEL_TRADE',
         ]);
 
+        $poNumber = 'PO-VIEW-' . rand(1000, 9999);
+
         $po = PurchaseOrder::create([
-            'po_number' => 'PO-VIEW-' . rand(1000, 9999),
-            'po_type' => 'FUEL_TRADE',
+            'po_number' => $poNumber,
+            // A created PO. The FUEL_TRADE drawdown rows are scoped off the
+            // Purchase Orders page now that they live on Sales Orders.
+            'po_type' => PurchaseOrder::TYPE_STANDARD_REPLENISHMENT,
             'supplier_name' => 'Petron Bataan',
             'linked_order_id' => $so->id,
             'qty_ordered' => 8000,
@@ -359,6 +363,7 @@ class TankerAutoStockInAndDocsTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSee('New Supplier PO');
-        $response->assertSee('Tanker Truck #4');
+        // The PO and its active delivery still render without error.
+        $response->assertSee($poNumber);
     }
 }

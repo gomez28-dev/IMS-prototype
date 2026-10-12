@@ -25,7 +25,10 @@ class PurchaseOrderController extends Controller
 {
     public function index(Request $request): View
     {
-        $query = PurchaseOrder::with([
+        // Only real purchase orders. Module 2 stock requests and the Module 1
+        // Sales Order drawdown rows live on their own pages, and including
+        // them here would also inflate the stat cards.
+        $query = PurchaseOrder::createdPos()->with([
             'warehouse',
             'client',
             'requester',
@@ -150,19 +153,19 @@ class PurchaseOrderController extends Controller
         ));
     }
 
-    /**
+/**
      * Headline figures shown as stat cards at the top of the list.
      *
-     * The three volume cards are broken out per product so the page answers
-     * "how much of each fuel has this PO book committed and picked up?"
-     * at a glance.
+     * The count is scoped to created POs so stock requests do not inflate it.
+     * The volume cards read from PO lines and allocations, which request rows
+     * never have, so they already ignore them.
      *
      * @return array<string, mixed>
      */
     protected function stats(): array
     {
         return [
-            'total' => PurchaseOrder::count(),
+            'total' => PurchaseOrder::createdPos()->count(),
             'volumes' => PurchaseOrder::volumeTotals(),
         ];
     }
