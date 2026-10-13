@@ -428,8 +428,17 @@ class Order extends Model
      *
      * @return array<string, int>
      */
-    public function productRequirements(string $fallbackProduct = 'Diesel'): array
+    public function productRequirements(?string $fallbackProduct = null): array
     {
+        // With no explicit fallback, use the product the order is actually for.
+        // Every order raised before the product_type column existed needs this:
+        // without it they all defaulted to Diesel whatever they were really for.
+        if ($fallbackProduct === null || $fallbackProduct === '') {
+            $resolved = $this->resolvedProduct();
+
+            $fallbackProduct = in_array($resolved, self::PRODUCT_TYPES, true) ? $resolved : 'Diesel';
+        }
+
         $requirements = [];
 
         foreach ($this->items as $item) {

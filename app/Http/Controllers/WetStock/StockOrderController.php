@@ -531,7 +531,14 @@ class StockOrderController extends Controller
             ]);
         }
 
-        $defaultProduct = $request->input('product', 'Diesel');
+        // The product used when a drawdown row does not name one. Left to the
+        // order when the form did not say, so a legacy order allocates against
+        // the product it is really for rather than always Diesel.
+        $defaultProduct = $request->input('product') ?: $order->resolvedProduct();
+
+        if (! in_array($defaultProduct, PurchaseOrder::PRODUCTS, true)) {
+            $defaultProduct = 'Diesel';
+        }
 
         // Drawdown engine submission (multi-PO or single-PO drawdown)
         if ($request->has('drawdowns') && is_array($request->input('drawdowns'))) {
