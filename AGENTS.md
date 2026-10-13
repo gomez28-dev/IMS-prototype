@@ -32,7 +32,7 @@ RewriteCond %{REQUEST_URI} !^/public/
 RewriteRule ^(.*)$ /public/$1 [L]
 ```
 
-This file lives at the project root (`.../ims/.htaccess`) and is **not** part of the git repo by default (Laravel's own `.gitignore` may not exclude it, but it was created manually on the server, not committed) — if the server is ever rebuilt from scratch, this file needs to be recreated manually as part of setup, or added to the repo so it's not lost.
+This file lives at the project root (`.../ims/.htaccess`) and **is committed to the repo**, so a fresh clone or a server rebuilt from scratch gets it automatically. (It was originally created by hand on the server and left uncommitted; it has since been added to git, so there is no manual recreation step anymore.)
 
 ---
 
@@ -43,7 +43,7 @@ The AI-driven Python-to-Laravel rewrite had several gaps that caused real deploy
 1. **`artisan` file was missing `->handleCommand(...)`** on the bootstrap line, causing every single `artisan` command to fatal-error with "Object of class Application could not be converted to string." Fixed by correcting line 17 of `artisan` to match Laravel 11's standard bootstrap pattern.
 2. **`app/Http/Controllers/Controller.php`** (the base controller class every other controller extends) was missing entirely. Recreated manually.
 3. **`config/auth.php`** was missing entirely — meant Laravel had no instruction to use the `Admin` model for authentication instead of the default `User` model, causing login to fail with "Class App\Models\User not found." Recreated manually, configured for the `Admin` model and `admins` guard/provider.
-4. **`storage/framework/{views,cache,sessions}`, `storage/logs`, and `bootstrap/cache`** subfolders didn't exist after cloning (git doesn't track empty folders), causing cache-path errors. Created manually with `mkdir -p` and `chmod -R 775`.
+4. **`storage/framework/{views,cache,sessions}`, `storage/logs`, and `bootstrap/cache`** subfolders didn't exist after cloning (git doesn't track empty folders), causing cache-path errors. Originally worked around with `mkdir -p` and `chmod -R 775` on the server — **now properly fixed**: every one of those directories carries a placeholder `.gitignore` (`*` + `!.gitignore`) that is tracked in git, so the structure survives a fresh clone or a server rebuild. Do **not** add blanket `/storage/...` or `/bootstrap/cache/` rules back to the root `.gitignore` — git cannot re-include a file inside an ignored directory, so those rules would untrack the placeholders and reintroduce this bug (there is a warning comment in `.gitignore` saying the same thing).
 5. **No `cache` table migration exists**, but `CACHE_DRIVER` defaults to `database` — this causes `php artisan cache:clear` to fail (table doesn't exist). Currently worked around in the deploy workflow with `|| true` so it doesn't fail deployments. **Not yet properly fixed** — either add a migration for a `cache` table, or switch `CACHE_DRIVER=file` in `.env` (simpler fix, no table needed).
 
 **Recommendation for future sessions:** given how many core scaffolding files were missing, it's worth doing a deliberate audit of the rest of the codebase (compare against a fresh `laravel new` project's file structure) rather than assuming the rest is complete, since these gaps only surfaced one at a time as features were tested.
@@ -66,10 +66,10 @@ Every push to the `main` branch automatically deploys to the live server. Workfl
 
 What it does on every push to `main`:
 1. SSH into the Hostinger server (credentials via GitHub repo Secrets: `SSH_HOST`, `SSH_PORT`, `SSH_USER`, `SSH_PRIVATE_KEY`)
-2. `git pull origin main`
+2. `git fetch --all` + `git reset --hard origin/main` (a hard reset, **not** a `git pull` — local changes on the server are discarded, so never deploy anything by hand-editing files on the server)
 3. `composer2 install --no-dev --optimize-autoloader`
 4. `php artisan migrate --force` (runs automatically, no confirmation prompt — be careful with destructive migrations)
-5. `php artisan config:clear`, `view:clear`, `cache:clear` (cache:clear allowed to fail silently, see known issue #4 above)
+5. `php artisan config:clear`, `view:clear`, `cache:clear` (cache:clear allowed to fail silently, see known issue #5 above)
 
 The SSH key used for this is a dedicated deploy-only key (`~/.ssh/github_actions_deploy` on the server), separate from the personal SSH login — added to the server's `~/.ssh/authorized_keys`.
 
@@ -93,7 +93,7 @@ Don't test changes only on the live site. Set up a local Laravel environment (La
 
 ## Open / Future Work
 
-- Fix the `cache` driver issue properly (see known issue #4) rather than relying on the `|| true` workaround.
+- Fix the `cache` driver issue properly (see known issue #5) rather than relying on the `|| true` workaround.
 - Build out RBAC for multiple admin accounts with different permission levels.
 - Audit the rest of the codebase for any other missing scaffolding files, given the pattern of gaps found during initial deployment.
 - Consider rotating the GitHub Actions deploy SSH key, since it passed through a screenshot during setup (not a confirmed compromise, just good hygiene).
@@ -104,7 +104,8 @@ Don't test changes only on the live site. Set up a local Laravel environment (La
 
 ## AI Agent Workflow Notes
 
-- **Skills:** If your harness provides the "superpowers" skill library (e.g., opencode's `skill` tool), check available skills before starting any task. Commonly relevant here: `brainstorming` (before feature work), `systematic-debugging` (before fixing bugs), `verification-before-completion` (before claiming done), `writing-plans`, `test-driven-development`.
+- **Skills:** If your harness provides the "superpowers" skill library (e.g., opencode's `skill` tool), check available skills before starting any task. Superpowers ships the generic process skills (`brainstorming`, `systematic-debugging`, `verification-before-completion`, `writing-plans`, `test-driven-development`, plus `executing-plans`, `requesting-code-review`, `using-git-worktrees` and others). This repo **also** carries project-specific variants prefixed **`ims-`** — `ims-brainstorming`, `ims-systematic-debugging`, `ims-verification-before-completion`, `ims-writing-plans`, `ims-test-driven-development`, `ims-subagent-driven-development` — which hold the Laravel/Hostinger/MySQL-specific guidance (e.g. `php artisan test`, `php -l`, Blade `@csrf`, Hostinger's no-node-build constraint). **Prefer the `ims-` variants when working in this repo.**
+- **`.agents/` is local-only:** the skills above live in `.agents/skills/`, which is gitignored — they exist only on the developer's machine and will not be present on a fresh clone or the live server. The unprefixed skill IDs resolve to superpowers' generic versions from the plugin.
 - **Project design docs:** Past feature specs and implementation plans live in `docs/superpowers/specs/` and `docs/superpowers/plans/` — but note these are **local-only** (gitignored, not in the repo), so they exist only on the developer's machine and won't be present on a fresh clone or the live server.
 - **AGENTS.md is the source of truth** for deployment context — update it when deployment facts change.
 

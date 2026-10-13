@@ -5,18 +5,18 @@
 # Laravel / PHP
 /vendor/
 /node_modules/
-/bootstrap/cache/
-/storage/framework/cache/data/
-/storage/framework/views/*
-/storage/framework/testing/
-/storage/framework/sessions/*
-/storage/app/public/*
-/storage/logs/*
 .env
 .env.backup
 .env.production
 .phpunit.result.cache
+/.phpunit.cache/
 *.log
+
+# Storage / cache runtime artifacts are handled by the per-directory placeholder
+# `.gitignore` files in storage/ and bootstrap/cache/ (each contains `*` + `!.gitignore`).
+# Do NOT re-add blanket `/storage/...` or `/bootstrap/cache/` patterns here: git cannot
+# re-include a file inside an ignored directory, so those patterns would untrack the
+# placeholders themselves and recreate known issue #4 in AGENTS.md.
 
 # Database
 *.db
@@ -26,10 +26,21 @@
 .vscode/
 .idea/
 
+# OS junk
+Thumbs.db
+desktop.ini
+
 # Superpowers agent files (design docs are local-only, not needed for deployment)
 .superpowers/
 .opencode/
 docs/superpowers/
+
+# AI agent config / local tooling (not needed for deployment)
+.agents/
+.kilo/
+
+# Leftover Python Flask prototype
+instance/
 
 
 # Stray SQLite database from old Python prototype (local only)
