@@ -204,11 +204,13 @@ class PurchaseOrderDetailPageTest extends TestCase
         $this->assertStringContainsString('DOYEN', $response->getContent());
     }
 
-    public function test_products_required_section_reports_atld_volume_and_a_badge(): void
+    public function test_products_required_section_is_withdrawn(): void
     {
         $po = $this->poWithLines('CONFIRMED', ['Diesel' => 20000, 'Premium' => 10000]);
 
-        // Diesel fully drawn, Premium not ATL'd at all.
+        // Diesel fully drawn, Premium not ATL'd at all. The supervisor removed
+        // the section: the three volume cards above state the same thing per
+        // product, without the Fully/Not ATL'd badges.
         $this->delivery($po, 'ATL-DET-1', 20000, PurchaseOrderDelivery::LIFT_LIFTED, [
             'Diesel' => 20000,
         ]);
@@ -217,9 +219,13 @@ class PurchaseOrderDetailPageTest extends TestCase
             ->get(route('stock-orders.purchase-orders.show', $po->id));
 
         $response->assertStatus(200);
-        $response->assertSee('Products Required by this Order');
-        $response->assertSee('Fully ATL', false);
-        $response->assertSee('Not ATL', false);
+        $response->assertDontSee('Products Required by this Order');
+        $response->assertDontSee('Fully ATL', false);
+        $response->assertDontSee('Not ATL', false);
+
+        // The volume cards still carry the per-product figures.
+        $response->assertSee('Total Qty. Lifted', false);
+        $response->assertSee('Total Qty. Unlifted', false);
     }
 
     public function test_atl_records_table_lists_every_atl_that_drew_from_this_po(): void

@@ -105,58 +105,15 @@
             @endforeach
         </div>
 
-        {{-- Per-product requirement --}}
-        @if ($purchaseOrder->items->isNotEmpty())
-            <div class="card card-custom border-0 shadow-sm mb-4">
-                <div class="card-header bg-white py-3">
-                    <h6 class="fw-bold text-dark mb-0">Products Required by this Order</h6>
-                </div>
-                <div class="card-body py-3">
-                    <div class="row g-3">
-                        @foreach ($purchaseOrder->items as $item)
-                            @php
-                                $required = (int) $item->quantity_ordered;
-                                $atlQty = $atlByProduct[$item->product] ?? 0;
-                            @endphp
-                            <div class="col-md-4">
-                                <div class="border rounded-3 p-3 h-100">
-                                    <div class="fw-bold text-dark">{{ $item->product }}</div>
-                                    <div class="small text-muted">
-                                        Required <strong class="text-dark">{{ number_format($required) }} L</strong>
-                                    </div>
-                                    <div class="small text-muted">
-                                        ATL'd <strong class="text-primary">{{ number_format($atlQty) }} L</strong>
-                                    </div>
-                                    <div class="small mt-1">
-                                        @if ($atlQty === 0)
-                                            <span class="badge bg-light text-muted border">Not ATL'd</span>
-                                        @elseif ($atlQty === $required)
-                                            <span class="badge bg-success-subtle text-success border border-success-subtle">Fully ATL'd</span>
-                                        @elseif ($atlQty > $required)
-                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Over by {{ number_format($atlQty - $required) }} L</span>
-                                        @else
-                                            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Short by {{ number_format($required - $atlQty) }} L</span>
-                                        @endif
-                                    </div>
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-                </div>
-            </div>
-        @endif
+        {{-- The per-product requirement block that used to sit here is gone: the
+             three volume cards above already state Ordered, Lifted and Unlifted
+             for every product on this PO. --}}
 
-        {{-- ATLs --}}
+        {{-- ATLs. Raising a new one is done from Sales Orders or Stock Requests,
+             which know which PO the volume is coming from. --}}
         <div class="card card-custom border-0 shadow-sm">
             <div class="card-header bg-white py-3">
-                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <h6 class="fw-bold text-dark mb-0">ATL Records</h6>
-                    @if ($purchaseOrder->isVpApproved() && Auth::user()->canEditStockOrders())
-                        <a href="{{ route('stock-orders.add-atl', $purchaseOrder->id) }}" class="btn btn-sm btn-primary-custom rounded-pill px-3">
-                            <i class="bi bi-plus-lg me-1"></i> Create ATL
-                        </a>
-                    @endif
-                </div>
+                <h6 class="fw-bold text-dark mb-0">ATL Records</h6>
             </div>
             <div class="card-body border-bottom py-2">
                 <form method="GET" action="{{ route('stock-orders.purchase-orders.show', $purchaseOrder->id) }}" class="row g-2 align-items-center">

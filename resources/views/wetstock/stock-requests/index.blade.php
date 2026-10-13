@@ -43,6 +43,23 @@
         </div>
     @endif
 
+    {{-- Validation failures are raised by the request pop-up, but they are
+         reported here rather than only inside it. A send that could not be
+         saved used to land on this page with the pop-up shut and no visible
+         message at all, which read as though nothing had happened. --}}
+    @if ($errors->any())
+        <div class="alert alert-danger alert-dismissible fade show rounded-3" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <strong class="d-block mb-1">That request was not saved:</strong>
+            <ul class="mb-0 ps-3">
+                @foreach ($errors->all() as $message)
+                    <li>{{ $message }}</li>
+                @endforeach
+            </ul>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
     {{-- Stat cards. These total the same product lines the table below shows,
      so the two always reconcile. Routed Buy Back orders are excluded.
      Markup and colours match the Purchase Orders page so all three pages
@@ -363,6 +380,20 @@
                                                 <i class="bi bi-pencil me-1"></i> Pen
                                             </button>
                                         @endif
+
+                                        {{-- ATLs are raised here rather than on the PO's own
+                                             page, which no longer offers the button. Both the
+                                             request and its PO have to be in place: createAtl
+                                             refuses a PO the VP has not approved. --}}
+                                        @if (Auth::user()->canEditStockOrders()
+                                            && $req->isPrepared()
+                                            && $req->purchaseOrder?->isVpApproved())
+                                            <a href="{{ route('stock-orders.add-atl', $req->purchase_order_id) }}"
+                                               class="btn btn-sm btn-primary-custom rounded-pill px-2 py-1"
+                                               title="Raise an ATL against PO #{{ $req->purchaseOrder->po_number }}">
+                                                <i class="bi bi-plus-lg me-1"></i> Add ATL
+                                            </a>
+                                        @endif
                                     </div>
                                 </td>
                             </tr>
@@ -384,7 +415,11 @@
 {{-- The request form, a floating pop-up used by both Create Request and Pen. --}}
 <div class="modal fade" id="requestFormModal" tabindex="-1" aria-labelledby="requestFormModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
-        <form method="POST" id="requestForm" class="modal-content rounded-4 border-0 shadow">
+        {{-- The action is rewritten by script when the pop-up opens in edit
+             mode. Stating the create route here means the form still submits
+             if that script never runs, rather than posting to the current
+             GET-only URL and drawing a 405. --}}
+        <form method="POST" action="{{ route('wetstock.stock-requests.store') }}" id="requestForm" class="modal-content rounded-4 border-0 shadow">
             @csrf
             <div class="modal-header border-0 pb-0">
                 <h5 class="modal-title fw-bold text-dark" id="requestFormModalLabel">
@@ -785,6 +820,22 @@ document.addEventListener('DOMContentLoaded', function () {
         const modal = document.getElementById('requestFormModal');
         if (modal && window.bootstrap) {
             window.bootstrap.Modal.getOrCreateInstance(modal).show();
+        }
+    @endif
+
+    // Arriving with ?edit={id} is how a rejected edit comes back: the pop-up
+    // reopens on that request rather than resetting to a blank create form.
+    // Clicking its Pen button reuses the populate logic above.
+    @if ($openEdit)
+        const penForOpenEdit = document.querySelector(
+            '[data-request-mode="edit"][data-request-id="{{ (int) $openEdit }}"]'
+        );
+        if (penForOpenEdit) {
+            penForOpenEdit.click();
+        }
+        const editModal = document.getElementById('requestFormModal');
+        if (editModal && window.bootstrap) {
+            window.bootstrap.Modal.getOrCreateInstance(editModal).show();
         }
     @endif
 });

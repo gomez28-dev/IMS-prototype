@@ -14,6 +14,8 @@ use App\Models\Warehouse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class StockRequestController extends Controller
@@ -28,8 +30,9 @@ class StockRequestController extends Controller
 
         // Replenishment requests live in stock_requests now. Lines are eager
         // loaded because the list reports Pending = Requested - Received per
-        // product, and the stat cards total the same lines.
-        $requestsQuery = StockRequest::with(['warehouse', 'requester', 'lines', 'purchasingReceiver'])
+        // product, and the stat cards total the same lines. The PO is loaded so
+        // a prepared request can offer Add ATL without an N+1.
+        $requestsQuery = StockRequest::with(['warehouse', 'requester', 'lines', 'purchasingReceiver', 'purchaseOrder'])
             ->latest();
 
         if ($warehouseId) {
@@ -74,11 +77,14 @@ class StockRequestController extends Controller
 
         // ?create=1 opens the request pop-up straight away, which is how the
         // Incoming Stock page and the dashboard reach "Request Replenishment".
+        // ?edit={id} reopens it in edit mode, which is where a rejected edit
+        // comes back to.
         $openCreate = $request->boolean('create');
+        $openEdit = $request->integer('edit') ?: null;
 
         return view('wetstock.stock-requests.index', compact(
             'stockRequests', 'incomingDeliveries', 'warehouses', 'warehouseId',
-            'search', 'stats', 'openCreate'
+            'search', 'stats', 'openCreate', 'openEdit'
         ));
     }
 
@@ -104,7 +110,7 @@ public function store(Request $request): RedirectResponse
         abort(403);
     }
 
-    $validated = $request->validate([
+    $validated = $this->validatePopUp($request, [
         'warehouse_id' => ['required', 'exists:warehouses,id'],
         'request_type' => ['nullable', 'in:'.StockRequest::TYPE_PICKUP.','.StockRequest::TYPE_DELIVERY],
         'date_needed' => ['nullable', 'date'],
@@ -116,7 +122,7 @@ public function store(Request $request): RedirectResponse
         'lines.*.id' => ['nullable', 'integer'],
         'lines.*.product' => ['nullable', 'string', 'max:64'],
         'lines.*.qty' => ['nullable', 'integer', 'min:0'],
-    ]);
+    ], ['create' => 1]);
 
     $warehouse = Warehouse::findOrFail($validated['warehouse_id']);
 
@@ -126,7 +132,7 @@ public function store(Request $request): RedirectResponse
         ->values();
 
     if ($lines->isEmpty()) {
-        return back()
+        return $this->backToPopUp(['create' => 1])
             ->withInput()
             ->withErrors(['lines' => 'Add at least one product with a quantity.']);
     }
@@ -163,18 +169,61 @@ public function store(Request $request): RedirectResponse
 }
 
 /**
+ * Validate a pop-up submission, sending failures back to a URL that reopens the
+ * pop-up.
+ *
+ * A plain ->validate() redirects to the previous URL, which is the index with no
+ * query string. The pop-up then stays shut and its @error messages are never
+ * seen, so a rejected send looked like no send at all.
+ *
+ * @param  array<string, mixed>  $query  e.g. ['create' => 1] or ['edit' => $id]
+ * @return array<string, mixed>
+ *
+ * @throws ValidationException
+ */
+private function validatePopUp(Request $request, array $rules, array $query): array
+{
+    $validator = Validator::make($request->all(), $rules);
+
+    if ($validator->fails()) {
+        throw ValidationException::withMessages($validator->errors()->messages())
+            ->redirectTo($this->popUpUrl($query));
+    }
+
+    return $validator->validated();
+}
+
+/**
+ * Where the index sends the browser so the pop-up reopens on failure.
+ *
+ * @param  array<string, mixed>  $query
+ */
+private function popUpUrl(array $query): string
+{
+    return route('wetstock.stock-requests.index', $query);
+}
+
+/**
+ * @param  array<string, mixed>  $query
+ */
+private function backToPopUp(array $query): RedirectResponse
+{
+    return redirect()->to($this->popUpUrl($query));
+}
+
+/**
  * Edit an existing request from the same floating pop-up.
  *
  * The quantity already received is never overwritten, so Pending can never
  * be pushed below zero by editing the requested figure.
  */
-public function update(Request $request, StockRequest $stockRequest): RedirectResponse
-{
-    if (!Auth::user()->canEditModule2()) {
+    public function update(Request $request, StockRequest $stockRequest): RedirectResponse
+    {
+        if (!Auth::user()->canEditModule2()) {
         abort(403);
     }
 
-    $validated = $request->validate([
+    $validated = $this->validatePopUp($request, [
         'warehouse_id' => ['required', 'exists:warehouses,id'],
         'request_type' => ['required', 'in:'.StockRequest::TYPE_PICKUP.','.StockRequest::TYPE_DELIVERY],
         'date_needed' => ['nullable', 'date'],
@@ -183,7 +232,19 @@ public function update(Request $request, StockRequest $stockRequest): RedirectRe
         'lines.*.id' => ['nullable', 'integer'],
         'lines.*.product' => ['nullable', 'string', 'max:64'],
         'lines.*.qty' => ['nullable', 'integer', 'min:0'],
-    ]);
+    ], ['edit' => $stockRequest->id]);
+
+    // Emptying the pop-up must not wipe the request. Without this guard every
+    // existing line fell into whereNotIn([0]) and was deleted, and the save was
+    // still reported as a success.
+    $usableRows = collect($validated['lines'])
+        ->filter(fn ($row) => filled($row['product'] ?? null) && (int) ($row['qty'] ?? 0) > 0);
+
+    if ($usableRows->isEmpty()) {
+        return $this->backToPopUp(['edit' => $stockRequest->id])
+            ->withInput()
+            ->withErrors(['lines' => 'Add at least one product with a quantity.']);
+    }
 
     $stockRequest->load('lines');
 
