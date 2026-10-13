@@ -22,8 +22,9 @@ class SalesOrderController extends Controller
 {
     public function index(Request $request): View
     {
-        // Module 3 handles every order category except a Buy Back that is
-        // delivered, which routes to the Module 2 Stock Requests list instead.
+        // Module 3 handles every order category. Buy Back is no longer
+        // special-cased: it raises an ATL here and its delivery is assigned
+        // in Module 2's Assign Delivery.
         $query = Order::query()
             ->with('items')
             ->where('status', '!=', 'Cancelled')

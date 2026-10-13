@@ -337,12 +337,10 @@ class StockRequestPageTest extends TestCase
         $this->assertSame(2, StockRequest::where('warehouse_id', $this->warehouse->id)->count());
     }
 
-    public function test_routed_buy_back_orders_are_left_out_of_the_cards(): void
+    public function test_buy_back_orders_are_not_listed_on_this_page(): void
     {
-        StockRequest::volumeTotals();
-
-        // A Buy Back order is an Order, not a StockRequest, so it cannot be
-        // counted by these totals at all.
+        // Buy Back orders are assigned through Assign Delivery, so they have
+        // no section here. The cards only ever total StockRequest lines.
         $totals = StockRequest::volumeTotals();
 
         foreach ($totals as $bucket) {

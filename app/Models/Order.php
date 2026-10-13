@@ -45,8 +45,9 @@ class Order extends Model
     /**
      * A Buy Back order that is delivered rather than collected at a depot.
      *
-     * This is the one combination that routes to Module 2 Stock Requests
-     * instead of Module 3, so it is the single place that rule lives.
+     * Still recorded, because Module 1 uses it to default the fulfillment
+     * picker and Module 3 uses it to label the ATL Type. It no longer decides
+     * routing: every order category reaches Module 3.
      */
     public function isBuyBackDelivery(): bool
     {
@@ -57,19 +58,20 @@ class Order extends Model
     /**
      * Scope to the orders Module 3 handles.
      *
-     * Everything reaches Module 3 except a Buy Back order that is delivered,
-     * which belongs on the Module 2 Stock Requests list.
+     * Every order category reaches Module 3. Buy Back orders are no longer
+     * special-cased: they raise an ATL like a regular order and their delivery
+     * is assigned in Module 2's Assign Delivery.
      */
     public function scopeForModuleThree(Builder $query): Builder
     {
-        return $query->where(function ($q) {
-            $q->where('order_category', '!=', self::CATEGORY_BUY_BACK)
-                ->orWhere('fulfillment_type', '!=', self::FULFILLMENT_DELIVERY);
-        });
+        return $query;
     }
 
     /**
-     * Scope to the Buy Back orders that are delivered, handled by Module 2.
+     * Scope to the Buy Back orders that are delivered.
+     *
+     * Reported on rather than routed: kept so the M1 form and any audit can
+     * still ask which Buy Back orders are delivered.
      */
     public function scopeBuyBackDelivery(Builder $query): Builder
     {
@@ -356,12 +358,6 @@ class Order extends Model
      */
     public function canPrepareAtl(): bool
     {
-        // A Buy Back order that is delivered lives in Module 2, so it must not
-        // be able to raise a Module 3 ATL.
-        if ($this->isBuyBackDelivery()) {
-            return false;
-        }
-
         return ($this->isFuelTrade() || $this->isBuyBack()) && $this->status !== 'Cancelled';
     }
 

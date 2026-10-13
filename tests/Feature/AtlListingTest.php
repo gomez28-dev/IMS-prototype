@@ -25,15 +25,16 @@ class AtlListingTest extends TestCase
         ]);
     }
 
-    public function test_sales_orders_shows_every_category_except_delivered_buy_back(): void
+    public function test_sales_orders_shows_every_category(): void
     {
         $fuelTrade = $this->order('FT-1', 'FUEL_TRADE', 'CLIENT_ORDER');
         $buyBack = $this->order('BB-1', 'DEPOT_PICKUP', 'BUY_BACK');
-        // Every category reaches Module 3. Only a delivered Buy Back does not:
-        // it routes to the Module 2 Stock Requests list instead.
+        // Every category reaches Module 3, including a Buy Back that we
+        // deliver ourselves: it is assigned through Assign Delivery, not
+        // listed separately.
         $plainDelivery = $this->order('PLAIN-1', 'DELIVERY', 'CLIENT_ORDER');
         $consumo = $this->order('CONSUMO-1', 'DELIVERY', 'CONSUMO');
-        $this->order('BB-DELIVERED', 'DELIVERY', 'BUY_BACK');
+        $buyBackDelivery = $this->order('BB-DELIVERED', 'DELIVERY', 'BUY_BACK');
 
         $response = $this->actingAs($this->purchasing)->get(route('stock-orders.sales-orders.index'));
 
@@ -42,7 +43,7 @@ class AtlListingTest extends TestCase
         $response->assertSee($buyBack->so_number);
         $response->assertSee($plainDelivery->so_number);
         $response->assertSee($consumo->so_number);
-        $response->assertDontSee('BB-DELIVERED');
+        $response->assertSee($buyBackDelivery->so_number);
     }
 
     public function test_atl_list_excludes_cancelled_orders(): void

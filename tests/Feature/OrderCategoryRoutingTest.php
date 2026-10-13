@@ -146,17 +146,23 @@ class OrderCategoryRoutingTest extends TestCase
         ];
     }
 
-    public function test_buy_back_delivery_routes_to_module_two(): void
+    public function test_a_delivered_buy_back_reaches_module_three_like_a_regular_order(): void
     {
         $order = $this->storeOrder([
             'order_type' => 'BUY_BACK',
             'buy_back_fulfillment' => 'DELIVERY',
         ]);
 
-        $this->assertFalse(
+        // Every category reaches Module 3 now. Buy Back is not special-cased:
+        // it raises an ATL like a regular order and its delivery is assigned in
+        // Module 2's Assign Delivery.
+        $this->assertTrue(
             Order::forModuleThree()->whereKey($order->id)->exists(),
-            'Buy Back + Delivery must not appear in Module 3'
+            'A delivered Buy Back must still reach Module 3'
         );
+
+        // The combination is still recorded, for the M1 form and the ATL Type.
+        $this->assertTrue($order->isBuyBackDelivery());
         $this->assertTrue(Order::buyBackDelivery()->whereKey($order->id)->exists());
     }
 
@@ -166,7 +172,7 @@ class OrderCategoryRoutingTest extends TestCase
         $ft = $this->storeOrder(['order_type' => 'FUEL_TRADE']);
         $cs = $this->storeOrder(['order_type' => 'CONSUMO']);
         $bbPickup = $this->storeOrder(['order_type' => 'BUY_BACK', 'buy_back_fulfillment' => 'PICKUP']);
-        $m2Only = $this->storeOrder(['order_type' => 'BUY_BACK', 'buy_back_fulfillment' => 'DELIVERY']);
+        $bbDelivery = $this->storeOrder(['order_type' => 'BUY_BACK', 'buy_back_fulfillment' => 'DELIVERY']);
 
         // Module 3 is not open to the sales role.
         $purchasing = Admin::create([
@@ -186,11 +192,11 @@ class OrderCategoryRoutingTest extends TestCase
             $response->assertSee($order->formatted_so_number);
         }
 
-        // A delivered Buy Back belongs to Module 2 instead.
-        $response->assertDontSee($m2Only->formatted_so_number);
+        // A delivered Buy Back is listed here too, so nothing hides from M3.
+        $response->assertSee($bbDelivery->formatted_so_number);
     }
 
-    public function test_the_module_two_page_lists_routed_buy_back_orders(): void
+    public function test_the_module_two_page_no_longer_has_a_buy_back_section(): void
     {
         $ops = Admin::create([
             'username' => 'ops_' . uniqid(),
@@ -208,23 +214,27 @@ class OrderCategoryRoutingTest extends TestCase
             ->get(route('wetstock.stock-requests.index'));
 
         $response->assertStatus(200);
-        $response->assertSee($order->formatted_so_number);
+
+        // The supervisor removed the separate section: Buy Back orders are
+        // assigned through Assign Delivery, not listed here.
+        $response->assertDontSee('Buy Back Orders Routed to Module 2');
+        $response->assertDontSee($order->formatted_so_number);
     }
 
-    public function test_a_delivered_buy_back_cannot_raise_a_module_three_atl(): void
+    public function test_a_delivered_buy_back_can_raise_a_module_three_atl(): void
     {
         $order = $this->storeOrder([
             'order_type' => 'BUY_BACK',
             'buy_back_fulfillment' => 'DELIVERY',
         ]);
 
-        // Buy Back pick-up still can.
+        // Buy Back pick-up behaves identically.
         $pickup = $this->storeOrder([
             'order_type' => 'BUY_BACK',
             'buy_back_fulfillment' => 'PICKUP',
         ]);
 
-        $this->assertFalse($order->canPrepareAtl());
+        $this->assertTrue($order->canPrepareAtl());
         $this->assertTrue($pickup->canPrepareAtl());
     }
 
