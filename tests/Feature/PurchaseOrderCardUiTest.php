@@ -108,16 +108,15 @@ class PurchaseOrderCardUiTest extends TestCase
 
         $this->assertStringContainsString('class="stat-icon"', $html);
         $this->assertStringContainsString('class="stat-title"', $html);
-        $this->assertStringContainsString('class="stat-big"', $html);
         $this->assertStringContainsString('prod-chip', $html);
 
         // 3 per-product cards x 3 products.
         $this->assertSame(9, substr_count($html, 'class="stat-row"'));
-        // Only the per-product cards carry a Total footer; the Qty Ordered /
-        // Total ATL'd / Remaining cards use the big-number layout instead,
-        // exactly like "Total Orders" on the Orders Dashboard.
         $this->assertSame(3, substr_count($html, 'class="stat-total"'));
-        $this->assertSame(3, substr_count($html, 'class="stat-big"'));
+
+        // The supervisor removed the duplicate Qty Ordered / Total ATL'd /
+        // Remaining cards, which were the only big-number layout on this page.
+        $this->assertSame(0, substr_count($html, 'class="stat-big"'));
 
         // The lifted figure is carried through from the allocations.
         $response->assertSee('Total Qty. Lifted');

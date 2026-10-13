@@ -97,7 +97,7 @@ class PurchaseOrderDetailPageTest extends TestCase
         return $delivery;
     }
 
-    public function test_header_shows_the_po_number_supplier_and_a_back_link(): void
+    public function test_header_shows_the_po_number_and_a_back_link(): void
     {
         $po = $this->poWithLines('CONFIRMED', ['Diesel' => 10000]);
 
@@ -106,9 +106,12 @@ class PurchaseOrderDetailPageTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSee($po->po_number);
-        $response->assertSee('Petron Bataan Refinery');
         $response->assertSee('Back to Purchase Orders');
         $response->assertSee(route('stock-orders.purchase-orders.index'), false);
+
+        // The supplier and order date line under the title was redundant with
+        // the table below it, so it goes.
+        $response->assertDontSee('Order Date');
     }
 
     public function test_summary_cards_add_up_the_atl_and_lifted_volumes(): void
@@ -129,20 +132,25 @@ class PurchaseOrderDetailPageTest extends TestCase
 
         $response->assertStatus(200);
 
-        // Per-product cards, as on the Purchase Orders list.
+        // Per-product cards, as on the Purchase Orders list. These three are
+        // the only summary cards the supervisor kept.
         $response->assertSee('Total Qty. Ordered', false);
         $response->assertSee('Total Qty. Lifted', false);
         $response->assertSee('Total Qty. Unlifted', false);
 
-        // Single-figure cards retained alongside them.
-        $response->assertSee('Qty Ordered', false);
-        $response->assertSee('Total ATL', false);
-        $response->assertSee('Remaining', false);
+        // The duplicate single-figure cards came off with the metadata block.
+        $html = $response->getContent();
+        $this->assertStringNotContainsString('>Qty Ordered<', $html);
+        $this->assertStringNotContainsString(">Total ATL'd<", $html);
+        $this->assertStringNotContainsString('>Remaining<', $html);
 
-        $this->assertStringContainsString('30,000', $response->getContent());
-        $this->assertStringContainsString('25,000', $response->getContent());
-        $this->assertStringContainsString('15,000', $response->getContent());
-        $this->assertStringContainsString('5,000', $response->getContent());
+        // Ordered 30,000 (20k Diesel + 10k Premium), lifted 20,000, and 5,000
+        // still unlifted. The combined ATL'd figure of 25,000 is no longer
+        // printed anywhere: it is lifted plus unlifted.
+        $this->assertStringContainsString('30,000', $html);
+        $this->assertStringContainsString('20,000', $html);
+        $this->assertStringContainsString('15,000', $html);
+        $this->assertStringContainsString('5,000', $html);
     }
 
     public function test_per_product_cards_split_lifted_and_unlifted_volume(): void
@@ -191,8 +199,9 @@ class PurchaseOrderDetailPageTest extends TestCase
         $this->assertStringContainsString('50.00', $response->getContent());
         $this->assertStringContainsString('500,000.00', $response->getContent());
 
-        // The PO's own type label is what the Type column reports.
-        $response->assertSee('Doyen Stock');
+        // The Type column reports the ATL's own category, not the PO's. The PO
+        // category label used to sit in the metadata card the supervisor removed.
+        $this->assertStringContainsString('DOYEN', $response->getContent());
     }
 
     public function test_products_required_section_reports_atld_volume_and_a_badge(): void
@@ -282,14 +291,17 @@ class PurchaseOrderDetailPageTest extends TestCase
             ->assertSee(route('stock-orders.po-pdf', $approved->id), false);
     }
 
-    public function test_prepare_button_is_offered_on_requested_pos(): void
+    public function test_the_legacy_prepare_link_is_withdrawn(): void
     {
         $requested = $this->poWithLines('REQUESTED', ['Diesel' => 10000]);
         $approved = $this->poWithLines('CONFIRMED', ['Diesel' => 10000]);
 
+        // The legacy shell-then-number flow had its own button on this page.
+        // The supervisor asked for one action only: Edit PO, or the PDF once
+        // the VP has approved.
         $this->actingAs($this->purchasing)
             ->get(route('stock-orders.purchase-orders.show', $requested->id))
-            ->assertSee(route('stock-orders.edit-request', $requested->id), false);
+            ->assertDontSee(route('stock-orders.edit-request', $requested->id), false);
 
         $this->actingAs($this->purchasing)
             ->get(route('stock-orders.purchase-orders.show', $approved->id))

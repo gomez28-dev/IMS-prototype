@@ -17,113 +17,23 @@
                 <h3 class="fw-bold text-dark mb-0">
                     <i class="bi bi-card-checklist text-primary me-2"></i>Purchase Order &mdash; {{ $purchaseOrder->po_number ?: '(Pending PO#)' }}
                 </h3>
-                <p class="text-muted small mb-0 mt-1">
-                    {{ $purchaseOrder->supplier_name ?: ($purchaseOrder->client->name ?? '—') }}
-                    @if ($purchaseOrder->po_date)
-                        &middot; Order Date {{ $purchaseOrder->po_date->format('M d, Y') }}
-                    @endif
-                </p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                @if ($purchaseOrder->request_status === 'REQUESTED' && Auth::user()->canEditStockOrders())
-                    <a href="{{ route('stock-orders.edit-request', $purchaseOrder->id) }}" class="btn btn-primary-custom">
-                        <i class="bi bi-pencil-square me-1"></i> Prepare &amp; Submit
-                    </a>
-                @endif
-                @if (Auth::user()->canEditStockOrders())
-                    <a href="{{ route('stock-orders.edit-supplier-po', $purchaseOrder->id) }}" class="btn btn-outline-secondary">
-                        <i class="bi bi-pencil me-1"></i> Edit PO
-                    </a>
-                @endif
+                {{-- One action at a time. Editing an approved PO is not offered,
+                     so the figures the VP signed off cannot drift afterwards. --}}
                 @if ($purchaseOrder->isVpApproved())
-                    <a href="{{ route('stock-orders.po-pdf', $purchaseOrder->id) }}" class="btn btn-outline-danger">
-                        <i class="bi bi-file-earmark-pdf me-1"></i> PO PDF
+                    <a href="{{ route('stock-orders.po-pdf', $purchaseOrder->id) }}"
+                       class="btn btn-outline-danger" title="PO PDF" aria-label="Download PO PDF">
+                        <i class="bi bi-file-earmark-pdf"></i>
+                    </a>
+                @elseif (Auth::user()->canEditStockOrders())
+                    <a href="{{ route('stock-orders.edit-supplier-po', $purchaseOrder->id) }}" class="btn btn-primary-custom">
+                        <i class="bi bi-pencil me-1"></i> Edit PO
                     </a>
                 @endif
                 <a href="{{ route('stock-orders.purchase-orders.index') }}" class="btn btn-outline-secondary">
                     <i class="bi bi-arrow-left me-1"></i> Back to Purchase Orders
                 </a>
-            </div>
-        </div>
-
-        {{-- PO-specific metadata: supplier, type, pipeline position and who
-             touched it. The ATL story lives in the sections below. --}}
-        <div class="card card-custom border-0 shadow-sm mb-4">
-            <div class="card-body p-4">
-                <div class="row g-3">
-                    <div class="col-md-3">
-                        <span class="text-muted extra-small uppercase fw-semibold d-block mb-1" style="font-size: 0.7rem;">PO TYPE</span>
-                        <span class="badge {{ $purchaseOrder->typeBadgeClass() }}">{{ $purchaseOrder->typeLabel() }}</span>
-                        <div class="small text-muted mt-2">
-                            <span class="text-muted d-block">Order Date</span>
-                            <span class="fw-semibold text-dark">{{ $purchaseOrder->po_date ? $purchaseOrder->po_date->format('M d, Y') : '—' }}</span>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <span class="text-muted extra-small uppercase fw-semibold d-block mb-1" style="font-size: 0.7rem;">PIPELINE STATUS</span>
-                        @if ($purchaseOrder->request_status === 'REQUESTED')
-                            <span class="badge bg-secondary-subtle text-secondary border rounded-pill px-3 py-1">1. REQUESTED</span>
-                        @elseif ($purchaseOrder->request_status === 'RECEIVED')
-                            <span class="badge bg-warning-subtle text-warning border rounded-pill px-3 py-1">2. RECEIVED (Pending VP)</span>
-                        @elseif ($purchaseOrder->request_status === 'CONFIRMED')
-                            <span class="badge bg-info-subtle text-info border rounded-pill px-3 py-1">3. CONFIRMED (Approved)</span>
-                        @elseif ($purchaseOrder->request_status === 'FOR_DELIVERY')
-                            <span class="badge bg-primary rounded-pill px-3 py-1 text-white">4. FOR DELIVERY</span>
-                        @elseif ($purchaseOrder->request_status === 'COMPLETED')
-                            <span class="badge bg-success-subtle text-success border rounded-pill px-3 py-1">5. COMPLETED</span>
-                        @else
-                            <span class="badge bg-light text-dark border rounded-pill px-3 py-1">{{ $purchaseOrder->request_status }}</span>
-                        @endif
-                        <div class="mt-2 small text-muted">Computed: <span class="fw-semibold text-dark">{{ $purchaseOrder->computed_status }}</span></div>
-                    </div>
-                    <div class="col-md-3">
-                        <span class="text-muted extra-small uppercase fw-semibold d-block mb-1" style="font-size: 0.7rem;">SITE / CHANNEL</span>
-                        <span class="fw-semibold text-dark">
-                            @if ($purchaseOrder->warehouse)
-                                <i class="bi bi-geo-alt text-primary me-1"></i>{{ $purchaseOrder->warehouse->name }}
-                            @elseif ($purchaseOrder->isFuelTrade())
-                                Direct Pick-up
-                            @else
-                                &mdash;
-                            @endif
-                        </span>
-                        @if ($purchaseOrder->linkedOrder)
-                            <div class="small text-muted mt-1">Sales Order: <span class="fw-semibold text-dark">{{ $purchaseOrder->linkedOrder->so_number ?? '—' }}</span></div>
-                        @endif
-                    </div>
-                    <div class="col-md-3">
-                        <span class="text-muted extra-small uppercase fw-semibold d-block mb-1" style="font-size: 0.7rem;">DATES</span>
-                        <div class="small">
-                            <span class="text-muted d-block">Requested By</span>
-                            <span class="fw-semibold text-dark">{{ $purchaseOrder->requester->name ?? 'System' }}</span>
-                        </div>
-                        <div class="small mt-1">
-                            <span class="text-muted d-block">Approved By</span>
-                            <span class="fw-semibold text-dark">{{ $purchaseOrder->approver->name ?? '—' }}</span>
-                            @if ($purchaseOrder->approved_at)
-                                <span class="text-muted">({{ $purchaseOrder->approved_at->format('M d, Y h:i A') }})</span>
-                            @endif
-                        </div>
-                        @if ($purchaseOrder->date_needed)
-                            <div class="small mt-1">
-                                <span class="text-muted d-block">Date Needed</span>
-                                <span class="fw-semibold text-dark">{{ $purchaseOrder->date_needed->format('M d, Y') }}</span>
-                            </div>
-                        @endif
-                    </div>
-                </div>
-                @if ($purchaseOrder->remarks)
-                    <div class="alert alert-light border small mb-0 mt-3">
-                        <span class="text-muted">Remarks:</span> {{ $purchaseOrder->remarks }}
-                    </div>
-                @endif
-                @if ($purchaseOrder->request_status === 'RECEIVED' && Auth::user()->canApproveStockOrders())
-                    <div class="d-flex gap-2 mt-3">
-                        <a href="{{ route('stock-orders.approvals') }}" class="btn btn-sm btn-outline-success rounded-pill px-3">
-                            <i class="bi bi-patch-check me-1"></i> Review in Approvals Queue
-                        </a>
-                    </div>
-                @endif
             </div>
         </div>
 
@@ -193,44 +103,6 @@
                     </div>
                 </div>
             @endforeach
-        </div>
-
-        {{-- Single-figure view of the same PO: what has been committed to an
-             ATL, what has actually left, and what is still outstanding. --}}
-        <div class="row g-4 mb-4">
-            <div class="col-md-4">
-                <div class="card card-custom p-3 border-0 h-100">
-                    <div class="d-flex align-items-center gap-3">
-                        <div class="stat-icon" style="background:#ecfeff;color:#0891b2;"><i class="bi bi-journal-text"></i></div>
-                        <span class="stat-title">Qty Ordered</span>
-                    </div>
-                    <div class="d-flex flex-grow-1 align-items-center justify-content-center py-3">
-                        <span class="stat-big">{{ number_format($totals['ordered']) }}</span>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card card-custom p-3 border-0 h-100">
-                    <div class="d-flex align-items-center gap-3">
-                        <div class="stat-icon" style="background:#eef2ff;color:#4338ca;"><i class="bi bi-patch-check"></i></div>
-                        <span class="stat-title">Total ATL'd</span>
-                    </div>
-                    <div class="d-flex flex-grow-1 align-items-center justify-content-center py-3">
-                        <span class="stat-big">{{ number_format($totals['atl_issued']) }}</span>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card card-custom p-3 border-0 h-100">
-                    <div class="d-flex align-items-center gap-3">
-                        <div class="stat-icon" style="background:#fffbeb;color:#d97706;"><i class="bi bi-clock-history"></i></div>
-                        <span class="stat-title">Remaining</span>
-                    </div>
-                    <div class="d-flex flex-grow-1 align-items-center justify-content-center py-3">
-                        <span class="stat-big">{{ number_format($totals['remaining']) }}</span>
-                    </div>
-                </div>
-            </div>
         </div>
 
         {{-- Per-product requirement --}}

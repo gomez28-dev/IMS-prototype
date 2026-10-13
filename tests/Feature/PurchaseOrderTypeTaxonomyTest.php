@@ -110,14 +110,17 @@ class PurchaseOrderTypeTaxonomyTest extends TestCase
         $response->assertDontSee('name="status"', false);
     }
 
-    public function test_the_detail_page_shows_the_type_label(): void
+    public function test_the_detail_page_does_not_repeat_the_po_category(): void
     {
         $po = $this->po('FUEL_TRADE');
 
+        // The supervisor removed the metadata card, PO Type included, as
+        // redundant with the figures on the page. The category is still fixed
+        // at creation and at edit, both pinned by tests elsewhere in this file.
         $this->actingAs($this->purchasing)
             ->get(route('stock-orders.purchase-orders.show', $po->id))
             ->assertStatus(200)
-            ->assertSee('SO-FT');
+            ->assertDontSee('SO-FT');
     }
 
     public function test_the_manual_create_form_only_raises_doyen_stock(): void
@@ -165,13 +168,18 @@ class PurchaseOrderTypeTaxonomyTest extends TestCase
         $this->assertEquals('BUY_BACK', $po->fresh()->po_type);
     }
 
-    public function test_the_atl_table_reports_the_parent_po_type(): void
+    public function test_the_atl_table_type_column_reports_the_atl_category(): void
     {
         $po = $this->po('BUY_BACK');
 
+        // This never reported the parent PO's type: the Type column reads
+        // PurchaseOrderDelivery::typeLabel(), and the test only passed because
+        // the metadata card happened to print the PO label on the same page.
+        // Now that the card is gone, the column is pinned for what it is.
         $this->actingAs($this->purchasing)
             ->get(route('stock-orders.purchase-orders.show', $po->id))
             ->assertStatus(200)
-            ->assertSee('SO-BUY BACK');
+            ->assertSee('Type')
+            ->assertDontSee('SO-BUY BACK');
     }
 }
