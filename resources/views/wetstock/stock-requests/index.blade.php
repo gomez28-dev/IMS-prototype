@@ -279,7 +279,7 @@
                                         <span class="text-muted">&mdash;</span>
                                     @else
                                         @foreach ($req->lines as $line)
-                                            <div>{{ \Illuminate\Support\Str::substr((string) $line->product, 0, 1) }} &mdash; {{ number_format($line->qty_requested) }}</div>
+                                            <div>{!! $chip(\Illuminate\Support\Str::substr((string) $line->product, 0, 1), $line->product) !!} <span class="ms-2">{{ number_format($line->qty_requested) }}</span></div>
                                         @endforeach
                                     @endif
                                 </td>
@@ -288,7 +288,7 @@
                                         <span class="text-muted">&mdash;</span>
                                     @else
                                         @foreach ($req->lines as $line)
-                                            <div>{{ \Illuminate\Support\Str::substr((string) $line->product, 0, 1) }} &mdash; {{ number_format($line->qty_received) }}</div>
+                                            <div>{!! $chip(\Illuminate\Support\Str::substr((string) $line->product, 0, 1), $line->product) !!} <span class="ms-2">{{ number_format($line->qty_received) }}</span></div>
                                         @endforeach
                                     @endif
                                 </td>
@@ -297,7 +297,7 @@
                                         <span class="text-muted">&mdash;</span>
                                     @else
                                         @foreach ($req->lines as $line)
-                                            <div class="{{ $line->qty_pending > 0 ? 'text-warning-emphasis fw-semibold' : 'text-success' }}">{{ \Illuminate\Support\Str::substr((string) $line->product, 0, 1) }} &mdash; {{ number_format($line->qty_pending) }}</div>
+                                            <div class="{{ $line->qty_pending > 0 ? 'text-warning-emphasis fw-semibold' : 'text-success' }}">{!! $chip(\Illuminate\Support\Str::substr((string) $line->product, 0, 1), $line->product) !!} <span class="ms-2">{{ number_format($line->qty_pending) }}</span></div>
                                         @endforeach
                                     @endif
                                 </td>

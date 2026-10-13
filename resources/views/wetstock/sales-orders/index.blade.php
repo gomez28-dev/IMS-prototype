@@ -26,32 +26,118 @@
             </div>
         </div>
 
-        {{-- Summary cards --}}
-        <div class="row g-3 mb-4">
-            <div class="col-md-3">
-                <div class="card card-custom p-3 border-0 shadow-sm">
-                    <span class="text-uppercase text-muted fw-bold small">Orders Listed</span>
-                    <h3 class="fw-bold text-dark mb-0 mt-1">{{ number_format($stats['orders']) }}</h3>
+        @php
+            // Product chip colours: U = Unleaded, D = Diesel, P = Premium.
+            // Kept identical to the Orders Dashboard, Purchase Orders and
+            // Stock Requests so all the pages read as one set.
+            $chipStyles = [
+                'U' => 'background:#dcfce7;color:#166534;border:1px solid #bbf7d0;',
+                'D' => 'background:#e0e7ff;color:#3730a3;border:1px solid #c7d2fe;',
+                'P' => 'background:#fee2e2;color:#991b1b;border:1px solid #fecaca;',
+            ];
+
+            $chip = function ($code, $title = '') use ($chipStyles) {
+                $style = $chipStyles[$code] ?? 'background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb;';
+
+                return '<span class="prod-chip" style="'.$style.'" title="'.e($title).'">'.e($code ?: '—').'</span>';
+            };
+
+            $prodRows = [['D', 'Diesel'], ['U', 'Unleaded'], ['P', 'Premium']];
+
+            // Pending Clearance is a count of orders rather than a volume, so
+            // it has no product dimension; it sits under the headline count.
+            $statCards = [
+                ['title' => 'Total Qty. Ordered', 'icon' => 'bi-boxes', 'tint' => 'background:#ecfeff;color:#0891b2;', 'data' => $stats['volumes']['ordered']],
+                ['title' => 'Unlifted ATLs', 'icon' => 'bi-clock-history', 'tint' => 'background:#fffbeb;color:#d97706;', 'data' => $stats['volumes']['unlifted']],
+                ['title' => 'Lifted ATLs', 'icon' => 'bi-truck', 'tint' => 'background:#f0fdf4;color:#16a34a;', 'data' => $stats['volumes']['lifted']],
+            ];
+        @endphp
+        <style>
+            .stat-title {
+                font-size: 0.72rem;
+                font-weight: 700;
+                letter-spacing: 0.05em;
+                text-transform: uppercase;
+                color: #374151;
+            }
+            .stat-icon {
+                width: 46px;
+                height: 46px;
+                border-radius: 0.8rem;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.3rem;
+                flex-shrink: 0;
+            }
+            .stat-row {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                border: 1px solid #e5e7eb;
+                border-radius: 0.6rem;
+                padding: 0.45rem 0.8rem;
+                margin-bottom: 0.45rem;
+                background: #fff;
+            }
+            .stat-row .stat-val { font-weight: 700; color: #111827; }
+            .stat-total {
+                display: flex;
+                justify-content: space-between;
+                padding: 0.25rem 0.3rem 0;
+                color: #6b7280;
+            }
+            .stat-total .stat-val { font-weight: 600; color: #111827; }
+            .stat-big { font-size: 3.6rem; font-weight: 800; line-height: 1; color: #111827; }
+            .stat-sub { font-size: 0.8rem; color: #6b7280; }
+            .prod-chip {
+                display: inline-block;
+                font-size: 0.65rem;
+                font-weight: 700;
+                line-height: 1;
+                padding: 0.2rem 0.4rem;
+                border-radius: 0.35rem;
+                margin: 0 1px;
+            }
+        </style>
+
+        {{-- Stat cards: one headline count, then volume split by product. --}}
+        <div class="row g-4 mb-4">
+            <div class="col-xl-3 col-md-6">
+                <div class="card card-custom p-3 border-0 h-100">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="stat-icon" style="background:#fff1ee;color:#f04a1a;"><i class="bi bi-journal-text"></i></div>
+                        <span class="stat-title">Orders Listed</span>
+                    </div>
+                    <div class="d-flex flex-grow-1 flex-column align-items-center justify-content-center py-3">
+                        <span class="stat-big">{{ number_format($stats['orders']) }}</span>
+                        <span class="stat-sub mt-2">
+                            <span class="text-warning fw-semibold">{{ number_format($stats['pending_clearance']) }}</span> pending clearance
+                        </span>
+                    </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="card card-custom p-3 border-0 shadow-sm">
-                    <span class="text-uppercase text-muted fw-bold small">Pending Clearance</span>
-                    <h3 class="fw-bold text-warning mb-0 mt-1">{{ number_format($stats['pending_clearance']) }}</h3>
+
+            @foreach ($statCards as $card)
+                <div class="col-xl-3 col-md-6">
+                    <div class="card card-custom p-3 border-0 h-100">
+                        <div class="d-flex align-items-center gap-3 mb-3">
+                            <div class="stat-icon" style="{{ $card['tint'] }}"><i class="bi {{ $card['icon'] }}"></i></div>
+                            <span class="stat-title">{{ $card['title'] }}</span>
+                        </div>
+                        @foreach ($prodRows as [$code, $name])
+                            <div class="stat-row">
+                                <span>{!! $chip($code, $name) !!} <span class="ms-2">{{ $name }}</span></span>
+                                <span class="stat-val">{{ number_format($card['data'][$name] ?? 0) }}</span>
+                            </div>
+                        @endforeach
+                        <div class="stat-total">
+                            <span>Total</span>
+                            <span class="stat-val">{{ number_format(array_sum($card['data'])) }}</span>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card card-custom p-3 border-0 shadow-sm">
-                    <span class="text-uppercase text-muted fw-bold small">Unlifted ATLs</span>
-                    <h3 class="fw-bold text-primary mb-0 mt-1">{{ number_format($stats['unlifted']) }}</h3>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card card-custom p-3 border-0 shadow-sm">
-                    <span class="text-uppercase text-muted fw-bold small">Lifted ATLs</span>
-                    <h3 class="fw-bold text-success mb-0 mt-1">{{ number_format($stats['lifted']) }}</h3>
-                </div>
-            </div>
+            @endforeach
         </div>
 
         {{-- Search --}}
@@ -78,9 +164,9 @@
                         <thead class="bg-light">
                             <tr>
                                 <th class="ps-3 py-3">SO Number</th>
+                                <th class="py-3">Date Needed</th>
                                 <th class="py-3">Client / Account</th>
-                                <th class="py-3 text-end">Qty Ordered</th>
-                                <th class="py-3">Products</th>
+                                <th class="py-3">Qty Ordered / Products</th>
                                 <th class="py-3 text-center">Clearance</th>
                                 <th class="py-3 text-center">ATL Status</th>
                                 <th class="pe-3 py-3 text-end">Action</th>
@@ -92,24 +178,43 @@
                                     $rowAtls = $atlsByOrder[$row->id] ?? [];
                                     $allLifted = count($rowAtls) > 0
                                         && collect($rowAtls)->every(fn($a) => $a->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_LIFTED);
+                                    // Per-product volumes, so a multi-product
+                                    // order reports each product's own quantity
+                                    // rather than one lump total.
+                                    $rowVolumes = [];
+                                    foreach ($row->items as $item) {
+                                        $name = $item->product_name;
+                                        $rowVolumes[$name] = ($rowVolumes[$name] ?? 0) + (int) $item->qty;
+                                    }
+                                    $rowTotal = array_sum($rowVolumes);
                                 @endphp
                                 <tr>
                                     <td class="ps-3 fw-bold text-dark">
                                         {{ $row->formatted_so_number }}
-                                        <div class="small text-muted">{{ $row->date ? $row->date->format('M d, Y') : '' }}</div>
+                                    </td>
+                                    {{-- The date entered in Module 1 as "date needed",
+                                         not the order date. --}}
+                                    <td class="small">
+                                        {{ $row->date_needed ? $row->date_needed->format('M d, Y') : '—' }}
                                     </td>
                                     <td><strong>{{ $row->account }}</strong></td>
-                                    <td class="text-end fw-bold font-monospace">{{ number_format($row->qty_ordered) }} L</td>
                                     <td>
-                                        @if ($row->items->isNotEmpty())
-                                            @foreach ($row->items->slice(0, 3) as $item)
-                                                <span class="badge bg-light text-dark border me-1">{{ $item->product_name }}</span>
-                                            @endforeach
-                                            @if ($row->items->count() > 3)
-                                                <span class="extra-small text-muted">+{{ $row->items->count() - 3 }} more</span>
-                                            @endif
-                                        @else
+                                        @if ($rowVolumes === [])
                                             <span class="text-muted">—</span>
+                                            <div class="small text-muted font-monospace">{{ number_format($row->qty_ordered) }} L</div>
+                                        @else
+                                            @foreach ($rowVolumes as $product => $qty)
+                                                @php $code = \Illuminate\Support\Str::substr((string) $product, 0, 1); @endphp
+                                                <div class="mb-1">
+                                                    {!! $chip($code, $product) !!}
+                                                    <span class="ms-2 text-muted small">{{ $product }}</span>
+                                                    <span class="fw-bold font-monospace ms-2">{{ number_format($qty) }}</span>
+                                                </div>
+                                            @endforeach
+                                            <div class="stat-total">
+                                                <span>Total</span>
+                                                <span class="stat-val">{{ number_format($rowTotal) }} L</span>
+                                            </div>
                                         @endif
                                     </td>
                                     <td class="text-center">

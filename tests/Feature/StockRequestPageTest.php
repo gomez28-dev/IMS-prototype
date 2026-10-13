@@ -439,6 +439,28 @@ class StockRequestPageTest extends TestCase
         $this->assertSame(2, substr_count($html, '<span class="stat-val">15,000</span>'));
     }
 
+    /**
+     * The quantities have to be product-aware for U, D and P, and read the
+     * same way as the cards above them.
+     */
+    public function test_the_quantity_columns_use_product_chips(): void
+    {
+        $this->request([
+            ['product' => 'Diesel', 'qty' => 10000],
+            ['product' => 'Unleaded', 'qty' => 5000],
+            ['product' => 'Premium', 'qty' => 2500],
+        ]);
+
+        $html = $this->page();
+
+        $this->assertStringContainsString('prod-chip', $html);
+        $this->assertStringContainsString('10,000', $html);
+        $this->assertStringContainsString('5,000', $html);
+        $this->assertStringContainsString('2,500', $html);
+        // The old bare-letter rendering is gone.
+        $this->assertStringNotContainsString('D &mdash;', $html);
+    }
+
     public function test_the_page_has_its_own_title_and_sidebar_entry(): void
     {
         $html = $this->page();
