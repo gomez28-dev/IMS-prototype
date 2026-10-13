@@ -171,6 +171,69 @@ class Order extends Model
     }
 
     /**
+     * The product this order is for, as a readable name.
+     *
+     * Every order raised before the product_type column was added stores null
+     * there, and the ATL Details page used to read the name straight off the
+     * line, so those orders all read "Unspecified". The product is still
+     * recoverable further down the chain: the PO raised against the order, and
+     * an ATL already issued against it, both record a real product.
+     *
+     * Nothing is written back. This only answers what the order is for; the
+     * order's own lines are left exactly as they were entered.
+     */
+    public function resolvedProduct(): string
+    {
+        // The order's own line, when a product was captured at entry.
+        $own = $this->items->first(fn (OrderItem $item) => filled($item->product_type));
+
+        if ($own) {
+            return $own->product_name;
+        }
+
+        // The PO raised against this order. PurchaseOrder::linkedOrder() is the
+        // reliable direction of that link; Order::linkedPurchaseOrder() reads a
+        // column that predates the dedicated stock request tables.
+        $fromPo = PurchaseOrder::where('linked_order_id', $this->getKey())
+            ->with('items')
+            ->get()
+            ->pluck('items')
+            ->flatten()
+            ->first(fn ($item) => filled($item->product));
+
+        if ($fromPo) {
+            return $fromPo->product;
+        }
+
+        // An ATL already issued against this order.
+        $fromAtl = PurchaseOrderDelivery::where('order_id', $this->getKey())
+            ->with('allocations')
+            ->get()
+            ->pluck('allocations')
+            ->flatten()
+            ->first(fn ($allocation) => filled($allocation->product));
+
+        if ($fromAtl) {
+            return $fromAtl->product;
+        }
+
+        return 'Unspecified';
+    }
+
+    /**
+     * The same product as a U / D / P code, for the chips used across the app.
+     * Null when the product cannot be identified, or is not one of the three.
+     */
+    public function resolvedProductCode(): ?string
+    {
+        $name = $this->resolvedProduct();
+
+        $code = array_search($name, self::PRODUCT_TYPES, true);
+
+        return $code === false ? null : $code;
+    }
+
+    /**
      * Turn product lines into a readable string:
      * "Unleaded (U) 5000 @ 78.00 | Diesel (D) 3000 @ 82.50"
      */

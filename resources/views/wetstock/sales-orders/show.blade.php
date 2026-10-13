@@ -14,8 +14,23 @@
                         <li class="breadcrumb-item active" aria-current="page">{{ $order->formatted_so_number }}</li>
                     </ol>
                 </nav>
-                <h3 class="fw-bold text-dark mb-0">
-                    <i class="bi bi-patch-check text-primary me-2"></i>ATL Details &mdash; {{ $order->formatted_so_number }}
+                <h3 class="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                    <span><i class="bi bi-patch-check text-primary me-2"></i>ATL Details &mdash; {{ $order->formatted_so_number }}</span>
+                    @php
+                        // The order's own line may predate the product_type column,
+                        // in which case the product is recovered from the PO it
+                        // raised or an ATL already issued against it.
+                        $orderProduct = $order->resolvedProduct();
+                        $orderProductCode = $order->resolvedProductCode();
+                        $chipStyles = [
+                            'U' => 'background:#dcfce7;color:#166534;border:1px solid #bbf7d0;',
+                            'D' => 'background:#e0e7ff;color:#3730a3;border:1px solid #c7d2fe;',
+                            'P' => 'background:#fee2e2;color:#991b1b;border:1px solid #fecaca;',
+                        ];
+                    @endphp
+                    <span class="badge rounded-pill fw-semibold"
+                          style="{{ $chipStyles[$orderProductCode] ?? 'background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb;' }}"
+                          title="Product for this order">{{ $orderProductCode ? $orderProductCode.' - ' : '' }}{{ $orderProduct }}</span>
                 </h3>
                 <p class="text-muted small mb-0 mt-1">{{ $order->account }}</p>
             </div>
@@ -67,43 +82,12 @@
             </div>
         </div>
 
-        {{-- Per-product requirement --}}
-        @if ($order->items->isNotEmpty())
-            <div class="card card-custom border-0 shadow-sm mb-4">
-                <div class="card-header bg-white py-3">
-                    <h6 class="fw-bold text-dark mb-0">Products Required by this Order</h6>
-                </div>
-                <div class="card-body py-3">
-                    <div class="row g-3">
-                        @foreach ($order->items as $item)
-                            @php $atlQty = $atlByProduct[$item->product_name] ?? 0; @endphp
-                            <div class="col-md-4">
-                                <div class="border rounded-3 p-3 h-100">
-                                    <div class="fw-bold text-dark">{{ $item->product_name }}</div>
-                                    <div class="small text-muted">
-                                        Required <strong class="text-dark">{{ number_format($item->qty) }} L</strong>
-                                    </div>
-                                    <div class="small text-muted">
-                                        ATL'd <strong class="text-primary">{{ number_format($atlQty) }} L</strong>
-                                    </div>
-                                    <div class="small mt-1">
-                                        @if ($atlQty === 0)
-                                            <span class="badge bg-light text-muted border">Not ATL'd</span>
-                                        @elseif ($atlQty === (int) $item->qty)
-                                            <span class="badge bg-success-subtle text-success border border-success-subtle">Fully ATL'd</span>
-                                        @elseif ($atlQty > (int) $item->qty)
-                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Over by {{ number_format($atlQty - $item->qty) }} L</span>
-                                        @else
-                                            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Short by {{ number_format($item->qty - $atlQty) }} L</span>
-                                        @endif
-                                    </div>
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-                </div>
-            </div>
-        @endif
+        {{-- The per-product requirement block that used to sit here is gone.
+             The supervisor removed it as redundant, and it was the last place
+             the page read a product off the order's own line, which is how
+             legacy orders came to say "Unspecified". The product now resolves
+             through Order::resolvedProduct() and is shown as the chip in the
+             title above. --}}
 
         {{-- ATLs --}}
         <div class="card card-custom border-0 shadow-sm">

@@ -81,17 +81,8 @@ class SalesOrderController extends Controller
             ->orderByDesc('id')
             ->get();
 
-        // Per-product totals come from allocations, which is where a
-        // multi-product ATL records each product's volume.
-        $atlByProduct = [];
-        foreach ($atls as $atl) {
-            foreach ($atl->allocations as $allocation) {
-                $product = $allocation->product ?: 'Unspecified';
-                $atlByProduct[$product] = ($atlByProduct[$product] ?? 0) + (int) $allocation->quantity;
-            }
-        }
-        ksort($atlByProduct);
-
+        // Per-product ATL totals are no longer rendered on this page; the ATL
+        // table reads each ATL's own breakdown instead.
         $totals = [
             'ordered' => (int) $order->qty_ordered,
             'atl_issued' => (int) $atls->sum('qty_to_receive'),
@@ -116,7 +107,7 @@ class SalesOrderController extends Controller
             && $atl->lift_status !== PurchaseOrderDelivery::LIFT_LIFTED);
 
         return view('wetstock.sales-orders.show', compact(
-            'order', 'atls', 'totals', 'atlByProduct', 'mobileTankers', 'liftableDelivery'
+            'order', 'atls', 'totals', 'mobileTankers', 'liftableDelivery'
         ));
     }
 
