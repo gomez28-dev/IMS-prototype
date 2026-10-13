@@ -12,6 +12,7 @@ use App\Models\Order;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderDelivery;
 use App\Models\PurchaseOrderItem;
+use App\Models\PoNumber;
 use App\Models\StockIn;
 use App\Models\StockRequest;
 use App\Models\StorageTank;
@@ -107,7 +108,19 @@ class StockOrderController extends Controller
         // Only active suppliers are offered; deactivated ones stay on old POs.
         $suppliers = Supplier::active()->orderBy('company_name')->orderBy('location')->get();
 
-        return view('wetstock.stock-orders.create-po', compact('warehouses', 'suppliers'));
+        // The supervisor asked for the PO number to be a dropdown. Each active
+        // supplier keeps a pool of unused numbers ready, topped up on load so
+        // the dropdown is never empty.
+        $suppliers->each(fn (Supplier $supplier) => PoNumber::ensurePoolFor($supplier));
+
+        $availablePoNumbers = PoNumber::available()
+            ->with('supplier')
+            ->orderBy('po_number')
+            ->get();
+
+        return view('wetstock.stock-orders.create-po', compact(
+            'warehouses', 'suppliers', 'availablePoNumbers'
+        ));
     }
 
     /**
@@ -130,9 +143,29 @@ class StockOrderController extends Controller
             $suppliers->push($purchaseOrder->supplier);
         }
 
+        // An unapproved PO can still be renumbered, so its dropdown needs the unused
+        // pool. The PO's own number is added back in because that row is spent
+        // against this PO and so no longer reads as available.
+        $availablePoNumbers = PoNumber::available()
+            ->with('supplier')
+            ->orderBy('po_number')
+            ->get();
+
+        $ownNumber = $purchaseOrder->po_number;
+        if ($ownNumber && ! $availablePoNumbers->contains('po_number', $ownNumber)) {
+            $availablePoNumbers->push(
+                new PoNumber([
+                    'po_number' => $ownNumber,
+                    'supplier_id' => $purchaseOrder->supplier_id,
+                    'status' => PoNumber::STATUS_AVAILABLE,
+                ])
+            );
+        }
+
         return view('wetstock.stock-orders.create-po', [
             'warehouses' => $warehouses,
             'suppliers' => $suppliers,
+            'availablePoNumbers' => $availablePoNumbers,
             'purchaseOrder' => $purchaseOrder,
             'isEdit' => true,
         ]);
@@ -145,7 +178,17 @@ class StockOrderController extends Controller
         }
 
         $validated = $request->validate([
-            'po_number' => ['required', 'string', 'max:64', 'unique:purchase_orders,po_number'],
+            // The number is picked from the pre-generated pool rather than
+            // typed, so it must be unused and must belong to the chosen
+            // supplier. purchase_orders still carries the unique check as a
+            // safety net.
+            'po_number' => [
+                'required',
+                'string',
+                'max:64',
+                'exists:po_number_pool,po_number',
+                Rule::unique('purchase_orders', 'po_number'),
+            ],
             // Only active suppliers are selectable; deactivated ones remain on
             // existing Purchase Orders but cannot be chosen for new ones.
             'supplier_id' => ['required', Rule::exists('suppliers', 'id')->where('is_active', true)],
@@ -180,6 +223,23 @@ class StockOrderController extends Controller
         // existing screens that read it keep working.
         $supplier = Supplier::find($validated['supplier_id']);
         $supplierName = $supplier->company_name;
+
+        // The number has to be unused, and has to belong to the supplier the PO
+        // is being raised against. A crafted POST picking another supplier's
+        // number is refused here rather than silently accepted.
+        $pooledNumber = PoNumber::where('po_number', $validated['po_number'])->first();
+
+        if ($pooledNumber?->isAvailable() !== true) {
+            return back()
+                ->withInput()
+                ->withErrors(['po_number' => 'That PO number is already used. Please pick another from the list.']);
+        }
+
+        if ($pooledNumber->supplier_id !== null && $pooledNumber->supplier_id !== $supplier->id) {
+            return back()
+                ->withInput()
+                ->withErrors(['po_number' => 'That PO number belongs to a different supplier.']);
+        }
 
         // Net Payable is always the gross less the creditable withholding tax.
         // VAT already sits inside the line total, so it is not subtracted. The
@@ -231,6 +291,9 @@ class StockOrderController extends Controller
             'action' => 'created',
             'description' => "Purchasing created Bulk Supplier PO #{$po->po_number} ({$po->supplier_name}) for total " . number_format($totalQty) . " L",
         ]);
+
+        // Spend the pooled number so it can never be picked twice.
+        $pooledNumber->markUsed($po);
 
         return redirect()->route('stock-orders.purchase-orders.index')
             ->with('success', "Supplier PO #{$po->po_number} created and submitted for VP approval with " . count($validated['items']) . " product line(s).");

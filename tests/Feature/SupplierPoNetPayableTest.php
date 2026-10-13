@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Admin;
+use App\Models\PoNumber;
 use App\Models\PurchaseOrder;
 use App\Models\Supplier;
 use Tests\TestCase;
@@ -36,9 +37,13 @@ class SupplierPoNetPayableTest extends TestCase
      */
     protected function createPo(array $overrides = []): PurchaseOrder
     {
+        // Created once: company_name + location is unique, and the pooled
+        // number has to come from the same supplier the PO is raised against.
+        $supplier = $this->supplier();
+
         $this->actingAs($this->purchasing)->post(route('stock-orders.store-supplier-po'), array_merge([
-            'po_number' => 'PO-NP-' . rand(1000, 9999),
-            'supplier_id' => $this->supplier()->id,
+            'po_number' => PoNumber::issueFor($supplier),
+            'supplier_id' => $supplier->id,
             'po_type' => 'STANDARD_REPLENISHMENT',
             'items' => [
                 // 220,000 x 89.15 = 19,613,000.00

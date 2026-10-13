@@ -121,7 +121,7 @@ class PurchaseOrderTypeTaxonomyTest extends TestCase
     public function test_the_manual_create_form_only_raises_doyen_stock(): void
     {
         $this->actingAs($this->purchasing)->post(route('stock-orders.store-supplier-po'), [
-            'po_number' => 'PO-MANUAL-'.uniqid(),
+            'po_number' => \App\Models\PoNumber::issueFor($this->supplier),
             'supplier_id' => $this->supplier->id,
             // A crafted POST must not be able to choose another category.
             'po_type' => 'BUY_BACK',
