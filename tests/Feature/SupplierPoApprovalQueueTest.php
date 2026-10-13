@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\Admin;
-use App\Models\PoNumber;
 use App\Models\PurchaseOrder;
 use App\Models\Supplier;
 use Tests\TestCase;
@@ -33,16 +32,12 @@ class SupplierPoApprovalQueueTest extends TestCase
         ]);
     }
 
-    protected function createRequestedSupplierPo(): PurchaseOrder
+    protected function createRequestedSupplierPo(string $poNumber): PurchaseOrder
     {
         $supplier = Supplier::create([
             'company_name' => 'Agieko Fuel Trading',
             'location' => 'Limay Terminal',
         ]);
-
-        // The number is picked from the pre-generated pool, as the form's
-        // dropdown does, and spent once the PO is saved.
-        $poNumber = PoNumber::issueFor($supplier);
 
         $this->actingAs($this->purchasing)->post(route('stock-orders.store-supplier-po'), [
             'po_number' => $poNumber,
@@ -56,7 +51,7 @@ class SupplierPoApprovalQueueTest extends TestCase
 
     public function test_new_supplier_po_is_saved_pending_vp_approval(): void
     {
-        $po = $this->createRequestedSupplierPo();
+        $po = $this->createRequestedSupplierPo('PO-Q-'.rand(1000, 9999));
 
         // RECEIVED is this codebase's "waiting on the VP" state, which is what
         // the Approvals queue filters on.
@@ -65,7 +60,7 @@ class SupplierPoApprovalQueueTest extends TestCase
 
     public function test_new_supplier_po_is_not_self_approved_by_its_creator(): void
     {
-        $po = $this->createRequestedSupplierPo();
+        $po = $this->createRequestedSupplierPo('PO-Q-'.rand(1000, 9999));
 
         // Creating a PO must never approve it.
         $this->assertNull($po->approved_by);
@@ -75,20 +70,19 @@ class SupplierPoApprovalQueueTest extends TestCase
 
     public function test_new_supplier_po_appears_in_the_vp_approval_queue(): void
     {
-        $po = $this->createRequestedSupplierPo();
+        $po = $this->createRequestedSupplierPo('PO-QUEUE-VISIBLE');
 
         $this->assertEquals('RECEIVED', $po->request_status);
 
         $response = $this->actingAs($this->vp)->get(route('stock-orders.approvals'));
 
         $response->assertStatus(200);
-        // The PO is listed under the number it was actually given.
-        $response->assertSee($po->po_number);
+        $response->assertSee('PO-QUEUE-VISIBLE');
     }
 
     public function test_approved_supplier_po_leaves_the_queue(): void
     {
-        $po = $this->createRequestedSupplierPo();
+        $po = $this->createRequestedSupplierPo('PO-QUEUE-GONE');
 
         $this->actingAs($this->vp)
             ->post(route('stock-orders.approve', $po->id))
@@ -106,7 +100,7 @@ class SupplierPoApprovalQueueTest extends TestCase
 
     public function test_rejected_supplier_po_returns_to_purchasing(): void
     {
-        $po = $this->createRequestedSupplierPo();
+        $po = $this->createRequestedSupplierPo('PO-QUEUE-REJECT');
 
         $this->actingAs($this->vp)->post(route('stock-orders.reject', $po->id), [
             'rejection_reason' => 'Volume exceeds the approved allocation.',
@@ -130,7 +124,7 @@ class SupplierPoApprovalQueueTest extends TestCase
 
     public function test_purchasing_cannot_approve_a_supplier_po(): void
     {
-        $po = $this->createRequestedSupplierPo();
+        $po = $this->createRequestedSupplierPo('PO-QUEUE-SELFAPPROVE');
 
         $this->actingAs($this->purchasing)
             ->post(route('stock-orders.approve', $po->id))

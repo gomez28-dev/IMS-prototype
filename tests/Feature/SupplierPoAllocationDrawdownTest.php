@@ -47,7 +47,7 @@ class SupplierPoAllocationDrawdownTest extends TestCase
         ]);
 
         $payload = [
-            'po_number' => \App\Models\PoNumber::issueFor($supplier),
+            'po_number' => 'PO-BULK-' . rand(1000, 9999),
             'supplier_id' => $supplier->id,
             'po_type' => 'STANDARD_REPLENISHMENT',
             'date_needed' => now()->addDays(5)->format('Y-m-d'),

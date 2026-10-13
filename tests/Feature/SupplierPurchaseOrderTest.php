@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\Admin;
-use App\Models\PoNumber;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\Supplier;
@@ -33,11 +32,8 @@ class SupplierPurchaseOrderTest extends TestCase
             'attention' => 'Mr. Aaron Uy',
         ]);
 
-        // The number comes from the pool, exactly as the form's dropdown does.
-        $poNumber = PoNumber::issueFor($supplier);
-
         $response = $this->actingAs($this->purchasing)->post(route('stock-orders.store-supplier-po'), [
-            'po_number' => $poNumber,
+            'po_number' => 'PO-DITCF-26-0651',
             'supplier_id' => $supplier->id,
             'po_type' => 'STANDARD_REPLENISHMENT',
             'terms' => 'VAT EX CASH',
@@ -50,7 +46,7 @@ class SupplierPurchaseOrderTest extends TestCase
         $response->assertRedirect(route('stock-orders.purchase-orders.index'));
         $response->assertSessionHas('success');
 
-        $po = PurchaseOrder::where('po_number', $poNumber)->firstOrFail();
+        $po = PurchaseOrder::where('po_number', 'PO-DITCF-26-0651')->firstOrFail();
 
         $this->assertEquals($supplier->id, $po->supplier_id);
         // Legacy mirror so existing screens keep working.
@@ -70,7 +66,7 @@ class SupplierPurchaseOrderTest extends TestCase
         ]);
 
         $this->actingAs($this->purchasing)->post(route('stock-orders.store-supplier-po'), [
-            'po_number' => PoNumber::issueFor($supplier),
+            'po_number' => 'PO-TOTALS-' . rand(1000, 9999),
             'supplier_id' => $supplier->id,
             'po_type' => 'STANDARD_REPLENISHMENT',
             'items' => [
@@ -98,7 +94,7 @@ class SupplierPurchaseOrderTest extends TestCase
         ]);
 
         $this->actingAs($this->purchasing)->post(route('stock-orders.store-supplier-po'), [
-            'po_number' => PoNumber::issueFor($supplier),
+            'po_number' => 'PO-VAT-' . rand(1000, 9999),
             'supplier_id' => $supplier->id,
             'po_type' => 'STANDARD_REPLENISHMENT',
             'vatable_sales_amount' => 19613000.00,

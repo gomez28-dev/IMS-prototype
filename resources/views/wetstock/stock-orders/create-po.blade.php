@@ -64,33 +64,14 @@
                                 Official PO Number
                                 @unless ($poLocked)<span class="text-danger">*</span>@endunless
                             </label>
-
-                            @if ($poLocked)
-                                {{-- Editing an approved PO: the number is fixed. --}}
-                                <input type="text" class="form-control bg-light @error('po_number') is-invalid @enderror"
-                                       id="po_number" name="po_number" readonly
-                                       value="{{ old('po_number', $po->po_number ?? '') }}">
-                            @else
-                                {{-- A dropdown of pre-generated, unused numbers, narrowed to the
-                                     chosen refinery. Nothing is typed, so a clash is impossible. --}}
-                                <select class="form-select @error('po_number') is-invalid @enderror"
-                                        id="po_number" name="po_number" required>
-                                    <option value="">-- Choose the Company first --</option>
-                                    @foreach ($availablePoNumbers as $available)
-                                        <option value="{{ $available->po_number }}"
-                                                data-supplier="{{ $available->supplier_id }}"
-                                            {{ old('po_number') === $available->po_number ? 'selected' : '' }}>
-                                            {{ $available->po_number }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                            @endif
-
+                            <input type="text" class="form-control @error('po_number') is-invalid @enderror @if ($poLocked) bg-light @endif" id="po_number" name="po_number"
+                                   @if ($poLocked) readonly @else required @endif
+                                   placeholder="e.g. PO-PETRON-2026-001" value="{{ old('po_number', $po->po_number ?? '') }}">
                             <div class="form-text extra-small">
                                 @if ($poLocked)
                                     Locked: this PO is already approved, so its number cannot change.
                                 @else
-                                    Pre-generated and unused, e.g. PO-PETRON-2026-001. Pick one for the refinery you chose above.
+                                    Unique purchasing reference number issued to refinery.
                                 @endif
                             </div>
                         </div>
@@ -520,35 +501,6 @@ document.addEventListener('DOMContentLoaded', function () {
     if (companySelect) {
         companySelect.addEventListener('change', renderLocations);
         renderLocations();
-    }
-
-    // Numbers are supplier-prefixed, so the list is narrowed to the refinery
-    // that was chosen. The server checks this again on save.
-    const poNumberSelect = document.getElementById('po_number');
-    if (poNumberSelect && companySelect) {
-        const filterPoNumbers = function () {
-            const supplierId = companySelect.value;
-            const previouslyChosen = poNumberSelect.value;
-
-            Array.from(poNumberSelect.options).forEach(function (option) {
-                if (!option.value) return;
-                option.hidden = supplierId !== '' && option.dataset.supplier !== supplierId;
-            });
-
-            poNumberSelect.querySelector('option[value=""]').textContent =
-                supplierId === '' ? '-- Choose the Company first --' : '-- Choose a PO number --';
-
-            // A number belonging to another refinery must not stay selected.
-            const stillValid = Array.from(poNumberSelect.options).some(function (option) {
-                return option.value === previouslyChosen && !option.hidden;
-            });
-            if (!stillValid) {
-                poNumberSelect.value = '';
-            }
-        };
-
-        companySelect.addEventListener('change', filterPoNumbers);
-        filterPoNumbers();
     }
 });
 </script>
