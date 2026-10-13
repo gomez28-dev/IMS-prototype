@@ -259,7 +259,7 @@ class SupplierPoAllocationDrawdownTest extends TestCase
         $this->assertEquals(5000, $po->fresh()->getAvailableBalanceForProduct('Diesel'));
     }
 
-    public function test_cannot_issue_atl_when_total_drawn_does_not_match_so_quantity(): void
+    public function test_cannot_issue_atl_when_the_draw_would_overshoot_the_so_quantity(): void
     {
         $po = PurchaseOrder::create([
             'po_number' => 'PO-BIG-01',
@@ -288,7 +288,10 @@ class SupplierPoAllocationDrawdownTest extends TestCase
             'order_category' => 'CLIENT_ORDER',
         ]);
 
-        // SO is for 10,000, but only drawing 7,000
+        // SO is for 10,000 and this draws 12,000, so the order would be
+        // over-drawn. This used to be refused for any mismatch at all; a partial
+        // draw is now allowed, because the supervisor asked for several ATLs
+        // against one order.
         $payload = [
             'receiving_date' => now()->addDays(2)->format('Y-m-d'),
             'driver_name' => 'Driver',
@@ -296,14 +299,74 @@ class SupplierPoAllocationDrawdownTest extends TestCase
             'atl_type' => 'DITC_ATL',
             'atl_number' => 'ATL-FAIL-02',
             'drawdowns' => [
-                ['purchase_order_id' => $po->id, 'quantity' => 7000],
+                ['purchase_order_id' => $po->id, 'quantity' => 12000],
             ],
         ];
 
-        $response = $this->actingAs($this->purchasingUser)
-            ->post(route('stock-orders.store-fuel-trade-po', $order->id), $payload);
+        $this->actingAs($this->purchasingUser)
+            ->post(route('stock-orders.store-fuel-trade-po', $order->id), $payload)
+            ->assertSessionHasErrors('drawdowns');
 
-        $response->assertSessionHasErrors();
+        $this->assertSame(
+            50000,
+            $po->fresh()->getAvailableBalanceForProduct('Diesel'),
+            'A refused ATL must leave the PO balance untouched.'
+        );
+    }
+
+    public function test_a_second_atl_cannot_push_the_order_past_its_quantity(): void
+    {
+        $po = PurchaseOrder::create([
+            'po_number' => 'PO-CUM-'.rand(1000, 9999),
+            'po_type' => 'STANDARD_REPLENISHMENT',
+            'supplier_name' => 'Petron Bataan',
+            'qty_ordered' => 50000,
+            'request_status' => 'CONFIRMED',
+            'status' => 'Pending',
+        ]);
+        PurchaseOrderItem::create([
+            'purchase_order_id' => $po->id,
+            'product' => 'Diesel',
+            'quantity_ordered' => 50000,
+        ]);
+
+        $order = Order::create([
+            'account' => $this->client->name,
+            'location' => 'Valenzuela',
+            'so_number' => 'SO-FT-CUM',
+            'date' => now(),
+            'qty_ordered' => 10000,
+            'price' => 50.00,
+            'status' => 'Active',
+            'clearing_status' => 'Approved',
+            'fulfillment_type' => 'FUEL_TRADE',
+            'order_category' => 'CLIENT_ORDER',
+        ]);
+
+        $submit = fn (int $qty) => $this->actingAs($this->purchasingUser)
+            ->post(route('stock-orders.store-fuel-trade-po', $order->id), [
+                'receiving_date' => now()->addDays(2)->format('Y-m-d'),
+                'driver_name' => 'Driver',
+                'plate_number' => 'ABC-1111',
+                'atl_type' => 'DITC_ATL',
+                'atl_number' => 'ATL-CUM-'.uniqid(),
+                'drawdowns' => [
+                    ['purchase_order_id' => $po->id, 'quantity' => $qty],
+                ],
+            ]);
+
+        // 4,000 then 6,000 completes the order exactly.
+        $submit(4000)->assertSessionHasNoErrors();
+        $submit(6000)->assertSessionHasNoErrors();
+
+        // A third ATL for even 1 L would take the order to 10,001.
+        $submit(1)->assertSessionHasErrors('drawdowns');
+
+        $this->assertSame(
+            ['Diesel' => 10000],
+            $order->drawnByProduct(),
+            'Only the two accepted ATLs count towards the order.'
+        );
     }
 
     /**

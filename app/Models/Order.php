@@ -234,6 +234,43 @@ class Order extends Model
     }
 
     /**
+     * Volume already committed to this order by an ATL, per product.
+     *
+     * An order may carry several ATLs, so any check on how much has been drawn
+     * has to be against the running total across all of them, not the most
+     * recent one.
+     *
+     * ATLs issued before deliveries carried an order_id are picked up through
+     * their PO's linked_order_id.
+     *
+     * @return array<string, int>
+     */
+    public function drawnByProduct(): array
+    {
+        $atls = PurchaseOrderDelivery::where(function ($query) {
+            $query->where('order_id', $this->getKey())
+                ->orWhere(function ($legacy) {
+                    $legacy->whereNull('order_id')
+                        ->whereHas('purchaseOrder', fn ($po) => $po->where('linked_order_id', $this->getKey()));
+                });
+        })
+            ->with('allocations')
+            ->get();
+
+        $totals = [];
+
+        foreach ($atls as $atl) {
+            foreach ($atl->allocations as $allocation) {
+                $product = $allocation->product ?: 'Unspecified';
+
+                $totals[$product] = ($totals[$product] ?? 0) + (int) $allocation->quantity;
+            }
+        }
+
+        return $totals;
+    }
+
+    /**
      * Turn product lines into a readable string:
      * "Unleaded (U) 5000 @ 78.00 | Diesel (D) 3000 @ 82.50"
      */

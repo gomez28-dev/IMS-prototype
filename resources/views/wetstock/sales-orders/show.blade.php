@@ -43,11 +43,6 @@
                         <i class="bi bi-check-circle me-1"></i> Mark Picked Up
                     </button>
                 @endif
-                @if ($order->canBeIssuedAtl() && Auth::user()->canEditStockOrders())
-                    <a href="{{ route('stock-orders.create-fuel-trade-po', $order->id) }}" class="btn btn-primary-custom">
-                        <i class="bi bi-plus-lg me-1"></i> Create ATL
-                    </a>
-                @endif
                 <a href="{{ route('stock-orders.sales-orders.index') }}" class="btn btn-outline-secondary">
                     <i class="bi bi-arrow-left me-1"></i> Back to Sales Orders
                 </a>
@@ -92,7 +87,32 @@
         {{-- ATLs --}}
         <div class="card card-custom border-0 shadow-sm">
             <div class="card-header bg-white py-3">
-                <h6 class="fw-bold text-dark mb-0">ATL Records</h6>
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h6 class="fw-bold text-dark mb-0">ATL Records</h6>
+
+                    {{-- Create ATL, in the same spot and the same two states as
+                         M1's Add Delivery. Previously the button was hidden
+                         outright unless Accounting had cleared the order, so on
+                         an uncleared order the page simply offered nothing and
+                         the action looked like it did not exist.
+
+                         Several ATLs may be raised against one order: each is a
+                         draw against the POs below, and the order as a whole
+                         cannot be over-drawn. --}}
+                    @if (Auth::user()->canEditStockOrders())
+                        @if ($order->canBeIssuedAtl())
+                            <a href="{{ route('stock-orders.create-fuel-trade-po', $order->id) }}"
+                               class="btn btn-sm btn-primary-custom rounded-pill px-3">
+                                <i class="bi bi-plus-lg me-1"></i> Create ATL
+                            </a>
+                        @else
+                            <button type="button" class="btn btn-sm btn-secondary opacity-75 d-flex align-items-center"
+                                    disabled title="Awaiting Accounting clearance ({{ $order->clearing_status }})">
+                                <i class="bi bi-lock-fill me-2"></i> Locked: Pending Accounting Clearance
+                            </button>
+                        @endif
+                    @endif
+                </div>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">

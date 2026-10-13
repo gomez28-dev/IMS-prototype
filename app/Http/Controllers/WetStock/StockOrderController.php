@@ -585,14 +585,30 @@ class StockOrderController extends Controller
                 }
             }
 
-            // 1b. Per product, the volume drawn must exactly match the requirement.
+            // 1b. Per product, this ATL plus every earlier one against the same
+            // order must not overshoot what the order asked for.
+            //
+            // The rule used to demand that a single ATL exactly matched the
+            // order, which made a second ATL impossible. The supervisor asked
+            // for several per order, so the check runs against the running
+            // total instead: an ATL may be a partial draw, but the order as a
+            // whole can never be over-drawn.
+            $alreadyDrawn = $order->drawnByProduct();
+
             foreach ($requirements as $requiredProduct => $requiredQty) {
                 $drawnQty = (int) ($drawnByProduct[$requiredProduct] ?? 0);
-                if ($drawnQty !== $requiredQty) {
+                $previous = (int) ($alreadyDrawn[$requiredProduct] ?? 0);
+                $cumulative = $drawnQty + $previous;
+
+                if ($cumulative > $requiredQty) {
                     return back()->withInput()->withErrors([
-                        'drawdowns' => "Total drawn volume for {$requiredProduct} ("
-                            . number_format($drawnQty) . " L) must exactly match the Sales Order requirement ("
-                            . number_format($requiredQty) . " L).",
+                        'drawdowns' => $previous > 0
+                            ? "This ATL draws ".number_format($drawnQty)." L of {$requiredProduct}, which with the "
+                                .number_format($previous).' L already ATL\'d would take the total to '
+                                .number_format($cumulative).' L, over the Sales Order requirement ('
+                                .number_format($requiredQty).' L).'
+                            : "This Sales Order only requires ".number_format($requiredQty)
+                                ." L of {$requiredProduct}, but ".number_format($cumulative).' L was drawn.',
                     ]);
                 }
             }
