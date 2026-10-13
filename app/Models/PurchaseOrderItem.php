@@ -34,13 +34,30 @@ class PurchaseOrderItem extends Model
 
     /**
      * Total quantity drawn down from this item by issued ATLs.
+     *
+     * Most allocations carry purchase_order_item_id, but older ones only
+     * recorded the parent PO. Without a fallback here a fully drawn PO would
+     * still report its whole quantity as available, which is what the Allocate
+     * dropdown depends on. The fallback only applies when nothing is linked,
+     * so it cannot double-count.
      */
     public function getTotalDrawnAttribute(): int
     {
-        return (int) $this->allocations()
+        $linked = (int) $this->allocations()
             ->whereHas('delivery', function ($q) {
                 $q->where('status', '!=', 'Cancelled');
             })
+            ->sum('quantity');
+
+        if ($linked > 0) {
+            return $linked;
+        }
+
+        return (int) $this->purchaseOrder
+            ->allocations()
+            ->where('product', $this->product)
+            ->whereNull('purchase_order_item_id')
+            ->whereHas('delivery', fn ($q) => $q->where('status', '!=', 'Cancelled'))
             ->sum('quantity');
     }
 

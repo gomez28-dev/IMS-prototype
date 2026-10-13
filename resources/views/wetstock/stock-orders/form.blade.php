@@ -204,10 +204,19 @@
                                         <table class="table table-borderless align-middle mb-0" id="drawdownsTable">
                                             <thead class="table-light small">
                                                 <tr>
-                                                    <th class="ps-2" style="width: 42%;">Supplier PO</th>
-                                                    <th style="width: 20%;">Product <span class="text-danger">*</span></th>
-                                                    <th style="width: 28%;">Volume to Draw (Liters) <span class="text-danger">*</span></th>
-                                                    <th class="pe-2 text-center" style="width: 10%;">Remove</th>
+                                                    <th class="ps-2" style="width: 38%;">
+                                                            <span class="text-uppercase" style="letter-spacing:0.06em;">Allocate PO#</span>
+                                                            <span class="text-danger">*</span>
+                                                        </th>
+                                                        <th style="width: 22%;">
+                                                            <span class="text-uppercase" style="letter-spacing:0.06em;">Allocate Product</span>
+                                                            <span class="text-danger">*</span>
+                                                        </th>
+                                                        <th style="width: 30%;">
+                                                            <span class="text-uppercase" style="letter-spacing:0.06em;">Allocate Quantity</span>
+                                                            <span class="text-danger">*</span>
+                                                        </th>
+                                                        <th class="pe-2 text-center" style="width: 10%;">Remove</th>
                                                 </tr>
                                             </thead>
                                             <tbody id="drawdownRowsBody">
@@ -217,7 +226,8 @@
                                                             <option value="">-- Choose Supplier PO --</option>
                                                             @foreach ($availablePos as $p)
                                                                 @php
-                                                                    // Availability per product, so the form can validate the chosen product.
+                                                                    // Availability per product, so the form can offer only the
+                                                                    // products this PO still has, and validate the choice.
                                                                     $availByProduct = [];
                                                                     foreach ($productOptions as $pp) {
                                                                         $bal = $p->getAvailableBalanceForProduct($pp);
@@ -230,7 +240,6 @@
                                                                 </option>
                                                             @endforeach
                                                         </select>
-                                                        <div class="extra-small text-muted mt-1" data-avail-hint></div>
                                                     </td>
                                                     <td>
                                                         <select name="drawdowns[0][product]" class="form-select form-select-sm dd-product-select" required onchange="handleProductChange(this)">
@@ -240,13 +249,18 @@
                                                         </select>
                                                     </td>
                                                     <td>
+                                                        {{-- The system states what is available under the chosen
+                                                             PO and product; the user then enters the volume. --}}
+                                                        <div class="mb-1">
+                                                            <span class="badge rounded-pill px-2 py-1 border" data-avail-hint>—</span>
+                                                        </div>
                                                         <div class="input-group input-group-sm">
                                                             @php
                                                                 $firstAvail = $availablePos[0]->getAvailableBalanceForProduct($defaultReqProduct);
                                                                 $suggested = min($soRequirements[$defaultReqProduct] ?? $order->qty_ordered, $firstAvail);
                                                             @endphp
                                                             <input type="number" name="drawdowns[0][quantity]" class="form-control form-control-sm dd-qty-input font-monospace"
-                                                                   placeholder="Liters" min="1" max="{{ $firstAvail }}" value="{{ old('drawdowns.0.quantity', $suggested) }}" required oninput="calculateTotalDrawn()">
+                                                                   placeholder="Liters" min="1" step="1" max="{{ $firstAvail }}" value="{{ old('drawdowns.0.quantity', $suggested) }}" required oninput="calculateTotalDrawn()">
                                                             <span class="input-group-text">L</span>
                                                         </div>
                                                     </td>
@@ -520,12 +534,46 @@ function updateAvailHint(row) {
     const product = row.querySelector('.dd-product-select').value;
     const avail = parseInt(poAvailability(row.querySelector('.po-select'))[product] || 0);
     const hint = row.querySelector('[data-avail-hint]');
-    if (!hint) return avail;
-    hint.textContent = avail > 0
-        ? 'Available ' + product + ': ' + avail.toLocaleString() + ' L'
-        : 'This PO has no remaining ' + product + ' allocation';
-    hint.className = 'extra-small mt-1 ' + (avail > 0 ? 'text-muted' : 'text-danger');
+    if (hint) {
+        // A visible badge rather than a line of small text: the wireframe
+        // calls for the system to state what is available before the user
+        // types a volume.
+        hint.textContent = avail > 0
+            ? avail.toLocaleString() + ' L Available'
+            : 'No ' + product + ' left on this PO';
+        hint.className = 'badge rounded-pill px-2 py-1 border ' + (avail > 0
+            ? 'bg-success-subtle text-success border-success-subtle'
+            : 'bg-danger-subtle text-danger border-danger-subtle');
+    }
     return avail;
+}
+
+/**
+ * After a PO is chosen, offer only the products that PO still holds, which is
+ * what the supervisor asked for: "after maka select ng PO# may mag show na
+ * kung anong product at ilang qty ang available under that PO".
+ */
+function refreshProductOptions(row, preferredProduct) {
+    const select = row.querySelector('.dd-product-select');
+    if (!select) return;
+
+    const availability = poAvailability(row.querySelector('.po-select'));
+    const previous = preferredProduct || select.value;
+
+    let html = '';
+    Object.keys(availability).forEach(function (product) {
+        html += '<option value="' + product + '">' + product + '</option>';
+    });
+
+    // No PO chosen yet, or a PO with nothing left: fall back to the full list
+    // so the select is never empty and the user can still see the products.
+    select.innerHTML = html || productOptionsHtml;
+
+    if (availability[previous] !== undefined) {
+        select.value = previous;
+    } else if (!html && previous) {
+        select.value = previous;
+    }
 }
 
 function addDrawdownRow() {
@@ -543,7 +591,6 @@ function addDrawdownRow() {
             <select name="drawdowns[${ddIndex}][purchase_order_id]" class="form-select form-select-sm po-select" required onchange="handlePoSelectChange(this)">
                 ${optionsHtml}
             </select>
-            <div class="extra-small text-muted mt-1" data-avail-hint></div>
         </td>
         <td>
             <select name="drawdowns[${ddIndex}][product]" class="form-select form-select-sm dd-product-select" required onchange="handleProductChange(this)">
@@ -551,9 +598,12 @@ function addDrawdownRow() {
             </select>
         </td>
         <td>
+            <div class="mb-1">
+                <span class="badge rounded-pill px-2 py-1 border" data-avail-hint>—</span>
+            </div>
             <div class="input-group input-group-sm">
                 <input type="number" name="drawdowns[${ddIndex}][quantity]" class="form-control form-control-sm dd-qty-input font-monospace"
-                       placeholder="Liters" min="1" required oninput="calculateTotalDrawn()">
+                       placeholder="Liters" min="1" step="1" required oninput="calculateTotalDrawn()">
                 <span class="input-group-text">L</span>
             </div>
         </td>
@@ -587,7 +637,11 @@ function updateDrawdownRemoveButtons() {
 }
 
 function handlePoSelectChange(select) {
-    handleProductChange(select.closest('.drawdown-row').querySelector('.dd-product-select'));
+    const row = select.closest('.drawdown-row');
+    // Narrow the product list to what this PO actually holds, then re-run the
+    // quantity step so the availability badge reflects the new pair.
+    refreshProductOptions(row);
+    handleProductChange(row.querySelector('.dd-product-select'));
 }
 
 function calculateTotalDrawn() {

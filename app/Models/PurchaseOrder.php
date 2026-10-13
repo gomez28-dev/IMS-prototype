@@ -335,6 +335,14 @@ public function isFuelTrade(): bool
             return $item->remaining_balance;
         }
 
+        // A PO that carries item rows states its products exactly, so a product
+        // with no line simply has nothing available. Without this guard a
+        // Diesel-only PO would report its whole qty_ordered as Unleaded too,
+        // and the Allocate dropdown would offer products it never bought.
+        if ($this->items()->exists()) {
+            return 0;
+        }
+
         // Fallback for legacy POs without separate item rows
         $drawn = (int) $this->allocations()
             ->where('product', $product)

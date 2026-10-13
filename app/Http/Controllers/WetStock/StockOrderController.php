@@ -471,12 +471,20 @@ class StockOrderController extends Controller
                 ->with('error', "Cannot issue ATL: Sales Order {$order->formatted_so_number} has not been cleared by Accounting (Status: {$order->clearing_status}).");
         }
 
-        $product = 'Diesel';
+        // The supervisor's rule: the dropdown lists POs that still have remaining
+        // quantity. "Remaining" is judged on any product, not one in
+        // particular, so a PO holding only Premium is still offered.
         $availablePos = PurchaseOrder::where('status', '!=', 'Cancelled')
             ->with(['items.allocations', 'allocations'])
             ->get()
-            ->filter(function ($po) use ($product) {
-                return $po->getAvailableBalanceForProduct($product) > 0;
+            ->filter(function ($po) {
+                foreach (PurchaseOrder::PRODUCTS as $option) {
+                    if ($po->getAvailableBalanceForProduct($option) > 0) {
+                        return true;
+                    }
+                }
+
+                return false;
             })
             ->values();
 
@@ -778,6 +786,9 @@ class StockOrderController extends Controller
         AtlAllocation::create([
             'purchase_order_delivery_id' => $delivery->id,
             'purchase_order_id' => $po->id,
+            // Linked to the item so the PO's remaining balance for this product
+            // accounts for the drawdown.
+            'purchase_order_item_id' => $po->items()->where('product', $validated['product'])->value('id'),
             'product' => $validated['product'],
             'quantity' => $validated['qty_to_receive'],
         ]);
