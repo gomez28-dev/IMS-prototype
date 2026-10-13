@@ -37,14 +37,8 @@ class PurchaseOrderController extends Controller
             'deliveries.preparer',
         ]);
 
-        if ($request->filled('po_type')) {
-            $query->where('po_type', $request->po_type);
-        }
-
-        if ($request->filled('status')) {
-            $query->where('request_status', $request->status);
-        }
-
+        // The status dropdown and its Filter button are gone from the list, so
+        // the query no longer honours a status parameter. Search stays.
         if ($request->filled('search')) {
             $term = '%' . $request->search . '%';
             $query->where(function ($q) use ($term) {
@@ -55,13 +49,8 @@ class PurchaseOrderController extends Controller
 
         $purchaseOrders = $query->latest()->paginate(15);
 
-        $warehouses = Warehouse::orderBy('name')->get();
-        $clients = Client::orderBy('name')->get();
-
         return view('wetstock.purchase-orders.index', [
             'purchaseOrders' => $purchaseOrders,
-            'warehouses' => $warehouses,
-            'clients' => $clients,
             'stats' => $this->stats(),
         ]);
     }

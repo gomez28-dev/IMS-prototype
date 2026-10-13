@@ -17,18 +17,31 @@
                     <i class="bi bi-card-checklist text-primary me-2"></i>Purchase Orders
                 </h3>
             </div>
-            <div class="d-flex gap-2">
+            {{-- Approvals and Deliveries/ATLs used to sit here as buttons. Both
+                 are in the left navigation, which is where they are role-gated,
+                 so the header keeps only Create P.O. and the search box. --}}
+            <div class="d-flex gap-2 align-items-center flex-wrap">
+                <form method="GET" action="{{ route('stock-orders.purchase-orders.index') }}"
+                      class="d-flex gap-2 align-items-center">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0">
+                            <i class="bi bi-search text-muted"></i>
+                        </span>
+                        <input type="text" name="search" class="form-control border-start-0"
+                               placeholder="Search PO # or Supplier..." value="{{ request('search') }}">
+                    </div>
+                    <button type="submit" class="btn btn-primary-custom">Search</button>
+                    @if (request('search'))
+                        <a href="{{ route('stock-orders.purchase-orders.index') }}"
+                           class="btn btn-outline-secondary">Reset</a>
+                    @endif
+                </form>
+
                 @if (Auth::user()->canEditStockOrders())
                 <a href="{{ route('stock-orders.create-supplier-po') }}" class="btn btn-primary-custom shadow-sm">
                     <i class="bi bi-plus-lg me-1"></i> Create P.O.
                 </a>
                 @endif
-                <a href="{{ route('stock-orders.approvals') }}" class="btn btn-outline-success">
-                    <i class="bi bi-patch-check me-1"></i> Approvals Queue
-                </a>
-                <a href="{{ route('stock-orders.wet-stock-requests.index') }}" class="btn btn-outline-primary">
-                    <i class="bi bi-truck me-1"></i> Deliveries & ATLs
-                </a>
             </div>
         </div>
 
@@ -139,33 +152,6 @@
                     </div>
                 </div>
             @endforeach
-        </div>
-
-        {{-- Filter Bar --}}
-        <div class="card card-custom border-0 shadow-sm mb-4">
-            <div class="card-body p-3">
-                <form method="GET" action="{{ route('stock-orders.purchase-orders.index') }}" class="row g-2 align-items-center">
-                    <div class="col-md-4">
-                        <input type="text" name="search" class="form-control form-control-sm" placeholder="Search PO # or Supplier..." value="{{ request('search') }}">
-                    </div>
-                    <div class="col-md-4">
-                        {{-- The PO Type column is gone from the table, so its filter
-                             goes with it. Status and search stay. --}}
-                        <select name="status" class="form-select form-select-sm">
-                            <option value="">-- All Statuses --</option>
-                            <option value="REQUESTED" {{ request('status') === 'REQUESTED' ? 'selected' : '' }}>1. REQUESTED</option>
-                            <option value="RECEIVED" {{ request('status') === 'RECEIVED' ? 'selected' : '' }}>2. RECEIVED (Pending VP)</option>
-                            <option value="CONFIRMED" {{ request('status') === 'CONFIRMED' ? 'selected' : '' }}>3. CONFIRMED (Approved)</option>
-                            <option value="FOR_DELIVERY" {{ request('status') === 'FOR_DELIVERY' ? 'selected' : '' }}>4. FOR DELIVERY</option>
-                            <option value="COMPLETED" {{ request('status') === 'COMPLETED' ? 'selected' : '' }}>5. COMPLETED</option>
-                        </select>
-                    </div>
-                    <div class="col-md-4 d-flex gap-2">
-                        <button type="submit" class="btn btn-sm btn-primary w-100">Filter</button>
-                        <a href="{{ route('stock-orders.purchase-orders.index') }}" class="btn btn-sm btn-outline-secondary">Reset</a>
-                    </div>
-                </form>
-            </div>
         </div>
 
         {{-- Purchase Orders Master Table --}}

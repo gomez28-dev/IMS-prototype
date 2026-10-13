@@ -98,14 +98,16 @@ class PurchaseOrderTypeTaxonomyTest extends TestCase
         $response->assertDontSee('Standard Replenishment');
     }
 
-    public function test_the_list_keeps_search_and_status_filters(): void
+    public function test_the_list_keeps_search_but_not_the_status_filter(): void
     {
         $response = $this->actingAs($this->purchasing)
             ->get(route('stock-orders.purchase-orders.index'));
 
+        // The supervisor replaced the status dropdown and Filter button with a
+        // single search box, styled like the one on M1.
         $response->assertStatus(200);
         $response->assertSee('name="search"', false);
-        $response->assertSee('name="status"', false);
+        $response->assertDontSee('name="status"', false);
     }
 
     public function test_the_detail_page_shows_the_type_label(): void
