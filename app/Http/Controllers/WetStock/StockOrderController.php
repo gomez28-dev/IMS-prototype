@@ -102,12 +102,10 @@ class StockOrderController extends Controller
             abort(403);
         }
 
-        $warehouses = Warehouse::orderBy('name')->get();
-
         // Only active suppliers are offered; deactivated ones stay on old POs.
         $suppliers = Supplier::active()->orderBy('company_name')->orderBy('location')->get();
 
-        return view('wetstock.stock-orders.create-po', compact('warehouses', 'suppliers'));
+        return view('wetstock.stock-orders.create-po', compact('suppliers'));
     }
 
     /**
@@ -121,8 +119,6 @@ class StockOrderController extends Controller
 
         $purchaseOrder->load(['items', 'supplier', 'deliveries.preparer']);
 
-        $warehouses = Warehouse::orderBy('name')->get();
-
         // Deactivated suppliers stay selectable on the PO they are already
         // attached to, but cannot be newly chosen.
         $suppliers = Supplier::active()->orderBy('company_name')->orderBy('location')->get();
@@ -131,7 +127,6 @@ class StockOrderController extends Controller
         }
 
         return view('wetstock.stock-orders.create-po', [
-            'warehouses' => $warehouses,
             'suppliers' => $suppliers,
             'purchaseOrder' => $purchaseOrder,
             'isEdit' => true,

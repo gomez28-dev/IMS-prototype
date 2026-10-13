@@ -136,19 +136,31 @@ class PurchaseOrderTypeTaxonomyTest extends TestCase
         $response = $this->actingAs($this->purchasing)
             ->get(route('stock-orders.create-supplier-po'));
 
+        // The supervisor removed PO Classification from the form, so there is
+        // no longer any category to choose from, Buy Back included.
         $response->assertStatus(200);
-        $response->assertSee('Doyen Stock');
+        $response->assertDontSee('PO Classification');
         $response->assertDontSee('PO Buy Back (Repurchase from Client)');
     }
 
-    public function test_the_edit_form_shows_the_type_read_only(): void
+    public function test_editing_a_po_cannot_change_its_category(): void
     {
         $po = $this->po('BUY_BACK');
 
+        // The form no longer shows the category, and updateSupplierPo has no
+        // po_type rule, so a crafted POST cannot move the PO either.
         $this->actingAs($this->purchasing)
             ->get(route('stock-orders.edit-supplier-po', $po->id))
             ->assertStatus(200)
-            ->assertSee('SO-BUY BACK');
+            ->assertDontSee('PO Classification');
+
+        $this->actingAs($this->purchasing)->post(route('stock-orders.update-supplier-po', $po->id), [
+            'supplier_id' => $this->supplier->id,
+            'po_type' => 'STANDARD_REPLENISHMENT',
+            'items' => [['product' => 'Diesel', 'quantity' => 5000, 'unit_price' => 50]],
+        ]);
+
+        $this->assertEquals('BUY_BACK', $po->fresh()->po_type);
     }
 
     public function test_the_atl_table_reports_the_parent_po_type(): void

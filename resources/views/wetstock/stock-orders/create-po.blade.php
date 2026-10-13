@@ -64,12 +64,20 @@
                                 Official PO Number
                                 @unless ($poLocked)<span class="text-danger">*</span>@endunless
                             </label>
-                            <input type="text" class="form-control @error('po_number') is-invalid @enderror @if ($poLocked) bg-light @endif" id="po_number" name="po_number"
-                                   @if ($poLocked) readonly @else required @endif
+                            @php
+                                // Readonly once the PO exists. updateSupplierPo has no
+                                // po_number rule, so an editable box here would take a
+                                // value and silently throw it away.
+                                $poNumberLocked = $poLocked || $isEdit;
+                            @endphp
+                            <input type="text" class="form-control @error('po_number') is-invalid @enderror @if ($poNumberLocked) bg-light @endif" id="po_number" name="po_number"
+                                   @if ($poNumberLocked) readonly @else required @endif
                                    placeholder="e.g. PO-PETRON-2026-001" value="{{ old('po_number', $po->po_number ?? '') }}">
                             <div class="form-text extra-small">
                                 @if ($poLocked)
                                     Locked: this PO is already approved, so its number cannot change.
+                                @elseif ($isEdit)
+                                    Locked: the number was issued when the PO was raised and cannot be changed.
                                 @else
                                     Unique purchasing reference number issued to refinery.
                                 @endif
@@ -103,38 +111,12 @@
                             <div class="form-text extra-small" id="supplierAddressHint"></div>
                         </div>
 
-                        <div class="col-md-4">
-                            @if ($isEdit)
-                                {{-- The type also records which page raised the PO, so
-                                     an edit must never move it between categories. --}}
-                                <label for="po_type" class="form-label fw-semibold small">PO Classification</label>
-                                <input type="text" class="form-control bg-light" id="po_type"
-                                       value="{{ $po->typeLabel() }}" readonly>
-                            @else
-                                <label for="po_type" class="form-label fw-semibold small">PO Classification</label>
-                                <select class="form-select" id="po_type" required disabled>
-                                    <option selected>Doyen Stock</option>
-                                </select>
-                                <div class="form-text extra-small">
-                                    Raised from the Wet Stock Requests page. SO-FT and SO-BUY BACK come from Sales Orders.
-                                </div>
-                            @endif
-                        </div>
-
+                        {{-- PO Classification and Destination Depot are gone. The
+                             category is fixed by the page that raises the PO, and
+                             an allocation pool is not a delivery destination. --}}
                         <div class="col-md-4">
                             <label for="date_needed" class="form-label fw-semibold small">Target Availability Date</label>
                             <input type="date" class="form-control" id="date_needed" name="date_needed" value="{{ old('date_needed', $po?->date_needed?->format('Y-m-d') ?? now()->format('Y-m-d')) }}">
-                        </div>
-
-                        <div class="col-md-4">
-                            <label for="warehouse_id" class="form-label fw-semibold small">Destination Depot (Optional)</label>
-                            <select class="form-select" id="warehouse_id" name="warehouse_id">
-                                <option value="">-- General Allocation Pool (Refinery Rack) --</option>
-                                @foreach ($warehouses as $wh)
-                                    <option value="{{ $wh->id }}" {{ (int) old('warehouse_id', $po->warehouse_id ?? 0) === (int) $wh->id ? 'selected' : '' }}>{{ $wh->name }}</option>
-                                @endforeach
-                            </select>
-                            <div class="form-text extra-small">Leave blank if volume can be lifted by Fuel Trade or Tankers.</div>
                         </div>
                     </div>
 
