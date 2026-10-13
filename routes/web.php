@@ -233,8 +233,13 @@ Route::post('/warehouses/{warehouse}/tanks', [WetStock\StorageTankController::cl
         Route::post('/deliveries/{delivery}/complete-fuel-trade', [WetStock\StockOrderController::class, 'completeFuelTrade'])->name('complete-fuel-trade');
         Route::post('/deliveries/{delivery}/update-docs', [WetStock\StockOrderController::class, 'updateDeliveryDocs'])->name('update-docs');
         Route::get('/{purchaseOrder}/prepare', [WetStock\StockOrderController::class, 'editRequest'])->name('edit-request');
-        // A Module 2 request becomes a purchase order when Purchasing prepares it.
-        Route::post('/stock-requests/{stockRequest}/prepare', [WetStock\StockOrderController::class, 'prepareStockRequest'])->name('prepare-stock-request');
+        // A Module 2 request becomes a purchase order when Purchasing prepares
+        // it. The PO number is chosen from the requests still awaiting one, so
+        // it can never be typed wrong or clash.
+        Route::get('/prepare', [WetStock\StockOrderController::class, 'editStockRequest'])->name('prepare-stock-request');
+        Route::post('/prepare', [WetStock\StockOrderController::class, 'storeStockRequestPo'])->name('store-stock-request-po');
+        // Legacy request rows that still live in purchase_orders keep the old
+        // shell-then-number flow.
         Route::post('/{purchaseOrder}/prepare', [WetStock\StockOrderController::class, 'updateRequest'])->name('update-request');
         // Raising an extra ATL against an already-approved PO. Separate from
         // "prepare" because it must not re-submit the PO for VP approval.

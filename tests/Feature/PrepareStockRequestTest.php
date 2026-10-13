@@ -94,19 +94,21 @@ class PrepareStockRequestTest extends TestCase
         $request = $this->request();
 
         $response = $this->actingAs($this->purchasing)
-            ->post(route('stock-orders.prepare-stock-request', $request->id));
+            ->post(route('stock-orders.store-stock-request-po'), [
+                'stock_request_id' => $request->id,
+                'po_number' => 'PO-FROM-REQ',
+                'supplier_name' => 'Petron Bataan Refinery',
+            ]);
 
         $po = PurchaseOrder::latest('id')->firstOrFail();
 
-        // Lands on the existing Prepare & Submit form.
-        $response->assertRedirect(route('stock-orders.edit-request', $po->id));
+        $response->assertRedirect(route('stock-orders.purchase-orders.show', $po->id));
 
+        $this->assertSame('PO-FROM-REQ', $po->po_number);
         $this->assertSame('STANDARD_REPLENISHMENT', $po->po_type);
         $this->assertSame($this->warehouse->id, (int) $po->warehouse_id);
         $this->assertSame(15000, (int) $po->qty_ordered);
-        $this->assertSame('REQUESTED', $po->request_status);
-        // Still unnumbered, so it does not appear on the Purchase Orders list.
-        $this->assertNull($po->po_number);
+        $this->assertSame('RECEIVED', $po->request_status);
 
         $this->assertCount(2, $po->items);
         $this->assertEqualsCanonicalizing(
@@ -119,12 +121,45 @@ class PrepareStockRequestTest extends TestCase
         $this->assertTrue($request->fresh()->purchaseOrder->is($po));
     }
 
+    public function test_the_po_number_is_a_dropdown_not_free_text(): void
+    {
+        $request = $this->request();
+
+        $html = $this->actingAs($this->purchasing)
+            ->get(route('stock-orders.prepare-stock-request'))
+            ->assertOk()
+            ->getContent();
+
+        // The number is chosen from the requests awaiting one.
+        $this->assertStringContainsString('name="stock_request_id"', $html);
+        $this->assertStringNotContainsString('name="po_number"', $html);
+        $this->assertStringContainsString($request->request_number, $html);
+    }
+
+    public function test_the_queue_links_to_the_prepare_page_with_the_request_preselected(): void
+    {
+        $request = $this->request();
+
+        $html = $this->actingAs($this->purchasing)
+            ->get(route('stock-orders.wet-stock-requests.index'))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringContainsString(
+            route('stock-orders.prepare-stock-request', ['stock_request' => $request->id]),
+            $html
+        );
+    }
+
     public function test_a_prepared_request_leaves_the_open_queue(): void
     {
         $request = $this->request();
 
-        $this->actingAs($this->purchasing)
-            ->post(route('stock-orders.prepare-stock-request', $request->id));
+        $this->actingAs($this->purchasing)->post(route('stock-orders.store-stock-request-po'), [
+            'stock_request_id' => $request->id,
+            'po_number' => 'PO-FROM-REQ',
+            'supplier_name' => 'Petron Bataan Refinery',
+        ]);
 
         // It drops out of the queue of requests awaiting preparation.
         $this->assertFalse(StockRequest::open()->whereKey($request->id)->exists());
@@ -132,22 +167,49 @@ class PrepareStockRequestTest extends TestCase
         $this->actingAs($this->purchasing)
             ->get(route('stock-orders.wet-stock-requests.index'))
             ->assertOk()
-            // The Prepare action for this request is gone.
-            ->assertDontSee(route('stock-orders.prepare-stock-request', $request->id), false)
-            // It now shows as an unnumbered purchase order instead.
-            ->assertSee('Pending PO#');
+            ->assertDontSee(route('stock-orders.prepare-stock-request', ['stock_request' => $request->id]), false);
+
+        // And off the Prepare page's dropdown.
+        $this->actingAs($this->purchasing)
+            ->get(route('stock-orders.prepare-stock-request'))
+            ->assertOk()
+            ->assertDontSee($request->request_number);
     }
 
     public function test_preparing_the_same_request_twice_does_not_raise_two_orders(): void
     {
         $request = $this->request();
 
-        $this->actingAs($this->purchasing)
-            ->post(route('stock-orders.prepare-stock-request', $request->id));
+        foreach (range(1, 2) as $ignored) {
+            $this->actingAs($this->purchasing)->post(route('stock-orders.store-stock-request-po'), [
+                'stock_request_id' => $request->id,
+                'po_number' => 'PO-FROM-REQ',
+                'supplier_name' => 'Petron Bataan Refinery',
+            ]);
+        }
+
+        $this->assertSame(1, PurchaseOrder::count());
+    }
+
+    public function test_a_po_number_already_in_use_is_rejected(): void
+    {
+        $request = $this->request();
+
+        PurchaseOrder::create([
+            'po_number' => 'PO-ALREADY-TAKEN',
+            'po_type' => PurchaseOrder::TYPE_STANDARD_REPLENISHMENT,
+            'qty_ordered' => 1000,
+            'request_status' => 'RECEIVED',
+            'status' => 'Pending',
+        ]);
 
         $this->actingAs($this->purchasing)
-            ->post(route('stock-orders.prepare-stock-request', $request->id))
-            ->assertRedirect();
+            ->post(route('stock-orders.store-stock-request-po'), [
+                'stock_request_id' => $request->id,
+                'po_number' => 'PO-ALREADY-TAKEN',
+                'supplier_name' => 'Petron Bataan Refinery',
+            ])
+            ->assertSessionHasErrors('po_number');
 
         $this->assertSame(1, PurchaseOrder::count());
     }
@@ -157,10 +219,46 @@ class PrepareStockRequestTest extends TestCase
         $request = $this->request();
 
         $this->actingAs($this->opsManager)
-            ->post(route('stock-orders.prepare-stock-request', $request->id))
+            ->get(route('stock-orders.prepare-stock-request'))
+            ->assertForbidden();
+
+        $this->actingAs($this->opsManager)
+            ->post(route('stock-orders.store-stock-request-po'), [
+                'stock_request_id' => $request->id,
+                'po_number' => 'PO-FROM-REQ',
+                'supplier_name' => 'Petron Bataan Refinery',
+            ])
             ->assertForbidden();
 
         $this->assertSame(0, PurchaseOrder::count());
+    }
+
+    public function test_the_created_po_is_immediately_allocatable(): void
+    {
+        // The split depends on this: the PO raised from a request must carry
+        // enough balance for the Allocate flow to draw the delivery from.
+        $request = $this->request();
+
+        $this->actingAs($this->purchasing)->post(route('stock-orders.store-stock-request-po'), [
+            'stock_request_id' => $request->id,
+            'po_number' => 'PO-ALLOCATABLE',
+            'supplier_name' => 'Petron Bataan Refinery',
+        ]);
+
+        $po = PurchaseOrder::latest('id')->firstOrFail();
+
+        $this->assertSame(10000, $po->getAvailableBalanceForProduct('Diesel'));
+        $this->assertSame(5000, $po->getAvailableBalanceForProduct('Unleaded'));
+        // A product the request never asked for has nothing available.
+        $this->assertSame(0, $po->getAvailableBalanceForProduct('Premium'));
+    }
+
+    public function test_the_prepare_page_reports_when_nothing_is_waiting(): void
+    {
+        $this->actingAs($this->purchasing)
+            ->get(route('stock-orders.prepare-stock-request'))
+            ->assertOk()
+            ->assertSee('nothing to prepare');
     }
 
     public function test_legacy_request_rows_still_appear_in_the_queue(): void

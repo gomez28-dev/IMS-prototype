@@ -1035,37 +1035,93 @@ class StockOrderController extends Controller
     }
 
 /**
- * Turn a Module 2 stock request into a purchase order so it can be prepared.
+ * Prepare a Module 2 stock request into a purchase order.
  *
- * Requests used to be purchase_orders rows all along, so preparing one was just
- * a matter of giving it a PO number. Now a request lives in stock_requests, so
- * this materialises the PO it always implied and hands off to the existing
- * prepare form. Real item rows are created too, which the legacy JSON-only
- * requests never had.
+ * A request has no PO to allocate from, so the two steps are split: this page
+ * creates the PO from the request, and the Allocate flow then draws the
+ * delivery from that PO.
+ *
+ * Official PO Number is a dropdown of the requests still awaiting a number
+ * rather than free text, so it can never be typed wrong or clash.
  */
-public function prepareStockRequest(StockRequest $stockRequest): RedirectResponse
+public function editStockRequest(Request $request): View
 {
     if (!Auth::user()->canEditStockOrders()) {
         abort(403);
     }
 
-    $stockRequest->load('lines');
+    $unnumbered = StockRequest::open()
+        ->with(['lines', 'warehouse', 'requester'])
+        ->latest()
+        ->get();
 
-    // Preparing twice must not raise a second PO against the same request.
-    if ($stockRequest->isPrepared()) {
-        return back()->with('danger', 'This request already has a purchase order against it.');
+    // Reaching the page from a request in the queue pre-selects it.
+    $selected = null;
+    if ($request->filled('stock_request')) {
+        $selected = StockRequest::open()
+            ->with(['lines', 'warehouse', 'requester'])
+            ->findOrFail((int) $request->query('stock_request'));
     }
 
+    return view('wetstock.stock-orders.prepare', [
+        'unnumberedRequests' => $unnumbered,
+        'selected' => $selected,
+        'warehouses' => Warehouse::orderBy('name')->get(),
+    ]);
+}
+
+/**
+ * Create the purchase order for the chosen stock request.
+ */
+public function storeStockRequestPo(Request $request): RedirectResponse
+{
+    if (!Auth::user()->canEditStockOrders()) {
+        abort(403);
+    }
+
+    $validated = $request->validate([
+        'stock_request_id' => ['required', 'integer', 'exists:stock_requests,id'],
+        // A PO number identifies one PO, and it is chosen from the dropdown
+        // rather than typed.
+        'po_number' => [
+            'required',
+            'string',
+            'max:64',
+            Rule::unique('purchase_orders', 'po_number'),
+        ],
+        'supplier_name' => ['required', 'string', 'max:128'],
+        'attention' => ['nullable', 'string', 'max:128'],
+        'terms' => ['nullable', 'string', 'max:128'],
+        'po_date' => ['nullable', 'date'],
+        'remarks' => ['nullable', 'string', 'max:500'],
+    ]);
+
+    $stockRequest = StockRequest::with('lines')->findOrFail($validated['stock_request_id']);
+
+    // Guarded here as well as by the dropdown, so a stale page or a crafted
+    // POST cannot raise a second PO against the same request.
+    if ($stockRequest->isPrepared()) {
+        return back()->with('danger', "Request {$stockRequest->request_number} already has a purchase order against it.");
+    }
+
+    $supplier = Supplier::where('company_name', $validated['supplier_name'])->first();
+
     $purchaseOrder = PurchaseOrder::create([
+        'po_number' => $validated['po_number'],
         'po_type' => PurchaseOrder::TYPE_STANDARD_REPLENISHMENT,
+        'supplier_id' => $supplier?->id,
+        'supplier_name' => $validated['supplier_name'],
+        'attention' => $validated['attention'] ?? null,
+        'terms' => $validated['terms'] ?? null,
+        'po_date' => $validated['po_date'] ?? now()->toDateString(),
         'warehouse_id' => $stockRequest->warehouse_id,
         'qty_ordered' => $stockRequest->qty_requested,
-        'request_status' => 'REQUESTED',
+        'request_status' => 'RECEIVED',
         'status' => 'Pending',
         'requested_by' => $stockRequest->requested_by,
         'request_date' => $stockRequest->request_date,
         'date_needed' => $stockRequest->date_needed,
-        'remarks' => $stockRequest->remarks,
+        'remarks' => $validated['remarks'] ?? $stockRequest->remarks,
         'requested_products' => $stockRequest->lines
             ->map(fn ($line) => ['product' => $line->product, 'quantity' => (int) $line->qty_requested])
             ->all(),
@@ -1089,11 +1145,11 @@ public function prepareStockRequest(StockRequest $stockRequest): RedirectRespons
     AuditLog::create([
         'admin_id' => Auth::id(),
         'action' => 'updated',
-        'description' => "Prepared stock request {$stockRequest->request_number} into purchase order #{$purchaseOrder->id}.",
+        'description' => "Prepared stock request {$stockRequest->request_number} into purchase order {$purchaseOrder->po_number}.",
     ]);
 
-    return redirect()->route('stock-orders.edit-request', $purchaseOrder->id)
-        ->with('success', "Request {$stockRequest->request_number} is ready to prepare. Add the supplier and PO number, then submit.");
+    return redirect()->route('stock-orders.purchase-orders.show', $purchaseOrder->id)
+        ->with('success', "Purchase order {$purchaseOrder->po_number} created from request {$stockRequest->request_number} and sent for VP approval.");
 }
 
 /**

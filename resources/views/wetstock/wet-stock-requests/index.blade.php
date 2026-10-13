@@ -136,12 +136,12 @@
                                 <td class="small text-muted">{{ $req->remarks ?: '—' }}</td>
                                 <td class="pe-3 text-end">
                                     @if (Auth::user()->canEditStockOrders())
-                                        <form method="POST" action="{{ route('stock-orders.prepare-stock-request', $req->id) }}" class="d-inline">
-                                            @csrf
-                                            <button type="submit" class="btn btn-sm btn-primary rounded-pill px-3 py-1" title="Turn this request into a purchase order">
-                                                <i class="bi bi-pencil-square me-1"></i> Prepare &amp; Submit
-                                            </button>
-                                        </form>
+                                        {{-- Prepare raises the PO from the request. The PO number
+                                             is chosen there, so nothing is typed here. --}}
+                                        <a href="{{ route('stock-orders.prepare-stock-request', ['stock_request' => $req->id]) }}"
+                                           class="btn btn-sm btn-primary rounded-pill px-3 py-1" title="Raise a purchase order against this request">
+                                            <i class="bi bi-pencil-square me-1"></i> Prepare &amp; Submit
+                                        </a>
                                     @endif
                                 </td>
                             </tr>
