@@ -85,6 +85,9 @@ class WetStockRequestController extends Controller
             'warehouses' => \App\Models\Warehouse::orderBy('name')->get(),
             'warehouseId' => $warehouseId,
             'stats' => $this->stats(),
+            // Product-aware cards. Given the request's own builder so they total
+            // exactly what the filters left on the page, search term included.
+            'volumes' => StockRequest::volumeTotals($stockRequestQuery),
         ]);
     }
 

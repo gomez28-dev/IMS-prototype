@@ -56,6 +56,74 @@
         </div>
     @endif
 
+    {{-- Product-aware cards. Same card system as the M1 Deliveries page and the
+         Module 3 lists, so all of them read as one set. The figures come from
+         the request's own builder, so the cards always total exactly what the
+         table below lists under the current filters. Legacy PurchaseOrder rows
+         are not counted: they are being retired and their volume lives on the
+         stock_requests lines. --}}
+    @php
+        $chipStyles = [
+            'U' => 'background:#dcfce7;color:#166534;border:1px solid #bbf7d0;',
+            'D' => 'background:#e0e7ff;color:#3730a3;border:1px solid #c7d2fe;',
+            'P' => 'background:#fee2e2;color:#991b1b;border:1px solid #fecaca;',
+        ];
+        $chip = function ($code, $title = '') use ($chipStyles) {
+            $style = $chipStyles[$code] ?? 'background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb;';
+
+            return '<span class="prod-chip" style="'.$style.'" title="'.e($title).'">'.e($code ?: '—').'</span>';
+        };
+        $prodRows = [['D', 'Diesel'], ['U', 'Unleaded'], ['P', 'Premium']];
+
+        $volumeCards = [
+            ['title' => 'Total Requested', 'icon' => 'bi-boxes', 'tint' => 'background:#ecfeff;color:#0891b2;', 'data' => $volumes['requested']],
+            ['title' => 'Total Received', 'icon' => 'bi-truck', 'tint' => 'background:#f0fdf4;color:#16a34a;', 'data' => $volumes['received']],
+            ['title' => 'Remaining', 'icon' => 'bi-clock-history', 'tint' => 'background:#fffbeb;color:#d97706;', 'data' => $volumes['pending']],
+        ];
+    @endphp
+    <style>
+        .stat-title { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #374151; }
+        .stat-icon {
+            width: 46px; height: 46px; border-radius: 0.8rem; display: flex;
+            align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0;
+        }
+        .stat-row {
+            display: flex; justify-content: space-between; align-items: center;
+            border: 1px solid #e5e7eb; border-radius: 0.6rem;
+            padding: 0.45rem 0.8rem; margin-bottom: 0.45rem; background: #fff;
+        }
+        .stat-row .stat-val { font-weight: 700; color: #111827; }
+        .stat-total { display: flex; justify-content: space-between; padding: 0.25rem 0.3rem 0; color: #6b7280; }
+        .stat-total .stat-val { font-weight: 700; color: #111827; }
+        .prod-chip {
+            display: inline-block; font-size: 0.65rem; font-weight: 700; line-height: 1;
+            padding: 0.2rem 0.4rem; border-radius: 0.35rem; margin: 0 1px;
+        }
+    </style>
+
+    <div class="row g-3 mb-4">
+        @foreach ($volumeCards as $card)
+            <div class="col-md-4">
+                <div class="card card-custom p-3 border-0 h-100">
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                        <div class="stat-icon" style="{{ $card['tint'] }}"><i class="bi {{ $card['icon'] }}"></i></div>
+                        <span class="stat-title">{{ $card['title'] }}</span>
+                    </div>
+                    @foreach ($prodRows as [$code, $name])
+                        <div class="stat-row">
+                            <span>{!! $chip($code, $name) !!} <span class="ms-2">{{ $name }}</span></span>
+                            <span class="stat-val">{{ number_format($card['data'][$name] ?? 0) }}</span>
+                        </div>
+                    @endforeach
+                    <div class="stat-total">
+                        <span>Total</span>
+                        <span class="stat-val">{{ number_format(array_sum($card['data'])) }}</span>
+                    </div>
+                </div>
+            </div>
+        @endforeach
+    </div>
+
     <!-- Incoming Depot Deliveries Ready to Receive -->
     <div class="card card-custom border-0 shadow-sm mb-4">
         <div class="card-header bg-white border-0 py-3">
