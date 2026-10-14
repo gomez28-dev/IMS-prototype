@@ -135,17 +135,25 @@ class WetStockRequestAtlDefectsTest extends TestCase
      */
     protected function submit(StockRequest $request, PurchaseOrder $po, array $overrides = [])
     {
+        // The form posts a drawdown array now, because one ATL can be split across
+        // several POs. Call sites keep the flat product/quantity they always used
+        // and this builds the row.
+        $product = $overrides['product'] ?? 'Diesel';
+        $quantity = $overrides['qty_to_receive'] ?? 10000;
+        $poId = $overrides['purchase_order_id'] ?? $po->id;
+
+        unset($overrides['product'], $overrides['qty_to_receive'], $overrides['purchase_order_id']);
+
         return $this->actingAs($this->admin)
             ->post(route('stock-orders.wet-stock-requests.atls.store', $request->id), array_merge([
-                'purchase_order_id' => $po->id,
-                'product' => 'Diesel',
-                'qty_to_receive' => 10000,
+                'drawdowns' => [
+                    ['purchase_order_id' => $poId, 'product' => $product, 'quantity' => $quantity],
+                ],
                 'order_type' => 'DELIVERY',
                 'delivery_channel' => 'SUPPLIER_STOCKS_DELIVERY',
                 'atl_type' => 'DITC_ATL',
                 'atl_number' => 'ATL-'.uniqid(),
                 'receiving_date' => now()->addDays(3)->format('Y-m-d'),
-                'submit_for_approval' => 1,
             ], $overrides));
     }
 

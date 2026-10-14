@@ -41,67 +41,94 @@
             <div class="card card-custom border-0 shadow-sm mb-4">
                 <div class="card-body p-4">
                     <div class="row g-3">
-                        <div class="col-md-6">
-                            <label for="purchase_order_id" class="form-label fw-semibold small">
-                                Purchase Order <span class="text-danger">*</span>
+                        {{-- One ATL may be split across several purchase orders, for
+                             when no single PO holds enough of the product. Each row
+                             is its own PO and volume, and each becomes its own
+                             allocation linked to that PO's own product line. --}}
+                        <div class="col-12">
+                            <label class="form-label fw-semibold small">
+                                Purchase Order Drawdown <span class="text-danger">*</span>
                             </label>
-                            <select class="form-select @error('purchase_order_id') is-invalid @enderror"
-                                    id="purchase_order_id" name="purchase_order_id" required
-                                    onchange="refreshAvailability()">
-                                <option value="">-- Choose a Purchase Order --</option>
-                                @foreach ($availablePos as $po)
-                                    <option value="{{ $po->id }}"
-                                            data-products="{{ json_encode($po->items->pluck('product', 'product')->map(fn ($p) => [$p, $po->getAvailableBalanceForProduct($p)])->values()) }}"
-                                            {{ (int) old('purchase_order_id') === $po->id ? 'selected' : '' }}>
-                                        {{ $po->po_number }} — {{ $po->supplier_name }}
-                                    </option>
+                            <div id="drawdownRows">
+                                @php
+                                    // Re-render what was rejected, so a refusal does not
+                                    // lose the rows the user built up.
+                                    $oldRows = old('drawdowns');
+                                    $rows = is_array($oldRows) && $oldRows
+                                        ? $oldRows
+                                        : [null];
+                                @endphp
+                                @foreach ($rows as $index => $row)
+                                    <div class="drawdown-row row g-2 align-items-end mb-2">
+                                        <div class="col-md-5">
+                                            <select class="form-select @error("drawdowns.{$index}.purchase_order_id") is-invalid @enderror"
+                                                    name="drawdowns[{{ $index }}][purchase_order_id]" required
+                                                    data-po-select>
+                                                <option value="">-- Choose a Purchase Order --</option>
+                                                @foreach ($availablePos as $po)
+                                                    <option value="{{ $po->id }}"
+                                                            data-products="{{ json_encode($po->items->pluck('product', 'product')->map(fn ($p) => [$p, $po->getAvailableBalanceForProduct($p)])->values()) }}"
+                                                            {{ (int) ($row['purchase_order_id'] ?? 0) === $po->id ? 'selected' : '' }}>
+                                                        {{ $po->po_number }} — {{ $po->supplier_name }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                            @error("drawdowns.{$index}.purchase_order_id")
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                            @enderror
+                                        </div>
+                                        <div class="col-md-3">
+                                            <select class="form-select @error("drawdowns.{$index}.product") is-invalid @enderror"
+                                                    name="drawdowns[{{ $index }}][product]" required data-product-select>
+                                                <option value="">-- Product --</option>
+                                                @foreach (['Diesel', 'Premium', 'Unleaded'] as $product)
+                                                    {{-- Only products this request actually asked for. --}}
+                                                    @if (array_key_exists($product, $pending))
+                                                        <option value="{{ $product }}" {{ ($row['product'] ?? '') === $product ? 'selected' : '' }}>
+                                                            {{ $product }}
+                                                        </option>
+                                                    @endif
+                                                @endforeach
+                                            </select>
+                                            @error("drawdowns.{$index}.product")
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                            @enderror
+                                        </div>
+                                        <div class="col-md-3">
+                                            <input type="number" min="1" step="1" required
+                                                   class="form-control @error("drawdowns.{$index}.quantity") is-invalid @enderror"
+                                                   name="drawdowns[{{ $index }}][quantity]"
+                                                   value="{{ $row['quantity'] ?? '' }}"
+                                                   placeholder="Liters">
+                                            @error("drawdowns.{$index}.quantity")
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                            @enderror
+                                        </div>
+                                        <div class="col-md-1 text-end">
+                                            <button type="button" class="btn btn-outline-danger btn-sm remove-row" title="Remove this PO row">
+                                                <i class="bi bi-x-lg"></i>
+                                            </button>
+                                        </div>
+                                        <div class="col-12">
+                                            <div class="form-text extra-small availability-hint"></div>
+                                        </div>
+                                    </div>
                                 @endforeach
-                            </select>
-                            <div class="form-text extra-small">
-                                Only purchase orders with volume left are offered.
                             </div>
-                            @error('purchase_order_id')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-
-                        <div class="col-md-6">
-                            <label for="product" class="form-label fw-semibold small">
-                                Product <span class="text-danger">*</span>
-                            </label>
-                            <select class="form-select @error('product') is-invalid @enderror"
-                                    id="product" name="product" required onchange="refreshAvailability()">
-                                <option value="">-- Choose a Product --</option>
-                                @foreach (['Diesel', 'Premium', 'Unleaded'] as $product)
-                                    {{-- Only products this request actually asked for. --}}
-                                    @if (array_key_exists($product, $pending))
-                                        <option value="{{ $product }}" {{ old('product') === $product ? 'selected' : '' }}>
-                                            {{ $product }}
-                                        </option>
-                                    @endif
-                                @endforeach
-                            </select>
-                            <div class="form-text extra-small" id="availabilityHint"></div>
-                            @error('product')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-
-                        <div class="col-md-6">
-                            <label for="qty_to_receive" class="form-label fw-semibold small">
-                                Volume (Liters) <span class="text-danger">*</span>
-                            </label>
-                            <input type="number" min="1" step="1" required
-                                   class="form-control @error('qty_to_receive') is-invalid @enderror"
-                                   id="qty_to_receive" name="qty_to_receive"
-                                   value="{{ old('qty_to_receive') }}">
-                            <div class="form-text extra-small" id="outstandingHint">
+                            <button type="button" id="addPoRow" class="btn btn-outline-primary btn-sm mt-1">
+                                <i class="bi bi-plus-lg me-1"></i> Add PO
+                            </button>
+                            <div class="form-text extra-small mt-2">
+                                Only VP-approved purchase orders with volume left are offered. Add a
+                                second row when one PO does not hold enough on its own.
+                            </div>
+                            <div id="outstandingHint" class="form-text extra-small mt-1">
                                 @foreach ($pending as $product => $qty)
                                     Outstanding on {{ $product }}: {{ number_format($qty) }} L
                                 @endforeach
                             </div>
-                            @error('qty_to_receive')
-                                <div class="invalid-feedback">{{ $message }}</div>
+                            @error('drawdowns')
+                                <div class="text-danger extra-small mt-1">{{ $message }}</div>
                             @enderror
                         </div>
 
@@ -211,29 +238,95 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const poSelect = document.getElementById('purchase_order_id');
-    const productSelect = document.getElementById('product');
-    const hint = document.getElementById('availabilityHint');
+    const container = document.getElementById('drawdownRows');
+    const addButton = document.getElementById('addPoRow');
 
-    // States what is available under the chosen PO, for the chosen product.
-    // The server checks the same thing on save.
-    function refreshAvailability() {
+    if (!container) return;
+
+    // What each PO still holds, per product. The server checks the same thing on
+    // save; this is so the user is not told only after submitting.
+    function poProducts(poSelect) {
+        const option = poSelect.options[poSelect.selectedIndex];
+        return option && option.dataset.products ? JSON.parse(option.dataset.products) : [];
+    }
+
+    function refreshRow(row) {
+        const poSelect = row.querySelector('[data-po-select]');
+        const productSelect = row.querySelector('[data-product-select]');
+        const hint = row.querySelector('.availability-hint');
         if (!poSelect || !productSelect || !hint) return;
 
-        const option = poSelect.options[poSelect.selectedIndex];
-        const products = option && option.dataset.products ? JSON.parse(option.dataset.products) : [];
-        const product = productSelect.value;
-
-        const match = products.find(function (row) { return row[0] === product; });
+        const match = poProducts(poSelect).find(function (r) { return r[0] === productSelect.value; });
 
         hint.textContent = match
-            ? match[1].toLocaleString() + ' L of ' + product + ' available on this PO'
+            ? match[1].toLocaleString() + ' L of ' + productSelect.value + ' available on this PO'
             : '';
     }
 
-    if (poSelect) poSelect.addEventListener('change', refreshAvailability);
-    if (productSelect) productSelect.addEventListener('change', refreshAvailability);
-    refreshAvailability();
+    function refreshAll() {
+        container.querySelectorAll('.drawdown-row').forEach(refreshRow);
+    }
+
+    // Removing the last row would leave nothing to submit, so the final one keeps
+    // its button hidden rather than letting the form post an empty array.
+    function refreshRemoveButtons() {
+        const rows = container.querySelectorAll('.drawdown-row');
+        rows.forEach(function (row) {
+            const button = row.querySelector('.remove-row');
+            if (button) button.style.visibility = rows.length > 1 ? 'visible' : 'hidden';
+        });
+    }
+
+    container.addEventListener('change', function (event) {
+        if (event.target.matches('[data-po-select], [data-product-select]')) {
+            refreshRow(event.target.closest('.drawdown-row'));
+        }
+    });
+
+    container.addEventListener('click', function (event) {
+        const button = event.target.closest('.remove-row');
+        if (!button) return;
+
+        const rows = container.querySelectorAll('.drawdown-row');
+        if (rows.length <= 1) return;
+
+        button.closest('.drawdown-row').remove();
+        reindex();
+        refreshRemoveButtons();
+    });
+
+    // Field names are indexed, so after a removal the surviving rows are renumbered
+    // to keep the array gapless.
+    function reindex() {
+        container.querySelectorAll('.drawdown-row').forEach(function (row, index) {
+            row.querySelectorAll('[name]').forEach(function (field) {
+                field.name = field.name.replace(/drawdowns\[\d*\]/, 'drawdowns[' + index + ']');
+            });
+        });
+    }
+
+    if (addButton) {
+        addButton.addEventListener('click', function () {
+            const template = container.querySelector('.drawdown-row');
+            if (!template) return;
+
+            const clone = template.cloneNode(true);
+            clone.querySelectorAll('input, select').forEach(function (field) {
+                if (field.tagName === 'INPUT') field.value = '';
+                else field.selectedIndex = 0;
+                field.classList.remove('is-invalid');
+            });
+            const hint = clone.querySelector('.availability-hint');
+            if (hint) hint.textContent = '';
+
+            container.appendChild(clone);
+            reindex();
+            refreshRemoveButtons();
+        });
+    }
+
+    refreshAll();
+    refreshRemoveButtons();
 });
 </script>
 @endsection

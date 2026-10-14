@@ -5,8 +5,11 @@
 @section('content')
 <div class="container-fluid py-2">
 
-    {{-- Laid out like the M1 Deliveries page: an info card, product-aware
-         totals, then the list itself with its action on the heading. --}}
+    {{-- Laid out as Module 1's Deliveries page, with the same stylesheets
+         copied across rather than approximated: an info card, three
+         product-aware total cards, then the list itself with its action on the
+         heading. A request's ATLs are the same document as M1's deliveries, and
+         the supervisor asked for the two to look like one set. --}}
     @php
         $chipStyles = [
             'U' => 'background:#dcfce7;color:#166534;border:1px solid #bbf7d0;',
@@ -21,33 +24,124 @@
         $prodRows = [['D', 'Diesel'], ['U', 'Unleaded'], ['P', 'Premium']];
 
         $volumeCards = [
-            ['title' => 'Total Qty. Requested', 'icon' => 'bi-boxes', 'tint' => 'background:#ecfeff;color:#0891b2;', 'data' => $volumes['requested']],
-            ['title' => "Total ATL'd", 'icon' => 'bi-patch-check', 'tint' => 'background:#f0fdf4;color:#16a34a;', 'data' => $volumes['drawn']],
-            ['title' => 'Remaining', 'icon' => 'bi-clock-history', 'tint' => 'background:#fffbeb;color:#d97706;', 'data' => $volumes['pending']],
+            ['title' => 'Qty Requested', 'icon' => 'bi-boxes', 'tint' => 'background:#ecfeff;color:#0891b2;', 'data' => $volumes['requested'], 'class' => 'text-dark'],
+            ['title' => "Total ATL'd", 'icon' => 'bi-patch-check', 'tint' => 'background:#f0fdf4;color:#16a34a;', 'data' => $volumes['drawn'], 'class' => 'text-primary'],
+            ['title' => 'Remaining', 'icon' => 'bi-clock-history', 'tint' => 'background:#fffbeb;color:#d97706;', 'data' => $volumes['pending'], 'class' => 'text-warning'],
         ];
+
+        // Pick-up or delivery, as the request's own type says. M1 flips its date
+        // column heading the same way.
+        $isPickup = ! $request->isDelivered();
     @endphp
     <style>
+        /* ---- Table (aligned with Module 1's Deliveries page) ---- */
+        #atlsTable { width: 100%; }
+        #atlsTable thead th {
+            vertical-align: middle !important;
+            text-align: center !important;
+            font-size: 0.7rem !important;
+            font-weight: 700 !important;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: #475569;
+            background-color: #f8fafc !important;
+            padding: 0.85rem 0.5rem !important;
+            line-height: 1.2;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        #atlsTable tbody td {
+            padding: 0.75rem 0.5rem !important;
+            font-size: 0.82rem;
+            font-weight: 400 !important;
+            text-align: center;
+            vertical-align: middle;
+        }
+        #atlsTable tbody td[colspan] { padding: 3rem 0.5rem !important; }
+        #atlsTable .badge { font-size: 0.7rem; font-weight: 500; }
+        #atlsTable .btn-sm { font-size: 0.75rem; }
+
+        /* DR# / PO# pill (same look as M1's) */
+        .id-pill {
+            display: inline-block;
+            border: 1px solid #d1d5db;
+            background: #f8fafc;
+            color: #1f2937;
+            border-radius: 0.4rem;
+            padding: 0.15rem 0.6rem;
+            font-size: 0.78rem;
+            font-weight: 500;
+            letter-spacing: 0.01em;
+        }
+
+        /* Icon-only square action buttons (same as M1's) */
+        .action-icon {
+            width: 2rem;
+            height: 2rem;
+            padding: 0 !important;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.5rem !important;
+        }
+
+        /* Per-product lines: "D - 30,000" */
+        .pl-block { display: inline-block; text-align: left; }
+        .pl-block .prod-chip { margin-right: 0.35rem; }
+
+        /* ---- Stat cards (same pattern as M1's) ---- */
         .stat-card {
-            background: #fff; border: 1px solid #e2e8f0; border-radius: 1rem;
-            padding: 1.25rem; height: 100%;
+            background: #fff;
+            border-radius: 1rem;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+            padding: 1rem 1.1rem;
+            height: 100%;
         }
-        .stat-head { display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem; }
+        .stat-head {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            margin-bottom: 0.8rem;
+        }
         .stat-icon {
-            width: 46px; height: 46px; border-radius: 0.8rem; display: flex;
-            align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0;
+            width: 2.25rem;
+            height: 2.25rem;
+            border-radius: 0.65rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.05rem;
+            flex-shrink: 0;
         }
-        .stat-title { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #374151; }
+        .stat-title {
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: #334155;
+        }
         .stat-row {
-            display: flex; justify-content: space-between; align-items: center;
-            border: 1px solid #e5e7eb; border-radius: 0.6rem;
-            padding: 0.45rem 0.8rem; margin-bottom: 0.45rem; background: #fff;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.6rem;
+            padding: 0.4rem 0.7rem;
+            margin-bottom: 0.4rem;
+            font-size: 0.85rem;
         }
+        .stat-row .stat-name { flex: 1; color: #475569; }
         .stat-row .stat-val { font-weight: 700; color: #0f172a; }
-        .stat-total { display: flex; justify-content: space-between; padding: 0.25rem 0.3rem 0; color: #6b7280; }
+        .stat-total {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.25rem 0.2rem 0;
+            font-size: 0.85rem;
+            color: #475569;
+        }
         .stat-total .stat-val { font-weight: 700; color: #0f172a; }
         .prod-chip {
             display: inline-block; font-size: 0.65rem; font-weight: 700; line-height: 1;
-            padding: 0.2rem 0.4rem; border-radius: 0.35rem; margin: 0 1px;
+            padding: 0.2rem 0.4rem; border-radius: 0.35rem;
         }
     </style>
 
@@ -56,13 +150,23 @@
     </a>
 
     <div class="row g-3 mb-4">
+        {{-- Card 1: which request this is --}}
         <div class="col-md-3">
             <div class="stat-card">
-                <span class="badge rounded-pill mb-2" style="background:#fff1e6;color:#c2410c;">{{ $request->request_number }}</span>
-                <h5 class="fw-bold text-dark mb-2">{{ $request->warehouse->name ?? '—' }}</h5>
+                <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                    <span class="badge rounded-pill" style="background:#fff1e6;color:#c2410c;">REQ# {{ $request->request_number }}</span>
+                    <span class="badge rounded-pill" style="background:#eef2ff;color:#4338ca;">
+                        {{ $isPickup ? 'Pick-up' : 'Delivery' }}
+                    </span>
+                </div>
+                <h4 class="fw-bold text-dark mb-2">{{ $request->warehouse->name ?? '—' }}</h4>
                 <div class="text-muted small">
                     <i class="bi bi-calendar3 me-1"></i>
                     Requested {{ $request->request_date?->format('M d, Y') ?? '—' }}
+                </div>
+                <div class="text-muted small mt-1">
+                    <i class="bi bi-person me-1"></i>
+                    {{ $request->requester->name ?? '—' }}
                 </div>
                 @if ($request->date_needed)
                     <div class="text-muted small mt-1">
@@ -73,6 +177,7 @@
             </div>
         </div>
 
+        {{-- Cards 2-4: the volumes, per product --}}
         @foreach ($volumeCards as $card)
             <div class="col-md-3">
                 <div class="stat-card">
@@ -81,14 +186,15 @@
                         <span class="stat-title">{{ $card['title'] }}</span>
                     </div>
                     @foreach ($prodRows as [$code, $name])
-                        <div class="stat-row">
-                            <span>{!! $chip($code, $name) !!} <span class="ms-2">{{ $name }}</span></span>
+                        <div class="stat-row" title="{{ $name }}">
+                            {!! $chip($code, $name) !!}
+                            <span class="stat-name">{{ $name }}</span>
                             <span class="stat-val">{{ number_format($card['data'][$name] ?? 0) }}</span>
                         </div>
                     @endforeach
                     <div class="stat-total">
                         <span>Total</span>
-                        <span class="stat-val">{{ number_format(array_sum($card['data'])) }}</span>
+                        <span class="stat-val {{ $card['class'] }}">{{ number_format(array_sum($card['data'])) }}</span>
                     </div>
                 </div>
             </div>
@@ -100,8 +206,9 @@
             <i class="bi bi-truck text-primary me-2"></i>ATLs
         </h5>
 
-        {{-- Where the supervisor pointed the Create ATL button: on the list's
-             own heading, as Add Delivery sits on M1's. --}}
+        {{-- Where the supervisor pointed it: on the list's own heading, exactly
+             where Add Delivery sits on M1's. It opens the multi-PO drawdown
+             form, so this is step two of the two-step route in. --}}
         @if (Auth::user()->canEditStockOrders())
             <a href="{{ route('stock-orders.wet-stock-requests.atls.create', $request->id) }}"
                class="btn btn-primary-custom">
@@ -113,62 +220,104 @@
     <div class="card card-custom border-0 shadow-sm">
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="bg-light">
+                <table id="atlsTable" class="table table-custom table-hover align-middle mb-0">
+                    <thead>
                         <tr>
-                            <th class="ps-3 py-3">ATL # / DR #</th>
-                            <th class="py-3">PO #</th>
-                            <th class="py-3">Pick Up Date</th>
-                            <th class="py-3">Product / Qty</th>
-                            <th class="py-3">Status</th>
-                            <th class="py-3 text-center">Approval</th>
-                            <th class="py-3 text-center">Lift</th>
-                            <th class="pe-3 py-3 text-end">Action</th>
+                            <th>DR#</th>
+                            <th>ATL#</th>
+                            <th>PO#</th>
+                            <th>{{ $isPickup ? 'Pick Up Date' : 'Delivery Date' }}</th>
+                            <th>Qty Out</th>
+                            <th>Status</th>
+                            <th>Type</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse ($atls as $atl)
                             @php
+                                // Every PO this ATL drew on, not just the primary one it
+                                // is filed under, so a split drawdown is legible here.
                                 $poNumbers = $atl->allocations->pluck('purchaseOrder')->filter()
                                     ->pluck('po_number')->unique()->join(', ');
                                 $poNumbers = $poNumbers !== '' ? $poNumbers : ($atl->purchaseOrder->po_number ?? '—');
+
+                                // A multi-PO ATL records each product's volume on its
+                                // allocation rows, so the breakdown comes from there and
+                                // falls back to the ATL's own line.
+                                $breakdown = $atl->productBreakdown() ?: [$atl->product => (int) $atl->qty_to_receive];
+
+                                $codes = ['Diesel' => 'D', 'Unleaded' => 'U', 'Premium' => 'P'];
+                                $approved = $atl->isApproved();
+                                $lifted = $atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_LIFTED;
+                                // Lifting is offered only once the VP has signed it off,
+                                // and only while there is something left to lift.
+                                $canLift = $approved && ! $lifted && Auth::user()->canMarkAtlLifted();
                             @endphp
                             <tr>
-                                <td class="ps-3 fw-semibold">{{ $atl->atl_number ?? '—' }}</td>
-                                <td class="small">{{ $poNumbers }}</td>
-                                <td class="small">{{ $atl->receiving_date?->format('M d, Y') ?? '—' }}</td>
-                                <td class="small font-monospace">
-                                    @php
-                                        // A multi-PO ATL records each product's volume on
-                                        // its allocation rows, so the breakdown comes from
-                                        // there and falls back to the ATL's own line.
-                                        $breakdown = $atl->productBreakdown() ?: [$atl->product => (int) $atl->qty_to_receive];
-                                    @endphp
-                                    @foreach ($breakdown as $product => $qty)
-                                        <span class="d-block">{{ $product }} — {{ number_format($qty) }}</span>
-                                    @endforeach
-                                </td>
+                                <td><span class="id-pill">{{ $atl->dr_number ?: '—' }}</span></td>
+                                <td class="text-dark">{{ $atl->atl_number ?: ($atl->client_atl_number ?: 'Pending') }}</td>
+                                <td><span class="id-pill">{{ $poNumbers }}</span></td>
+                                <td>{{ $atl->receiving_date?->format('Y-m-d') ?? '—' }}</td>
                                 <td>
-                                    <span class="badge bg-light text-dark border">{{ $atl->status }}</span>
-                                </td>
-                                <td class="text-center">
-                                    <span class="badge rounded-pill {{ $atl->approval_status === \App\Models\PurchaseOrderDelivery::APPROVAL_APPROVED
-                                        ? 'bg-success-subtle text-success border'
-                                        : 'bg-warning-subtle text-warning-emphasis border' }}">
-                                        {{ str_replace('_', ' ', $atl->approval_status ?? 'DRAFT') }}
+                                    <span class="pl-block font-monospace">
+                                        @foreach ($breakdown as $product => $qty)
+                                            <span class="d-block">
+                                                {!! $chip($codes[$product] ?? '', $product) !!} {{ number_format($qty) }}
+                                            </span>
+                                        @endforeach
                                     </span>
                                 </td>
-                                <td class="text-center small">
-                                    {{ str_replace('_', ' ', $atl->lift_status ?? 'UNLIFTED') }}
+                                <td>
+                                    {{-- Approval and lift side by side: one says whether the
+                                         document is signed, the other whether the fuel has
+                                         moved. --}}
+                                    <div class="d-flex flex-column gap-1 align-items-center">
+                                        <span class="badge rounded-pill px-2 py-1 {{ $approved
+                                            ? 'bg-success-subtle text-success border'
+                                            : ($atl->approval_status === \App\Models\PurchaseOrderDelivery::APPROVAL_REJECTED
+                                                ? 'bg-danger-subtle text-danger border'
+                                                : 'bg-warning-subtle text-warning-emphasis border') }}">
+                                            {{ $approved ? 'APPROVED' : strtoupper(str_replace('_', ' ', $atl->approval_status ?? 'DRAFT')) }}
+                                        </span>
+                                        <span class="badge rounded-pill px-2 py-1 {{ $lifted
+                                            ? 'bg-success-subtle text-success border'
+                                            : 'bg-light text-dark border' }}">
+                                            {{ $lifted ? 'LIFTED' : strtoupper(str_replace('_', ' ', $atl->lift_status ?? 'UNLIFTED')) }}
+                                        </span>
+                                    </div>
                                 </td>
-                                <td class="pe-3 text-end">
-                                    <span class="small text-muted">—</span>
+                                <td class="text-dark">{{ $atl->typeLabel() }}</td>
+                                <td>
+                                    <div class="d-inline-flex gap-1 align-items-center justify-content-center">
+                                        {{-- The PDF is released only once the VP has approved
+                                             this ATL; the route enforces the same thing. --}}
+                                        @if ($approved)
+                                            <a href="{{ route('stock-orders.atl-pdf', $atl->id) }}"
+                                               class="btn btn-sm btn-outline-secondary action-icon" target="_blank"
+                                               title="Download ATL PDF">
+                                                <i class="bi bi-file-earmark-pdf"></i>
+                                            </a>
+                                        @endif
+                                        @if ($canLift)
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-success action-icon"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#confirmLiftModal{{ $atl->id }}"
+                                                    title="Mark Lifted">
+                                                <i class="bi bi-check-circle"></i>
+                                            </button>
+                                        @endif
+                                        @unless ($approved || $canLift)
+                                            <span class="small text-muted">—</span>
+                                        @endunless
+                                    </div>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="text-center text-muted py-5">
-                                    <i class="bi bi-file-earmark-x fs-1 d-block mb-3 text-secondary"></i>
+                                <td colspan="8" class="text-center text-muted">
+                                    <i class="bi bi-file-earmark-x fs-1 d-block mb-3 text-warning"></i>
                                     No ATLs issued for this request yet.
                                 </td>
                             </tr>
@@ -178,5 +327,59 @@
             </div>
         </div>
     </div>
+
+    {{-- One confirm dialog per liftable ATL, as the Sales Orders page does. --}}
+    @foreach ($atls as $atl)
+        @if ($atl->isApproved() && $atl->lift_status !== \App\Models\PurchaseOrderDelivery::LIFT_LIFTED)
+            <div class="modal fade" id="confirmLiftModal{{ $atl->id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content rounded-4 border-0 shadow">
+                        <div class="modal-header border-0 pb-0">
+                            <h5 class="modal-title fw-bold text-dark">
+                                <i class="bi bi-patch-check-fill text-success me-1"></i> Confirm Lift
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <form method="POST" action="{{ route('stock-orders.complete-fuel-trade', $atl->id) }}">
+                            @csrf
+                            <div class="modal-body pt-3">
+                                <div class="p-3 bg-light rounded-3 mb-3">
+                                    <div class="d-flex justify-content-between small text-muted mb-1">
+                                        <span>REQ# {{ $request->request_number }}</span>
+                                        <span class="badge bg-secondary-subtle text-secondary">{{ $atl->channel_label }}</span>
+                                    </div>
+                                    <div class="fw-bold fs-5 text-primary mb-1">
+                                        {{ number_format($atl->qty_to_receive) }} L of {{ $atl->product }}
+                                    </div>
+                                    <div class="small text-muted">
+                                        ATL: <span class="fw-semibold text-dark">{{ $atl->atl_number ?? '—' }}</span>
+                                    </div>
+                                </div>
+
+                                <div class="row g-2 mb-3">
+                                    <div class="col-6">
+                                        <label class="form-label small fw-semibold">Supplier DR #</label>
+                                        <input type="text" name="supplier_dr_number" class="form-control form-control-sm"
+                                               value="{{ $atl->dr_number }}">
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label small fw-semibold">Supplier SO #</label>
+                                        <input type="text" name="supplier_so_number" class="form-control form-control-sm"
+                                               value="{{ $atl->supplier_so_number }}">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer border-0 pt-0">
+                                <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-success rounded-pill px-4">
+                                    <i class="bi bi-check-circle me-1"></i> Confirm Lifted
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        @endif
+    @endforeach
 </div>
 @endsection

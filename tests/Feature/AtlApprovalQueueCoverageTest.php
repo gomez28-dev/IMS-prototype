@@ -280,9 +280,9 @@ class AtlApprovalQueueCoverageTest extends TestCase
 
         $this->actingAs($this->purchasing)
             ->post(route('stock-orders.wet-stock-requests.atls.store', $request->id), [
-                'purchase_order_id' => $po->id,
-                'product' => 'Diesel',
-                'qty_to_receive' => 20000,
+                'drawdowns' => [
+                    ['purchase_order_id' => $po->id, 'product' => 'Diesel', 'quantity' => 20000],
+                ],
                 'order_type' => 'DELIVERY',
                 'delivery_channel' => 'SUPPLIER_STOCKS_DELIVERY',
                 'atl_type' => 'DITC_ATL',
@@ -330,9 +330,9 @@ class AtlApprovalQueueCoverageTest extends TestCase
 
         $this->actingAs($this->purchasing)
             ->post(route('stock-orders.wet-stock-requests.atls.store', $request->id), [
-                'purchase_order_id' => $po->id,
-                'product' => 'Diesel',
-                'qty_to_receive' => 20000,
+                'drawdowns' => [
+                    ['purchase_order_id' => $po->id, 'product' => 'Diesel', 'quantity' => 20000],
+                ],
                 'order_type' => 'DELIVERY',
                 'delivery_channel' => 'SUPPLIER_STOCKS_DELIVERY',
                 'atl_type' => 'DITC_ATL',

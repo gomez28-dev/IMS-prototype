@@ -98,11 +98,21 @@ class WetStockRequestAddAtlTest extends TestCase
      */
     protected function submit(StockRequest $request, PurchaseOrder $po, array $overrides = [])
     {
+        // The form posts a drawdown array now, because one ATL can be split across
+        // several POs. Call sites keep passing the flat product/quantity they
+        // always did and this builds the row for them; the multi-PO cases are
+        // covered separately.
+        $product = $overrides['product'] ?? 'Diesel';
+        $quantity = $overrides['qty_to_receive'] ?? 20000;
+        $poId = $overrides['purchase_order_id'] ?? $po->id;
+
+        unset($overrides['product'], $overrides['qty_to_receive'], $overrides['purchase_order_id']);
+
         return $this->actingAs($this->admin)
             ->post(route('stock-orders.wet-stock-requests.atls.store', $request->id), array_merge([
-                'purchase_order_id' => $po->id,
-                'product' => 'Diesel',
-                'qty_to_receive' => 20000,
+                'drawdowns' => [
+                    ['purchase_order_id' => $poId, 'product' => $product, 'quantity' => $quantity],
+                ],
                 'order_type' => 'DELIVERY',
                 'delivery_channel' => 'SUPPLIER_STOCKS_DELIVERY',
                 'atl_type' => 'DITC_ATL',
@@ -125,7 +135,7 @@ class WetStockRequestAddAtlTest extends TestCase
             ->assertOk()
             ->getContent();
 
-        $this->assertStringContainsString('name="purchase_order_id"', $html);
+        $this->assertStringContainsString('drawdowns[0][purchase_order_id]', $html);
         $this->assertStringContainsString($po->po_number, $html);
     }
 
@@ -152,7 +162,7 @@ class WetStockRequestAddAtlTest extends TestCase
         // Scoped to the dropdown element. The layout prints any leftover success
         // flash from the save above, which quotes the PO number, so asserting on
         // the whole document would be measuring the wrong thing.
-        $start = strpos($html, 'name="purchase_order_id"');
+        $start = strpos($html, 'drawdowns[0][purchase_order_id]');
         $this->assertIsInt($start, 'The form should offer a purchase order dropdown.');
 
         $end = strpos($html, '</select>', $start);
@@ -196,8 +206,10 @@ class WetStockRequestAddAtlTest extends TestCase
         $request = $this->request();
         $po = $this->po(['Diesel' => 10000]);
 
+        // The PO is real and approved but only holds 10,000 L, so the failure is
+        // on that row's quantity rather than on the PO itself.
         $this->submit($request, $po, ['qty_to_receive' => 20000])
-            ->assertSessionHasErrors('qty_to_receive');
+            ->assertSessionHasErrors('drawdowns.0.quantity');
 
         $this->assertSame(0, PurchaseOrderDelivery::where('request_id', $request->id)->count());
     }
@@ -208,7 +220,7 @@ class WetStockRequestAddAtlTest extends TestCase
         $request = $this->request();
         $po = $this->po(['Diesel' => 100000], 'RECEIVED');
 
-        $this->submit($request, $po)->assertSessionHasErrors('purchase_order_id');
+        $this->submit($request, $po)->assertSessionHasErrors('drawdowns.0.purchase_order_id');
 
         $this->assertSame(0, PurchaseOrderDelivery::where('request_id', $request->id)->count());
     }
@@ -219,7 +231,7 @@ class WetStockRequestAddAtlTest extends TestCase
         $po = $this->po(['Diesel' => 100000, 'Premium' => 100000]);
 
         $this->submit($request, $po, ['product' => 'Premium'])
-            ->assertSessionHasErrors('product');
+            ->assertSessionHasErrors('drawdowns');
     }
 
     public function test_the_atl_cannot_exceed_the_request_pending_volume(): void
@@ -229,7 +241,7 @@ class WetStockRequestAddAtlTest extends TestCase
         $po = $this->po(['Diesel' => 200000]);
 
         $this->submit($request, $po, ['qty_to_receive' => 50001])
-            ->assertSessionHasErrors('qty_to_receive');
+            ->assertSessionHasErrors('drawdowns');
 
         $this->assertSame(0, PurchaseOrderDelivery::where('request_id', $request->id)->count());
     }
@@ -244,7 +256,7 @@ class WetStockRequestAddAtlTest extends TestCase
         $po = $this->po(['Diesel' => 200000]);
 
         $this->submit($request, $po, ['qty_to_receive' => 60001])
-            ->assertSessionHasErrors('qty_to_receive');
+            ->assertSessionHasErrors('drawdowns');
 
         $this->submit($request, $po, ['qty_to_receive' => 60000])->assertSessionHas('success');
     }
@@ -259,7 +271,7 @@ class WetStockRequestAddAtlTest extends TestCase
 
         // 50,000 of 50,000 pending is now committed.
         $this->submit($request, $po, ['qty_to_receive' => 1])
-            ->assertSessionHasErrors('qty_to_receive');
+            ->assertSessionHasErrors('drawdowns');
 
         $this->assertSame(2, PurchaseOrderDelivery::where('request_id', $request->id)->count());
     }
@@ -277,7 +289,7 @@ class WetStockRequestAddAtlTest extends TestCase
             ->assertSessionHas('success');
 
         $this->submit($request, $po, ['product' => 'Premium', 'qty_to_receive' => 1])
-            ->assertSessionHasErrors('qty_to_receive');
+            ->assertSessionHasErrors('drawdowns');
     }
 
     public function test_a_crafted_post_cannot_choose_a_po_outside_the_pool(): void
@@ -286,7 +298,7 @@ class WetStockRequestAddAtlTest extends TestCase
         $cancelled = $this->po(['Diesel' => 100000]);
         $cancelled->update(['status' => 'Cancelled']);
 
-        $this->submit($request, $cancelled)->assertSessionHasErrors('purchase_order_id');
+        $this->submit($request, $cancelled)->assertSessionHasErrors('drawdowns.0.purchase_order_id');
 
         $this->assertSame(0, PurchaseOrderDelivery::where('request_id', $request->id)->count());
     }

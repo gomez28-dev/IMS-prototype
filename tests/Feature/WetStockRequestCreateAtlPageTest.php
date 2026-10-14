@@ -197,7 +197,8 @@ class WetStockRequestCreateAtlPageTest extends TestCase
             ->assertOk()
             ->getContent();
 
-        $this->assertStringContainsString('Total Qty. Requested', $html);
+        // Titles follow M1's Deliveries cards.
+        $this->assertStringContainsString('Qty Requested', $html);
         // Blade escapes the apostrophe in the card title, so match the part
         // before it rather than the rendered entity.
         $this->assertStringContainsString('Total ATL', $html);

@@ -139,9 +139,10 @@ class WetStockRequestController extends Controller
         }
 
         $validated = $request->validate([
-            'purchase_order_id' => ['required', 'exists:purchase_orders,id'],
-            'product' => ['required', 'string', 'in:Diesel,Premium,Unleaded'],
-            'qty_to_receive' => ['required', 'integer', 'min:1'],
+            'drawdowns' => ['required', 'array', 'min:1'],
+            'drawdowns.*.purchase_order_id' => ['required', 'exists:purchase_orders,id'],
+            'drawdowns.*.product' => ['required', 'string', 'in:Diesel,Premium,Unleaded'],
+            'drawdowns.*.quantity' => ['required', 'integer', 'min:1'],
             'order_type' => ['required', 'in:DELIVERY,PICK_UP'],
             'delivery_channel' => ['required', 'string'],
             'atl_type' => ['required', 'in:DITC_ATL,CLIENT_ATL,NONE'],
@@ -155,54 +156,71 @@ class WetStockRequestController extends Controller
             'additional_remarks' => ['nullable', 'string', 'max:500'],
         ]);
 
-        // The PO has to be one the pool still offers. A crafted POST naming a
-        // drained or cancelled PO is refused here rather than silently accepted.
-        $po = PurchaseOrder::availableForAllocation()
-            ->firstWhere('id', (int) $validated['purchase_order_id']);
+        $drawdowns = collect($validated['drawdowns'])->map(fn (array $dd): array => [
+            'purchase_order_id' => (int) $dd['purchase_order_id'],
+            'product' => $dd['product'],
+            'quantity' => (int) $dd['quantity'],
+        ]);
 
-        if (! $po) {
-            return back()->withInput()->withErrors([
-                'purchase_order_id' => 'That purchase order has no volume left to draw on.',
-            ]);
-        }
-
-        if (! $po->isVpApproved()) {
-            return back()->withInput()->withErrors([
-                'purchase_order_id' => "PO {$po->po_number} has not been approved by the VP yet.",
-            ]);
-        }
-
-        $product = $validated['product'];
-        $qty = (int) $validated['qty_to_receive'];
-
-        $balance = $po->getAvailableBalanceForProduct($product);
-
-        if ($balance < $qty) {
-            return back()->withInput()->withErrors([
-                'qty_to_receive' => "PO {$po->po_number} has ".number_format($balance)
-                    ." L of {$product} left, not ".number_format($qty).' L.',
-            ]);
-        }
+        // A single ATL may be split across several POs when no one of them holds
+        // enough on its own, so the rows are summed per product before anything
+        // is checked. Checking row by row would let two rows for the same product
+        // each pass against the request's pending figure while together exceeding
+        // it - which is the whole reason for the split.
+        $drawnByProduct = $drawdowns
+            ->groupBy('product')
+            ->map(fn ($rows): int => (int) $rows->sum('quantity'));
 
         $pending = $stockRequest->pendingByProduct();
 
-        if (! array_key_exists($product, $pending)) {
-            return back()->withInput()->withErrors([
-                'product' => "This request does not ask for {$product}.",
-            ]);
+        // Every PO has to be one the pool still offers: VP-approved, not
+        // cancelled, and with volume left. A crafted POST naming a drained or
+        // unapproved PO is refused here rather than silently accepted.
+        $pool = PurchaseOrder::availableForAllocation()->keyBy('id');
+
+        foreach ($drawdowns as $index => $dd) {
+            $po = $pool->get($dd['purchase_order_id']);
+
+            if (! $po) {
+                return back()->withInput()->withErrors([
+                    "drawdowns.{$index}.purchase_order_id" => 'That purchase order has no volume left to draw on, or the VP has not approved it.',
+                ]);
+            }
+
+            $balance = $po->getAvailableBalanceForProduct($dd['product']);
+
+            if ($balance < $dd['quantity']) {
+                return back()->withInput()->withErrors([
+                    "drawdowns.{$index}.quantity" => "PO {$po->po_number} has ".number_format($balance)
+                        ." L of {$dd['product']} left, not ".number_format($dd['quantity']).' L. '
+                        .'Add another PO row to cover the rest.',
+                ]);
+            }
         }
 
-        if ($qty > $pending[$product]) {
-            return back()->withInput()->withErrors([
-                'qty_to_receive' => 'Only '.number_format($pending[$product])
-                    ." L of {$product} is still outstanding on this request. "
-                    .'Asked for '.number_format($stockRequest->lines->where('product', $product)->sum('qty_requested'))
-                    .' L, less what has arrived and what an ATL already covers.',
-            ]);
+        foreach ($drawnByProduct as $product => $qty) {
+            if (! array_key_exists($product, $pending)) {
+                return back()->withInput()->withErrors([
+                    'drawdowns' => "This request does not ask for {$product}.",
+                ]);
+            }
+
+            if ($qty > $pending[$product]) {
+                return back()->withInput()->withErrors([
+                    'drawdowns' => 'Only '.number_format($pending[$product])
+                        ." L of {$product} is still outstanding on this request. "
+                        .'Asked for '.number_format($stockRequest->lines->where('product', $product)->sum('qty_requested'))
+                        .' L, less what has arrived and what an ATL already covers.',
+                ]);
+            }
         }
+
+        $primaryPoId = $drawdowns->first()['purchase_order_id'];
+        $totalDrawn = (int) $drawdowns->sum('quantity');
+        $productSummary = $drawdowns->pluck('product')->unique()->implode(' + ');
 
         $delivery = PurchaseOrderDelivery::create([
-            'purchase_order_id' => $po->id,
+            'purchase_order_id' => $primaryPoId,
             'request_id' => $stockRequest->id,
             'storage_tank_id' => $validated['storage_tank_id'] ?? null,
             'delivery_channel' => $validated['delivery_channel'],
@@ -211,8 +229,10 @@ class WetStockRequestController extends Controller
             'atl_number' => $validated['atl_number'] ?? null,
             'dr_number' => $validated['dr_number'] ?? null,
             'reference_no' => $validated['reference_no'] ?? null,
-            'product' => $product,
-            'qty_to_receive' => $qty,
+            // The delivery row carries the summary: total litres and the products
+            // it covers. Per-product quantities live on the allocations below.
+            'product' => $productSummary,
+            'qty_to_receive' => $totalDrawn,
             'receiving_date' => $validated['receiving_date'],
             'driver_name' => $validated['driver_name'] ?? null,
             'plate_number' => $validated['plate_number'] ?? null,
@@ -228,29 +248,39 @@ class WetStockRequestController extends Controller
             'issued_at' => now(),
         ]);
 
-        // Linked to the purchase order item, as the other three allocation
-        // writers do. Leaving it null hides this volume from the PO balance the
-        // moment any other ATL has drawn from the same PO with a linked
-        // allocation, because PurchaseOrderItem::getTotalDrawnAttribute() only
-        // counts null-item allocations while it has no linked ones.
-        AtlAllocation::create([
-            'purchase_order_delivery_id' => $delivery->id,
-            'purchase_order_id' => $po->id,
-            'purchase_order_item_id' => $po->items()->where('product', $product)->value('id'),
-            'product' => $product,
-            'quantity' => $qty,
-        ]);
+        // One allocation per drawdown row, each linked to its own PO line.
+        //
+        // The item link matters: PurchaseOrderItem::getTotalDrawnAttribute() only
+        // counts allocations with no item while the PO has no linked ones, so a
+        // null here would hide this volume from the PO balance the moment any
+        // other ATL drew from the same PO with a linked allocation.
+        foreach ($drawdowns as $dd) {
+            $po = $pool->get($dd['purchase_order_id']);
+
+            AtlAllocation::create([
+                'purchase_order_delivery_id' => $delivery->id,
+                'purchase_order_id' => $po->id,
+                'purchase_order_item_id' => $po->items()->where('product', $dd['product'])->value('id'),
+                'product' => $dd['product'],
+                'quantity' => $dd['quantity'],
+            ]);
+        }
+
+        $poNumbers = $drawdowns->pluck('purchase_order_id')
+            ->map(fn ($id) => $pool->get($id)->po_number)
+            ->unique()
+            ->implode(', ');
 
         AuditLog::create([
             'admin_id' => Auth::id(),
             'action' => 'created',
             'description' => "ATL {$delivery->atl_number} raised for request "
-                .$stockRequest->request_number." against PO {$po->po_number} for "
-                .number_format($qty)." L of {$product}.",
+                .$stockRequest->request_number.' against PO '.$poNumbers
+                .' for '.number_format($totalDrawn)." L of {$productSummary}.",
         ]);
 
         return redirect()->route('stock-orders.wet-stock-requests.atls', $stockRequest)
-            ->with('success', "ATL {$delivery->atl_number} raised against PO {$po->po_number}.");
+            ->with('success', "ATL {$delivery->atl_number} raised against PO {$poNumbers}.");
     }
 
     /**
