@@ -73,6 +73,15 @@
                                                 {{ $atl->order->formatted_so_number }}
                                             </a>
                                             <div class="small text-muted">{{ $atl->order->account }}</div>
+                                        @elseif ($atl->stockRequest)
+                                            {{-- A stock-request ATL has no sales order and no
+                                                 so_number, so it used to show a dash where
+                                                 the reference belongs. --}}
+                                            <a href="{{ route('stock-orders.wet-stock-requests.atls', $atl->stockRequest->id) }}"
+                                               class="text-decoration-none">
+                                                {{ $atl->refNumber() }}
+                                            </a>
+                                            <div class="small text-muted">{{ $atl->stockRequest->warehouse->name ?? '' }}</div>
                                         @else
                                             <span class="text-muted">{{ $atl->so_number ?: '—' }}</span>
                                         @endif
@@ -93,23 +102,31 @@
                                         @endif
                                     </td>
                                     <td class="pe-3 text-end">
-                                        <div class="d-inline-flex gap-1 justify-content-end">
-                                            <form method="POST" action="{{ route('stock-orders.atl-reject', $atl->id) }}" class="d-inline"
-                                                  onsubmit="return confirm('Reject this ATL and return it to Purchasing?');">
-                                                @csrf
-                                                <input type="hidden" name="rejection_reason" value="">
-                                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3 py-1">
-                                                    <i class="bi bi-x-lg me-1"></i> Reject
-                                                </button>
-                                            </form>
-                                            <form method="POST" action="{{ route('stock-orders.atl-approve', $atl->id) }}" class="d-inline"
-                                                  onsubmit="return confirm('Approve this ATL?');">
-                                                @csrf
-                                                <button type="submit" class="btn btn-sm btn-success rounded-pill px-3 py-1">
-                                                    <i class="bi bi-check-lg me-1"></i> Approve
-                                                </button>
-                                            </form>
-                                        </div>
+                                        @if (Auth::user()->canApproveStockOrders())
+                                            <div class="d-inline-flex gap-1 justify-content-end">
+                                                <form method="POST" action="{{ route('stock-orders.atl-reject', $atl->id) }}" class="d-inline"
+                                                      onsubmit="return confirm('Reject this ATL and return it to Purchasing?');">
+                                                    @csrf
+                                                    <input type="hidden" name="rejection_reason" value="">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3 py-1">
+                                                        <i class="bi bi-x-lg me-1"></i> Reject
+                                                    </button>
+                                                </form>
+                                                <form method="POST" action="{{ route('stock-orders.atl-approve', $atl->id) }}" class="d-inline"
+                                                      onsubmit="return confirm('Approve this ATL?');">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-sm btn-success rounded-pill px-3 py-1">
+                                                        <i class="bi bi-check-lg me-1"></i> Approve
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        @else
+                                            {{-- The queue is open to every Module 2 and 3
+                                                 role so they can see what is waiting, but
+                                                 ruling on it is the VP's. Drawing buttons
+                                                 that can only 403 is worse than none. --}}
+                                            <span class="text-muted small">Awaiting VP</span>
+                                        @endif
                                     </td>
                                 </tr>
                             @empty

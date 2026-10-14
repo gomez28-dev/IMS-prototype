@@ -192,9 +192,9 @@
                             <div class="form-check">
                                 <input class="form-check-input @error('submit_for_approval') is-invalid @enderror"
                                        type="checkbox" value="1" id="submit_for_approval"
-                                       name="submit_for_approval" {{ old('submit_for_approval') ? 'checked' : '' }}>
+                                       name="submit_for_approval" checked>
                                 <label class="form-check-label small" for="submit_for_approval">
-                                    Submit to the VP for approval now
+                                    Submit to the VP for approval
                                 </label>
                                 @error('submit_for_approval')
                                     <div class="invalid-feedback">{{ $message }}</div>

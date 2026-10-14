@@ -135,14 +135,22 @@ class WetStockRequestController extends Controller
         // hold. A request does not need a PO of its own any more.
         $availablePos = PurchaseOrder::availableForAllocation();
 
+        // Only tanks at the request's own site. Booking a delivery against a tank
+        // at another depot is possible if the list is the whole company's.
+        $tanks = StorageTank::where('is_active', true)
+            ->when(
+                $stockRequest->warehouse_id,
+                fn ($query) => $query->where('warehouse_id', $stockRequest->warehouse_id)
+            )
+            ->with('warehouse')
+            ->orderBy('name')
+            ->get();
+
         return view('wetstock.wet-stock-requests.create-atl', [
             'request' => $stockRequest,
             'availablePos' => $availablePos,
             'pending' => $stockRequest->pendingByProduct(),
-            'tanks' => StorageTank::where('is_active', true)
-                ->with('warehouse')
-                ->orderBy('name')
-                ->get(),
+            'tanks' => $tanks,
         ]);
     }
 
@@ -246,14 +254,20 @@ class WetStockRequestController extends Controller
             'approval_status' => ($validated['submit_for_approval'] ?? false)
                 ? PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL
                 : PurchaseOrderDelivery::APPROVAL_DRAFT,
-            'status' => 'Active',
+            'status' => 'Pending',
             'lift_status' => PurchaseOrderDelivery::LIFT_UNLIFTED,
             'issued_at' => now(),
         ]);
 
+        // Linked to the purchase order item, as the other three allocation
+        // writers do. Leaving it null hides this volume from the PO balance the
+        // moment any other ATL has drawn from the same PO with a linked
+        // allocation, because PurchaseOrderItem::getTotalDrawnAttribute() only
+        // counts null-item allocations while it has no linked ones.
         AtlAllocation::create([
             'purchase_order_delivery_id' => $delivery->id,
             'purchase_order_id' => $po->id,
+            'purchase_order_item_id' => $po->items()->where('product', $product)->value('id'),
             'product' => $product,
             'quantity' => $qty,
         ]);

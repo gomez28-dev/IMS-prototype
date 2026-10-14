@@ -164,9 +164,12 @@ class StockRequest extends Model
     /**
      * What can still be ATL'd against this request, per product.
      *
-     * Asked for, less what has already arrived, less what an ATL has committed.
-     * The three ATLs a request may carry share one budget, which is why the
-     * drawn figure is totalled across all of them rather than the latest.
+     * Asked for, less what any ATL has already committed. The quantity the depot
+     * has recorded as received is deliberately NOT subtracted: a receipt is the
+     * settling of an ATL, not a second draw, so subtracting both would take the
+     * same litres off twice and strand the request short. Three ATLs share one
+     * budget, which is why the committed figure is totalled across all of them
+     * rather than the latest.
      *
      * @return array<string, int>
      */
@@ -180,23 +183,12 @@ class StockRequest extends Model
             $requested[$product] = ($requested[$product] ?? 0) + (int) $line->qty_requested;
         }
 
-        $received = [];
-
-        foreach ($this->lines as $line) {
-            $product = $line->product ?: 'Unspecified';
-
-            $received[$product] = ($received[$product] ?? 0) + (int) $line->qty_received;
-        }
-
         $drawn = $this->drawnByProduct();
 
         $pending = [];
 
         foreach ($requested as $product => $qty) {
-            $pending[$product] = max(
-                0,
-                $qty - (int) ($received[$product] ?? 0) - (int) ($drawn[$product] ?? 0)
-            );
+            $pending[$product] = max(0, $qty - (int) ($drawn[$product] ?? 0));
         }
 
         return $pending;

@@ -254,4 +254,91 @@ class AtlApprovalQueueCoverageTest extends TestCase
             $atl->fresh()->approval_status
         );
     }
+
+    // ---- End to end through the controller --------------------------------
+
+    public function test_an_atl_saved_on_the_new_form_lands_in_the_queue(): void
+    {
+        // Built through the HTTP POST rather than the model, so the two things
+        // that decide queueability are actually pinned: approval_status, and
+        // atl_source being left null rather than set to client-provided.
+        $request = StockRequest::create([
+            'request_number' => 'REQ-E2E-'.rand(100, 999),
+            'request_type' => StockRequest::TYPE_PICKUP,
+            'warehouse_id' => Warehouse::create(['name' => 'E2E Depot '.rand(1000, 9999)])->id,
+            'qty_requested' => 50000,
+            'status' => StockRequest::STATUS_REQUESTED,
+            'requested_by' => $this->purchasing->id,
+        ]);
+        StockRequestLine::create([
+            'stock_request_id' => $request->id,
+            'product' => 'Diesel',
+            'qty_requested' => 50000,
+        ]);
+
+        $po = $this->po();
+
+        $this->actingAs($this->purchasing)
+            ->post(route('stock-orders.wet-stock-requests.atls.store', $request->id), [
+                'purchase_order_id' => $po->id,
+                'product' => 'Diesel',
+                'qty_to_receive' => 20000,
+                'order_type' => 'DELIVERY',
+                'delivery_channel' => 'SUPPLIER_STOCKS_DELIVERY',
+                'atl_type' => 'DITC_ATL',
+                'atl_number' => 'ATL-E2E-'.uniqid(),
+                'receiving_date' => now()->addDays(3)->format('Y-m-d'),
+                'submit_for_approval' => 1,
+            ])
+            ->assertSessionHas('success');
+
+        $atl = PurchaseOrderDelivery::where('request_id', $request->id)->firstOrFail();
+
+        $this->assertSame(
+            PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL,
+            $atl->approval_status,
+            'Ticking the box should put it straight into the VP queue.'
+        );
+        $this->assertNull($atl->atl_source, 'Doyen-issued, so nothing is set to client-provided.');
+
+        $this->assertStringContainsString($atl->atl_number, $this->queueHtml());
+    }
+
+    public function test_an_atl_saved_as_a_draft_is_still_queued(): void
+    {
+        $request = StockRequest::create([
+            'request_number' => 'REQ-E2ED-'.rand(100, 999),
+            'request_type' => StockRequest::TYPE_PICKUP,
+            'warehouse_id' => Warehouse::create(['name' => 'E2E Draft Depot '.rand(1000, 9999)])->id,
+            'qty_requested' => 50000,
+            'status' => StockRequest::STATUS_REQUESTED,
+            'requested_by' => $this->purchasing->id,
+        ]);
+        StockRequestLine::create([
+            'stock_request_id' => $request->id,
+            'product' => 'Diesel',
+            'qty_requested' => 50000,
+        ]);
+
+        $po = $this->po();
+
+        // Box unchecked: a draft. It must still reach the queue.
+        $this->actingAs($this->purchasing)
+            ->post(route('stock-orders.wet-stock-requests.atls.store', $request->id), [
+                'purchase_order_id' => $po->id,
+                'product' => 'Diesel',
+                'qty_to_receive' => 20000,
+                'order_type' => 'DELIVERY',
+                'delivery_channel' => 'SUPPLIER_STOCKS_DELIVERY',
+                'atl_type' => 'DITC_ATL',
+                'atl_number' => 'ATL-E2ED-'.uniqid(),
+                'receiving_date' => now()->addDays(3)->format('Y-m-d'),
+            ])
+            ->assertSessionHas('success');
+
+        $atl = PurchaseOrderDelivery::where('request_id', $request->id)->firstOrFail();
+
+        $this->assertSame(PurchaseOrderDelivery::APPROVAL_DRAFT, $atl->approval_status);
+        $this->assertStringContainsString($atl->atl_number, $this->queueHtml());
+    }
 }

@@ -234,16 +234,19 @@ class WetStockRequestAddAtlTest extends TestCase
         $this->assertSame(0, PurchaseOrderDelivery::where('request_id', $request->id)->count());
     }
 
-    public function test_volume_already_received_reduces_what_can_still_be_atled(): void
+    public function test_volume_already_received_does_not_reduce_what_can_be_atled(): void
     {
-        // 60,000 asked for, 20,000 already arrived, so 40,000 is pending.
+        // 60,000 asked for and 20,000 has already arrived at the depot. A
+        // receipt is the settling of an ATL, not a second draw, so it does not
+        // come off the ATL budget: the whole 60,000 may still be authorised.
+        // It used to be subtracted as well, taking the same litres off twice.
         $request = $this->request([['Diesel', 60000]], ['Diesel' => 20000]);
         $po = $this->po(['Diesel' => 200000]);
 
-        $this->submit($request, $po, ['qty_to_receive' => 40001])
+        $this->submit($request, $po, ['qty_to_receive' => 60001])
             ->assertSessionHasErrors('qty_to_receive');
 
-        $this->submit($request, $po, ['qty_to_receive' => 40000])->assertSessionHas('success');
+        $this->submit($request, $po, ['qty_to_receive' => 60000])->assertSessionHas('success');
     }
 
     public function test_several_atls_share_one_pending_budget(): void
