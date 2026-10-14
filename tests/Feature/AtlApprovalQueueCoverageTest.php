@@ -62,7 +62,7 @@ class AtlApprovalQueueCoverageTest extends TestCase
 
         $po = PurchaseOrder::create([
             'po_number' => 'PO-QUEUE-'.rand(1000, 9999),
-            'po_type' => PurchaseOrder::TYPE_FUEL_TRADE,
+            'po_type' => PurchaseOrder::TYPE_STANDARD_REPLENISHMENT,
             'supplier_id' => $supplier->id,
             'supplier_name' => $supplier->company_name,
             'po_date' => now()->toDateString(),

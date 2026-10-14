@@ -64,7 +64,7 @@ class AtlAllocateProductDefaultTest extends TestCase
 
         $po = PurchaseOrder::create([
             'po_number' => 'PO-DEF-'.rand(1000, 9999),
-            'po_type' => PurchaseOrder::TYPE_FUEL_TRADE,
+            'po_type' => PurchaseOrder::TYPE_STANDARD_REPLENISHMENT,
             // The link is what makes the PO the fallback source for the order's
             // product when the order itself carries none.
             'linked_order_id' => $order?->id,

@@ -63,7 +63,7 @@ class AtlPurchaseOrderLinkingTest extends TestCase
         return $order;
     }
 
-    protected function po(?Order $order = null, int $qty = 100000, string $number = null, string $status = 'CONFIRMED'): PurchaseOrder
+    protected function po(?Order $order = null, int $qty = 100000, string $number = null, string $status = 'CONFIRMED', string $poType = PurchaseOrder::TYPE_FUEL_TRADE): PurchaseOrder
     {
         $supplier = Supplier::create([
             'company_name' => 'Linking Refinery '.rand(1000, 9999),
@@ -72,7 +72,10 @@ class AtlPurchaseOrderLinkingTest extends TestCase
 
         $po = PurchaseOrder::create([
             'po_number' => $number ?: 'PO-LINK-'.rand(1000, 9999),
-            'po_type' => PurchaseOrder::TYPE_FUEL_TRADE,
+            // A Fuel Trade placeholder belongs to one sales order and is reached by
+            // typing its number. A standard replenishment PO is what sits in the
+            // shared pool an ATL dropdown offers, so the two are told apart here.
+            'po_type' => $poType,
             'linked_order_id' => $order?->id,
             'supplier_id' => $supplier->id,
             'supplier_name' => $supplier->company_name,
@@ -183,11 +186,43 @@ class AtlPurchaseOrderLinkingTest extends TestCase
 
     public function test_the_pool_offers_a_po_with_volume_left(): void
     {
-        $po = $this->po(null, 100000);
+        $po = $this->po(null, 100000, null, 'CONFIRMED', PurchaseOrder::TYPE_STANDARD_REPLENISHMENT);
 
         $numbers = PurchaseOrder::availableForAllocation()->pluck('po_number');
 
         $this->assertContains($po->po_number, $numbers);
+    }
+
+    public function test_the_pool_excludes_a_po_the_vp_has_not_approved(): void
+    {
+        // Volume must not be drawn against a PO that is still sitting in the
+        // Approvals queue: its quantities are not fixed yet, so the VP may still
+        // change or send them back.
+        $po = $this->po(null, 100000, null, 'RECEIVED', PurchaseOrder::TYPE_STANDARD_REPLENISHMENT);
+
+        $numbers = PurchaseOrder::availableForAllocation()->pluck('po_number');
+
+        $this->assertNotContains(
+            $po->po_number,
+            $numbers,
+            'An unapproved PO must not be offered for allocation.'
+        );
+    }
+
+    public function test_the_pool_excludes_a_fuel_trade_placeholder(): void
+    {
+        // A Fuel Trade PO is raised per sales order when its ATL names a PO that
+        // does not exist yet. It is reached by typing its number, not from the
+        // shared pool, and it is created unapproved anyway.
+        $po = $this->po($this->order(), 100000, null, 'CONFIRMED', PurchaseOrder::TYPE_FUEL_TRADE);
+
+        $numbers = PurchaseOrder::availableForAllocation()->pluck('po_number');
+
+        $this->assertNotContains(
+            $po->po_number,
+            $numbers,
+            'A per-order Fuel Trade placeholder must not pollute the shared pool.'
+        );
     }
 
     public function test_the_pool_excludes_a_fully_drawn_po(): void
@@ -208,7 +243,7 @@ class AtlPurchaseOrderLinkingTest extends TestCase
     public function test_the_pool_is_where_the_atl_form_gets_its_dropdown(): void
     {
         $order = $this->order();
-        $po = $this->po($order, 100000);
+        $po = $this->po($order, 100000, null, 'CONFIRMED', PurchaseOrder::TYPE_STANDARD_REPLENISHMENT);
 
         $html = $this->actingAs($this->purchasing)
             ->get(route('stock-orders.create-fuel-trade-po', $order->id))

@@ -148,11 +148,28 @@ public function isFuelTrade(): bool
     }
 
     /**
+     * The pipeline states that count as "the VP has approved this PO".
+     *
+     * Kept as one list so isVpApproved() and availableForAllocation() cannot
+     * drift apart: a PO offered in an ATL dropdown is exactly a PO whose PDF
+     * and allocations the system treats as cleared.
+     *
+     * @var list<string>
+     */
+    public const VP_APPROVED_STATUSES = ['CONFIRMED', 'FOR_DELIVERY', 'COMPLETED'];
+
+    /**
      * Purchase orders an ATL can still draw volume from.
      *
      * The supervisor's rule for the PO dropdown: list the POs that still have
      * remaining quantity. "Remaining" is judged on any product, not one in
      * particular, so a PO holding only Premium is still offered.
+     *
+     * Only VP-approved POs are offered. Volume must not be drawn against a PO
+     * that is still RECEIVED, because that PO can still be edited or sent back
+     * by the VP and its quantities are not yet fixed. createdPos() also keeps
+     * Fuel Trade placeholders out: those belong to a single sales order rather
+     * than to the shared pool an ATL draws from.
      *
      * A collection rather than a scope because the balance is computed in PHP
      * from each PO's items and its allocations, which SQL cannot express.
@@ -162,7 +179,9 @@ public function isFuelTrade(): bool
     public static function availableForAllocation(): \Illuminate\Support\Collection
     {
         return self::query()
+            ->createdPos()
             ->where('status', '!=', 'Cancelled')
+            ->whereIn('request_status', self::VP_APPROVED_STATUSES)
             ->with(['items.allocations', 'allocations'])
             ->get()
             ->filter(function (self $po) {
@@ -240,7 +259,7 @@ public function isFuelTrade(): bool
      */
     public function isVpApproved(): bool
     {
-        return in_array($this->request_status, ['CONFIRMED', 'FOR_DELIVERY', 'COMPLETED'], true);
+        return in_array($this->request_status, self::VP_APPROVED_STATUSES, true);
     }
 
     /**
