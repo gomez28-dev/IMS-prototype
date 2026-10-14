@@ -31,26 +31,14 @@ class WetStockRequestController extends Controller
     {
         $warehouseId = $request->query('warehouse_id');
 
-        // Replenishment requests live in stock_requests. Legacy request rows that
-          // predate the table are still listed alongside them, so nothing
-          // disappears during the changeover.
-          $requestsQuery = PurchaseOrder::with(['warehouse', 'requester', 'approver', 'deliveries'])
-            ->whereIn('po_type', ['STANDARD_REPLENISHMENT', 'BUY_BACK']);
-
-        if ($warehouseId) {
-            $requestsQuery->where('warehouse_id', $warehouseId);
-        }
-
-        if ($request->filled('search')) {
-            $term = '%' . $request->search . '%';
-            $requestsQuery->where(function ($q) use ($term) {
-                $q->where('po_number', 'like', $term)
-                  ->orWhere('remarks', 'like', $term);
-            });
-        }
-
-        $legacyRequests = $requestsQuery->latest()->paginate(15);
-
+        // Replenishment requests live in stock_requests, and only there.
+        //
+        // This used to also list purchase orders filed as STANDARD_REPLENISHMENT
+        // or BUY_BACK as "legacy requests". But storeSupplierPo files every
+        // supplier PO as STANDARD_REPLENISHMENT, so the query pulled ordinary
+        // purchase orders onto this page with a View Request button that led to a
+        // PO, not a request. That was never a real legacy backlog: the rows were
+        // ordinary POs, so they go.
         $stockRequestQuery = StockRequest::with(['warehouse', 'requester', 'lines'])
             ->open();
 
@@ -68,26 +56,8 @@ class WetStockRequestController extends Controller
 
         $stockRequests = $stockRequestQuery->latest()->paginate(15);
 
-        // Depot-bound deliveries awaiting tank fill.
-        $deliveriesQuery = PurchaseOrderDelivery::with(['purchaseOrder.warehouse', 'stockIns.tank'])
-            ->whereIn('delivery_channel', [
-                'SUPPLIER_STOCKS_DELIVERY',
-                'SUPPLIER_DOYEN_PICKUP',
-                'BUY_BACK_STOCKS_DELIVERY',
-                'BUY_BACK_DOYEN_PICKUP',
-            ])
-            ->where('status', '!=', 'Cancelled');
-
-        if ($warehouseId) {
-            $deliveriesQuery->whereHas('purchaseOrder', fn ($q) => $q->where('warehouse_id', $warehouseId));
-        }
-
-        $incomingDeliveries = $deliveriesQuery->latest()->paginate(15);
-
         return view('wetstock.wet-stock-requests.index', [
             'stockRequests' => $stockRequests,
-            'legacyRequests' => $legacyRequests,
-            'incomingDeliveries' => $incomingDeliveries,
             'warehouses' => Warehouse::orderBy('name')->get(),
             'warehouseId' => $warehouseId,
             'stats' => $this->stats(),

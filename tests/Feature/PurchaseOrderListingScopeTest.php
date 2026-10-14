@@ -230,8 +230,9 @@ class PurchaseOrderListingScopeTest extends TestCase
             ->get(route('stock-orders.wet-stock-requests.index'));
 
         $response->assertStatus(200);
-        // Its own page keeps the request, and still shows the PO as well.
-        $response->assertSee('DITC-0005');
+        // The page lists genuine stock requests only. A purchase order is not a
+        // request, so it no longer rides along here under STANDARD_REPLENISHMENT.
+        $response->assertDontSee('DITC-0005');
     }
 
     public function test_a_created_po_is_still_offered_for_allocation(): void

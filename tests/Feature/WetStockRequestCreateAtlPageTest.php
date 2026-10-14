@@ -131,9 +131,11 @@ class WetStockRequestCreateAtlPageTest extends TestCase
         $this->assertStringContainsString('Create ATL', $html);
     }
 
-    public function test_prepare_is_still_available_on_its_own(): void
+    public function test_the_prepare_route_still_works_even_though_the_button_is_gone(): void
     {
-        // Raising the PO is a separate job from issuing an ATL against one.
+        // The button was withdrawn from the queue in favour of Create ATL, but
+        // the route and its handler are untouched, so a URL still works rather
+        // than being deleted out from under anyone with the link bookmarked.
         $request = $this->request();
 
         $html = $this->actingAs($this->admin)
@@ -141,12 +143,16 @@ class WetStockRequestCreateAtlPageTest extends TestCase
             ->assertOk()
             ->getContent();
 
-        $this->assertStringContainsString('Prepare &amp; Submit', $html);
-        // route() renders a URL, so the needle is the URL rather than the name.
-        $this->assertStringContainsString(
+        $this->assertStringNotContainsString('Prepare &amp; Submit', $html);
+        $this->assertStringNotContainsString(
             route('stock-orders.prepare-stock-request', ['stock_request' => $request->id]),
-            $html
+            $html,
+            'The queue should no longer offer it.'
         );
+
+        $this->actingAs($this->admin)
+            ->get(route('stock-orders.prepare-stock-request', ['stock_request' => $request->id]))
+            ->assertOk();
     }
 
     // ---- The per-request ATL page ------------------------------------------

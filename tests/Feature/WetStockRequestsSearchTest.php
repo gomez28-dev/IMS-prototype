@@ -87,17 +87,35 @@ class WetStockRequestsSearchTest extends TestCase
         $this->assertMatchesRegularExpression('/btn-primary-custom[^"]*"?>\s*Search/', $html);
     }
 
-    public function test_the_search_box_sits_in_the_page_header(): void
+    public function test_the_search_box_sits_on_the_section_it_filters(): void
     {
         $html = $this->page();
 
-        // Level with the two buttons it belongs beside.
+        // It moved out of the page header and onto the Submitted Replenishment
+        // Requests card it actually narrows, so it is no longer beside the
+        // Incoming Stock Log button.
         $searchAt = strpos($html, 'name="search"');
+        $sectionAt = strpos($html, 'Submitted Replenishment Requests');
         $incomingAt = strpos($html, 'Incoming Stock Log');
 
         $this->assertIsInt($searchAt);
+        $this->assertIsInt($sectionAt);
         $this->assertIsInt($incomingAt);
-        $this->assertLessThan($incomingAt, $searchAt, 'Search belongs before the header buttons.');
+
+        $this->assertGreaterThan(
+            $sectionAt,
+            $searchAt,
+            'The search box belongs inside the section header it filters.'
+        );
+        $this->assertGreaterThan(
+            $incomingAt,
+            $searchAt,
+            'It should no longer sit in the page header beside the other buttons.'
+        );
+
+        // The prompt the supervisor asked for.
+        $this->assertStringContainsString('Search REQ #, site, or remarks...', $html);
+        $this->assertStringContainsString('>Clear<', $html);
     }
 
     // ---- It works ----------------------------------------------------------

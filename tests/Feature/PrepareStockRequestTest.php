@@ -76,7 +76,7 @@ class PrepareStockRequestTest extends TestCase
             ->get(route('stock-orders.wet-stock-requests.index'))
             ->assertOk()
             ->assertSee($request->request_number)
-            ->assertSee('Prepare &amp; Submit', false);
+            ->assertSee('Create ATL', false);
     }
 
     public function test_the_queue_search_matches_the_req_number(): void
@@ -136,7 +136,7 @@ class PrepareStockRequestTest extends TestCase
         $this->assertStringContainsString($request->request_number, $html);
     }
 
-    public function test_the_queue_links_to_the_prepare_page_with_the_request_preselected(): void
+    public function test_the_queue_no_longer_offers_prepare_but_the_page_still_works(): void
     {
         $request = $this->request();
 
@@ -145,10 +145,17 @@ class PrepareStockRequestTest extends TestCase
             ->assertOk()
             ->getContent();
 
-        $this->assertStringContainsString(
+        // Create ATL is the queue's one action now. Prepare survives as a route
+        // so an existing link still works, but the queue stopped advertising it.
+        $this->assertStringNotContainsString(
             route('stock-orders.prepare-stock-request', ['stock_request' => $request->id]),
             $html
         );
+
+        $this->actingAs($this->purchasing)
+            ->get(route('stock-orders.prepare-stock-request', ['stock_request' => $request->id]))
+            ->assertOk()
+            ->assertSee($request->request_number);
     }
 
     public function test_a_prepared_request_leaves_the_open_queue(): void
@@ -261,8 +268,12 @@ class PrepareStockRequestTest extends TestCase
             ->assertSee('nothing to prepare');
     }
 
-    public function test_legacy_request_rows_still_appear_in_the_queue(): void
+    public function test_purchase_orders_no_longer_leak_into_the_request_queue(): void
     {
+        // This row is not a request at all: storeSupplierPo files every supplier
+        // PO as STANDARD_REPLENISHMENT, which is exactly what the legacy query
+        // matched on. It was surfacing on this page with a View Request button
+        // that led to a purchase order.
         $legacy = PurchaseOrder::create([
             'po_type' => 'STANDARD_REPLENISHMENT',
             'warehouse_id' => $this->warehouse->id,
@@ -272,13 +283,19 @@ class PrepareStockRequestTest extends TestCase
             'requested_by' => $this->opsManager->id,
             'request_date' => now(),
             'requested_products' => [['product' => 'Diesel', 'quantity' => 7500]],
-            'remarks' => 'Legacy row still awaiting purchase',
+            'remarks' => 'Ordinary supplier PO, not a request',
         ]);
 
-        $this->actingAs($this->purchasing)
+        $html = $this->actingAs($this->purchasing)
             ->get(route('stock-orders.wet-stock-requests.index'))
             ->assertOk()
-            ->assertSee('Pending PO#')
-            ->assertSee('Legacy row still awaiting purchase');
+            ->getContent();
+
+        $this->assertStringNotContainsString('Ordinary supplier PO, not a request', $html);
+        $this->assertStringNotContainsString('View Request', $html);
+        $this->assertStringNotContainsString(
+            route('stock-orders.wet-stock-requests.show', $legacy->id),
+            $html
+        );
     }
 }

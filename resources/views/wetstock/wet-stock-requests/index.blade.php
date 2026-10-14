@@ -10,27 +10,6 @@
             <p class="text-muted small mb-0">Incoming wet stock replenishment requests and the depot deliveries raised against them.</p>
         </div>
         <div class="d-flex gap-2 align-items-center flex-wrap">
-            {{-- The controller has always honoured ?search= on this page; only
-                 the field was missing. Styled like M1 so the two read as one set. --}}
-            <form method="GET" action="{{ route('stock-orders.wet-stock-requests.index') }}"
-                  class="d-flex gap-2 align-items-center">
-                @if (request('warehouse_id'))
-                    <input type="hidden" name="warehouse_id" value="{{ request('warehouse_id') }}">
-                @endif
-                <div class="input-group">
-                    <span class="input-group-text bg-white border-end-0">
-                        <i class="bi bi-search text-muted"></i>
-                    </span>
-                    <input type="text" name="search" class="form-control border-start-0"
-                           placeholder="Search REQ#, PO# or remarks..." value="{{ request('search') }}">
-                </div>
-                <button type="submit" class="btn btn-primary-custom">Search</button>
-                @if (request('search'))
-                    <a href="{{ route('stock-orders.wet-stock-requests.index') }}"
-                       class="btn btn-outline-secondary">Reset</a>
-                @endif
-            </form>
-
             <a href="{{ route('wetstock.supplier-orders.index') }}" class="btn btn-secondary-custom">
                 <i class="bi bi-box-seam me-1"></i> Incoming Stock Log
             </a>
@@ -124,68 +103,33 @@
         @endforeach
     </div>
 
-    <!-- Incoming Depot Deliveries Ready to Receive -->
-    <div class="card card-custom border-0 shadow-sm mb-4">
-        <div class="card-header bg-white border-0 py-3">
-            <h5 class="fw-bold text-dark mb-0"><i class="bi bi-truck text-primary me-2"></i>Depot Inbound Deliveries</h5>
-        </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-custom mb-0">
-                    <thead>
-                        <tr>
-                            <th>PO #</th>
-                            <th>Channel</th>
-                            <th>Product</th>
-                            <th class="text-end">Liters</th>
-                            <th>Supplier DR / ATL #</th>
-                            <th>Status</th>
-                            <th>Depot / Target</th>
-                            <th class="text-end">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @php
-                            $activeDeliveries = $incomingDeliveries->whereIn('status', ['Pending', 'Active']);
-                        @endphp
-                        @forelse ($activeDeliveries as $del)
-                            <tr>
-                                <td class="fw-bold text-dark">{{ $del->purchaseOrder->po_number ?? 'PO #' . $del->purchase_order_id }}</td>
-                                <td>
-                                    <span class="badge bg-light text-dark border">{{ $del->channel_label }}</span>
-                                </td>
-                                <td><span class="badge bg-secondary-subtle text-secondary border">{{ $del->product }}</span></td>
-                                <td class="text-end fw-bold text-primary">{{ number_format($del->qty_to_receive) }} L</td>
-                                <td class="small">{{ $del->dr_number ?: ($del->atl_number ?: 'Pending') }}</td>
-                                <td>
-                                    <span class="badge {{ $del->status === 'Active' ? 'bg-info' : 'bg-warning text-dark' }} px-2 py-1">
-                                        {{ $del->status === 'Active' ? 'Dispatched' : 'Pending' }}
-                                    </span>
-                                </td>
-                                <td>{{ $del->purchaseOrder->warehouse->name ?? 'Any Depot' }}</td>
-                                <td class="text-end">
-                                    @if (Auth::user()->canReceiveStockIntoDepot())
-                                        <button type="button" class="btn btn-sm btn-primary-custom" data-bs-toggle="modal" data-bs-target="#receiveStockModal{{ $del->id }}">
-                                            <i class="bi bi-box-arrow-in-down me-1"></i> Receive Stock
-                                        </button>
-                                    @endif
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="8" class="text-center text-muted py-4">No incoming depot deliveries currently awaiting tank fill.</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
     <!-- Replenishment Requests Table -->
     <div class="card card-custom border-0 shadow-sm">
         <div class="card-header bg-white border-0 py-3">
-            <h5 class="fw-bold text-dark mb-0"><i class="bi bi-file-earmark-text text-secondary me-2"></i>Submitted Replenishment Requests</h5>
+            {{-- The search sits on the section it filters rather than in the page
+                 header, so it is obvious what it narrows. The controller has always
+                 honoured ?search= here; only its placement is new. --}}
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2">
+                <h5 class="fw-bold text-dark mb-0"><i class="bi bi-file-earmark-text text-secondary me-2"></i>Submitted Replenishment Requests</h5>
+                <form method="GET" action="{{ route('stock-orders.wet-stock-requests.index') }}"
+                      class="d-flex gap-2 align-items-center flex-wrap">
+                    @if (request('warehouse_id'))
+                        <input type="hidden" name="warehouse_id" value="{{ request('warehouse_id') }}">
+                    @endif
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0">
+                            <i class="bi bi-search text-muted"></i>
+                        </span>
+                        <input type="text" name="search" class="form-control border-start-0"
+                               placeholder="Search REQ #, site, or remarks..." value="{{ request('search') }}">
+                    </div>
+                    <button type="submit" class="btn btn-primary-custom">Search</button>
+                    {{-- Always present rather than only after a search, so the pair
+                         reads as one control the way M1's does. --}}
+                    <a href="{{ route('stock-orders.wet-stock-requests.index') }}"
+                       class="btn btn-outline-secondary">Clear</a>
+                </form>
+            </div>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -225,20 +169,14 @@
                                 <td class="small text-muted">{{ $req->remarks ?: '—' }}</td>
                                 <td class="pe-3 text-end">
                                     @if (Auth::user()->canEditStockOrders())
-                                        {{-- Create ATL leads to the request's own ATL page, which
-     lists what has been issued and adds more. The PO to draw
-     on is chosen there, so a request does not need a PO of its
-     own first. --}}
-<a href="{{ route('stock-orders.wet-stock-requests.atls', $req->id) }}"
-   class="btn btn-sm btn-primary rounded-pill px-3 py-1 d-block w-100" title="Issue an ATL against this request">
-    <i class="bi bi-plus-lg me-1"></i> Create ATL
-</a>
-
-{{-- Prepare raises the PO from the request. The PO number
-                                             is chosen there, so nothing is typed here. --}}
-                                        <a href="{{ route('stock-orders.prepare-stock-request', ['stock_request' => $req->id]) }}"
-                                           class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1 d-block w-100 mt-1" title="Raise a purchase order against this request">
-                                            <i class="bi bi-pencil-square me-1"></i> Prepare &amp; Submit
+                                        {{-- The only action left on a request row. It leads to
+                                             the request's own ATL page, which lists what has been
+                                             issued and adds more, and which chooses the PO to
+                                             draw on. A request does not need a PO of its own
+                                             first, so there is no separate Prepare step here. --}}
+                                        <a href="{{ route('stock-orders.wet-stock-requests.atls', $req->id) }}"
+                                           class="btn btn-sm btn-primary rounded-pill px-3 py-1 d-block w-100" title="Issue an ATL against this request">
+                                            <i class="bi bi-plus-lg me-1"></i> Create ATL
                                         </a>
                                     @endif
                                 </td>
@@ -247,45 +185,6 @@
                             <tr>
                                 <td colspan="10" class="text-center text-muted py-4">No new replenishment requests.</td>
                             </tr>
-                        @endforelse
-
-                        {{-- Requests that predate the dedicated table and still live as
-                             purchase_orders rows. --}}
-                        @forelse ($legacyRequests as $req)
-                            @php
-                                // The ATL is raised as a delivery on this PO; show whichever
-                                // identifier has been issued, else Pending.
-                                $atlDelivery = $req->deliveries
-                                    ->first(fn ($d) => $d->atl_number || $d->client_atl_number);
-                            @endphp
-                            <tr>
-                                {{-- Real requests carry a REQ number of their own. These
-                                     rows predate that, so they fall back to the PO number
-                                     once issued, then to a placeholder. --}}
-                                <td class="fw-bold text-dark">
-                                    {{ $req->po_number ?: 'Pending PO#' }}
-                                </td>
-                                <td class="small">
-                                    {{ $atlDelivery?->atl_number ?? $atlDelivery?->client_atl_number ?? 'Pending' }}
-                                </td>
-                                <td>{{ $req->warehouse->name ?? 'All Depots' }}</td>
-                                <td><span class="badge bg-light text-dark border">{{ $req->po_type }}</span></td>
-                                <td class="text-end fw-bold">{{ number_format($req->qty_ordered) }} L</td>
-                                <td class="small">{{ $req->date_needed ? $req->date_needed->format('M d, Y') : '—' }}</td>
-                                <td>
-                                    <span class="badge bg-warning text-dark px-2 py-1">{{ $req->request_status }}</span>
-                                </td>
-                                <td class="small text-muted">{{ $req->requester->name ?? 'Depot' }}</td>
-                                <td class="small text-muted">{{ $req->remarks ?: '—' }}</td>
-                                <td class="pe-3 text-end">
-                                    <a href="{{ route('stock-orders.wet-stock-requests.show', $req->id) }}"
-                                       class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1">
-                                        <i class="bi bi-eye me-1"></i> View Request
-                                    </a>
-                                </td>
-                            </tr>
-                        @empty
-                            {{-- Nothing legacy to show. --}}
                         @endforelse
                     </tbody>
                 </table>
@@ -296,58 +195,4 @@
         </div>
     </div>
 </div>
-
-{{-- Modals container outside table (prevents layout shift and flickering) --}}
-@foreach ($incomingDeliveries->whereIn('status', ['Pending', 'Active']) as $del)
-    @if (Auth::user()->canReceiveStockIntoDepot())
-        <div class="modal fade" id="receiveStockModal{{ $del->id }}" tabindex="-1" aria-labelledby="receiveStockModalLabel{{ $del->id }}" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered text-start">
-                <div class="modal-content rounded-4 border-0 shadow">
-                    <div class="modal-header border-0 pb-0">
-                        <h5 class="modal-title fw-bold" id="receiveStockModalLabel{{ $del->id }}">Receive Stock into Depot Tank</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <form action="{{ route('wetstock.deliveries.receive-stock', $del->id) }}" method="POST">
-                        @csrf
-                        <div class="modal-body pt-3">
-                            <div class="p-3 bg-light rounded-3 mb-3">
-                                <div class="d-flex justify-content-between small text-muted mb-1">
-                                    <span>PO Delivery #{{ $del->id }}</span>
-                                    <span>{{ $del->channel_label }}</span>
-                                </div>
-                                <div class="fw-bold fs-5 text-primary">{{ number_format($del->qty_to_receive) }} L of {{ $del->product }}</div>
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label fw-semibold">Target Storage Tank <span class="text-danger">*</span></label>
-                                <select name="storage_tank_id" class="form-select" required>
-                                    <option value="">Select tank to fill...</option>
-                                    @php
-                                        $whTanks = $del->purchaseOrder && $del->purchaseOrder->warehouse 
-                                            ? $del->purchaseOrder->warehouse->tanks->where('is_active', true)
-                                            : $warehouses->pluck('tanks')->flatten()->where('is_active', true);
-                                    @endphp
-                                    @foreach ($whTanks as $tank)
-                                        <option value="{{ $tank->id }}">
-                                            {{ $tank->warehouse->name ?? '' }} - {{ $tank->name }} ({{ $tank->fuel_type }} | Remaining: {{ number_format($tank->remaining_capacity) }}L / Max: {{ number_format($tank->max_capacity) }}L)
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label fw-semibold">Receiving Date <span class="text-danger">*</span></label>
-                                <input type="date" name="date" class="form-control" value="{{ now()->format('Y-m-d') }}" required>
-                            </div>
-                        </div>
-                        <div class="modal-footer border-0 pt-0">
-                            <button type="button" class="btn btn-secondary-custom" data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" class="btn btn-primary-custom px-4">Confirm Stock IN</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    @endif
-@endforeach
 @endsection
