@@ -670,9 +670,7 @@ class StockOrderController extends Controller
                 'client_atl_number' => $isClientProvided
                     ? ($validated['client_atl_number'] ?? null)
                     : ($validated['client_atl_number'] ?? $order->client_atl_number),
-                'atl_category' => $order->isBuyBack()
-                    ? PurchaseOrderDelivery::CATEGORY_BUY_BACK
-                    : PurchaseOrderDelivery::CATEGORY_FUEL_TRADE,
+                'atl_category' => $order->atlCategory(),
                 'atl_source' => $isClientProvided
                     ? PurchaseOrderDelivery::SOURCE_CLIENT_PROVIDED
                     : PurchaseOrderDelivery::SOURCE_DOYEN_ISSUED,
@@ -816,9 +814,7 @@ class StockOrderController extends Controller
             'client_atl_number' => $isClientProvided
                 ? ($validated['client_atl_number'] ?? null)
                 : ($validated['client_atl_number'] ?? $order->client_atl_number),
-            'atl_category' => $order->isBuyBack()
-                ? PurchaseOrderDelivery::CATEGORY_BUY_BACK
-                : PurchaseOrderDelivery::CATEGORY_FUEL_TRADE,
+            'atl_category' => $order->atlCategory(),
             'atl_source' => $isClientProvided
                 ? PurchaseOrderDelivery::SOURCE_CLIENT_PROVIDED
                 : PurchaseOrderDelivery::SOURCE_DOYEN_ISSUED,

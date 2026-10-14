@@ -81,15 +81,32 @@ class SalesOrderController extends Controller
             ->orderByDesc('id')
             ->get();
 
-        // Per-product ATL totals are no longer rendered on this page; the ATL
-        // table reads each ATL's own breakdown instead.
+        // Product-aware totals. A single flat number cannot describe an order for
+        // three fuels, and a page that says "Ordered 30,000" against "ATL'd
+        // 30,000" cannot tell you that all of it was Diesel and the Unleaded is
+        // untouched. Each figure is keyed by product, with the flat total kept as
+        // the sum, so the cards can show both.
+        $orderedByProduct = $order->productRequirements($order->resolvedProduct());
+        $atlByProduct = $order->drawnByProduct();
+        $liftedByProduct = $order->liftedByProduct();
+
+        $remainingByProduct = [];
+        foreach ($orderedByProduct as $product => $qty) {
+            $remainingByProduct[$product] = max(0, $qty - ($atlByProduct[$product] ?? 0));
+        }
+
         $totals = [
-            'ordered' => (int) $order->qty_ordered,
-            'atl_issued' => (int) $atls->sum('qty_to_receive'),
-            'lifted' => (int) $atls->where('lift_status', PurchaseOrderDelivery::LIFT_LIFTED)
-                ->sum('qty_to_receive'),
+            'ordered' => (int) array_sum($orderedByProduct),
+            'atl_issued' => (int) array_sum($atlByProduct),
+            'lifted' => (int) array_sum($liftedByProduct),
+            'remaining' => (int) array_sum($remainingByProduct),
         ];
-        $totals['remaining'] = max(0, $totals['ordered'] - $totals['atl_issued']);
+        $totals['by_product'] = [
+            'ordered' => $orderedByProduct,
+            'atl_issued' => $atlByProduct,
+            'lifted' => $liftedByProduct,
+            'remaining' => $remainingByProduct,
+        ];
 
         $order->load('items');
 

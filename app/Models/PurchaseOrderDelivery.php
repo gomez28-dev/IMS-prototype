@@ -239,10 +239,38 @@ class PurchaseOrderDelivery extends Model
     public function typeLabel(): string
     {
         return match ($this->atl_category) {
-            self::CATEGORY_FUEL_TRADE => 'FT',
             self::CATEGORY_BUY_BACK => 'BUY BACK',
+            // Regular and Consumo orders are filed under FUEL_TRADE too, because
+            // their ATLs draw from supplier POs and are lifted straight to the
+            // client. Filing them by category alone would label every one of them
+            // FT, which is wrong for an order that was never a Fuel Trade.
+            self::CATEGORY_FUEL_TRADE => $this->orderCategoryLabel() ?? 'FT',
             default => $this->isDeliveredRequest() ? 'DOYEN - DELIVERY' : 'DOYEN - PICK UP',
         };
+    }
+
+    /**
+     * The sales order's own category name, when this ATL is not a Fuel Trade one.
+     *
+     * @return string|null
+     */
+    private function orderCategoryLabel(): ?string
+    {
+        $order = $this->order;
+
+        if (! $order) {
+            return null;
+        }
+
+        if ($order->isFuelTrade()) {
+            return 'FT';
+        }
+
+        if ($order->isConsumo()) {
+            return 'CONSUMO';
+        }
+
+        return 'REGULAR';
     }
 
     /**

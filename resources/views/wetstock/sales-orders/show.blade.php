@@ -49,32 +49,69 @@
             </div>
         </div>
 
-        {{-- Totals --}}
+        {{-- Product-aware totals, laid out like the M1 Deliveries cards: one row
+             per product and a Total underneath. --}}
+        @php
+            $chipStyles = [
+                'U' => 'background:#dcfce7;color:#166534;border:1px solid #bbf7d0;',
+                'D' => 'background:#e0e7ff;color:#3730a3;border:1px solid #c7d2fe;',
+                'P' => 'background:#fee2e2;color:#991b1b;border:1px solid #fecaca;',
+            ];
+            $chip = function ($code, $title = '') use ($chipStyles) {
+                $style = $chipStyles[$code] ?? 'background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb;';
+
+                return '<span class="prod-chip" style="'.$style.'" title="'.e($title).'">'.e($code ?: '—').'</span>';
+            };
+            $prodRows = [['D', 'Diesel'], ['U', 'Unleaded'], ['P', 'Premium']];
+
+            $volumeCards = [
+                ['title' => 'Qty Ordered', 'icon' => 'bi-clipboard-check', 'tint' => 'background:#ecfeff;color:#0891b2;', 'key' => 'ordered', 'class' => 'text-dark'],
+                ['title' => "Total ATL'd", 'icon' => 'bi-file-earmark-text', 'tint' => 'background:#eef2ff;color:#4f46e5;', 'key' => 'atl_issued', 'class' => 'text-primary'],
+                ['title' => 'Total Lifted', 'icon' => 'bi-truck', 'tint' => 'background:#f0fdf4;color:#16a34a;', 'key' => 'lifted', 'class' => 'text-success'],
+                ['title' => 'Remaining', 'icon' => 'bi-clock-history', 'tint' => 'background:#fffbeb;color:#d97706;', 'key' => 'remaining', 'class' => 'text-warning'],
+            ];
+        @endphp
+        <style>
+            .stat-title { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #374151; }
+            .stat-icon {
+                width: 46px; height: 46px; border-radius: 0.8rem; display: flex;
+                align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0;
+            }
+            .stat-row {
+                display: flex; justify-content: space-between; align-items: center;
+                border: 1px solid #e5e7eb; border-radius: 0.6rem;
+                padding: 0.45rem 0.8rem; margin-bottom: 0.45rem; background: #fff;
+            }
+            .stat-row .stat-val { font-weight: 700; color: #111827; }
+            .stat-total { display: flex; justify-content: space-between; padding: 0.25rem 0.3rem 0; color: #6b7280; }
+            .stat-total .stat-val { font-weight: 700; color: #111827; }
+            .prod-chip {
+                display: inline-block; font-size: 0.65rem; font-weight: 700; line-height: 1;
+                padding: 0.2rem 0.4rem; border-radius: 0.35rem; margin: 0 1px;
+            }
+        </style>
+
         <div class="row g-3 mb-4">
-            <div class="col-md-3">
-                <div class="card card-custom p-3 border-0 shadow-sm">
-                    <span class="text-uppercase text-muted fw-bold small">Qty Ordered</span>
-                    <h3 class="fw-bold text-dark mb-0 mt-1 font-monospace">{{ number_format($totals['ordered']) }} L</h3>
+            @foreach ($volumeCards as $card)
+                <div class="col-md-3">
+                    <div class="card card-custom p-3 border-0 h-100">
+                        <div class="d-flex align-items-center gap-3 mb-3">
+                            <div class="stat-icon" style="{{ $card['tint'] }}"><i class="bi {{ $card['icon'] }}"></i></div>
+                            <span class="stat-title">{{ $card['title'] }}</span>
+                        </div>
+                        @foreach ($prodRows as [$code, $name])
+                            <div class="stat-row">
+                                <span>{!! $chip($code, $name) !!} <span class="ms-2">{{ $name }}</span></span>
+                                <span class="stat-val">{{ number_format($totals['by_product'][$card['key']][$name] ?? 0) }}</span>
+                            </div>
+                        @endforeach
+                        <div class="stat-total">
+                            <span>Total</span>
+                            <span class="stat-val {{ $card['class'] }}">{{ number_format($totals[$card['key']]) }}</span>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card card-custom p-3 border-0 shadow-sm">
-                    <span class="text-uppercase text-muted fw-bold small">Total ATL'd</span>
-                    <h3 class="fw-bold text-primary mb-0 mt-1 font-monospace">{{ number_format($totals['atl_issued']) }} L</h3>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card card-custom p-3 border-0 shadow-sm">
-                    <span class="text-uppercase text-muted fw-bold small">Total Lifted</span>
-                    <h3 class="fw-bold text-success mb-0 mt-1 font-monospace">{{ number_format($totals['lifted']) }} L</h3>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card card-custom p-3 border-0 shadow-sm">
-                    <span class="text-uppercase text-muted fw-bold small">Remaining</span>
-                    <h3 class="fw-bold text-warning mb-0 mt-1 font-monospace">{{ number_format($totals['remaining']) }} L</h3>
-                </div>
-            </div>
+            @endforeach
         </div>
 
         {{-- The per-product requirement block that used to sit here is gone.

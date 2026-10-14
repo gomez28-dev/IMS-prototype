@@ -275,6 +275,38 @@ class Order extends Model
      */
     public function drawnByProduct(): array
     {
+        return $this->drawnByProductWhere(fn (PurchaseOrderDelivery $atl) => true);
+    }
+
+    /**
+     * Volume actually lifted off-site, per product.
+     *
+     * The lifted counterpart of drawnByProduct(), and subject to the same rule:
+     * an ATL counts only once it has actually been marked lifted, so a figure read
+     * off qty_to_receive would report fuel as gone that is still sitting on a
+     * tanker.
+     *
+     * @return array<string, int>
+     */
+    public function liftedByProduct(): array
+    {
+        return $this->drawnByProductWhere(
+            fn (PurchaseOrderDelivery $atl) => $atl->lift_status === PurchaseOrderDelivery::LIFT_LIFTED
+        );
+    }
+
+    /**
+     * Totals per product across this order's ATLs, filtered by $include.
+     *
+     * drawnByProduct() and liftedByProduct() differ only in which ATLs count, so
+     * they share the query rather than repeating it - a copy that drifted is how
+     * the detail page ends up claiming fuel left that was never lifted.
+     *
+     * @param  callable(PurchaseOrderDelivery): bool  $include
+     * @return array<string, int>
+     */
+    private function drawnByProductWhere(callable $include): array
+    {
         $atls = PurchaseOrderDelivery::where(function ($query) {
             $query->where('order_id', $this->getKey())
                 ->orWhere(function ($legacy) {
@@ -283,7 +315,8 @@ class Order extends Model
                 });
         })
             ->with('allocations')
-            ->get();
+            ->get()
+            ->filter($include);
 
         $totals = [];
 
@@ -493,23 +526,49 @@ class Order extends Model
     }
 
     /**
-     * Whether an ATL may be drafted for this order.
+     * The ATL category this order's ATLs are filed under.
      *
-     * Clearance only gates submitting for VP approval, not preparing the
-     * document, so this is looser than canBeIssuedAtl().
+     * Buy Back is called out because its deliveries behave differently. Every
+     * other category - Fuel Trade, Regular, Consumo - draws from supplier POs the
+     * same way and is lifted straight to the client, so all three file under
+     * FUEL_TRADE. That category is what keeps a tanker pick-up from being stocked
+     * into a depot tank, and a Regular order's ATL must not do that either.
+     *
+     * PurchaseOrderDelivery::typeLabel() is what tells the three apart for display.
      */
-    public function canPrepareAtl(): bool
+    public function atlCategory(): string
     {
-        return ($this->isFuelTrade() || $this->isBuyBack()) && $this->status !== 'Cancelled';
+        return $this->isBuyBack()
+            ? PurchaseOrderDelivery::CATEGORY_BUY_BACK
+            : PurchaseOrderDelivery::CATEGORY_FUEL_TRADE;
     }
 
     /**
-     * Security gate: An ATL can only be issued if Fuel Trade order is Approved by Accounting and not cancelled.
+     * Whether an ATL may be opened for this order.
+     *
+     * Every order that Module 3 lists can raise one, whatever its category. The
+     * supervisor drew the Create ATL button on a Regular order - it has no FT- or
+     * BB- prefix - and scopeForModuleThree() lists all of them, so gating this on
+     * the category offered a button that was never reachable and hid the feature
+     * from most of the page.
+     *
+     * Clearance is deliberately not tested here. canBeIssuedAtl() is the gate that
+     * matters at save time, and it is stricter.
+     */
+    public function canPrepareAtl(): bool
+    {
+        return $this->status !== 'Cancelled';
+    }
+
+    /**
+     * Security gate: an ATL is only issued once Accounting has cleared the order
+     * and it has not been cancelled.
+     *
+     * Also category-free, for the reason on canPrepareAtl().
      */
     public function canBeIssuedAtl(): bool
     {
-        return $this->isFuelTrade()
-            && $this->clearing_status === 'Approved'
+        return $this->clearing_status === 'Approved'
             && $this->status !== 'Cancelled';
     }
 
