@@ -202,8 +202,14 @@
                                                     title="View ATL">
                                                 <i class="bi bi-eye me-1"></i> View
                                             </button>
-                                            @if (Auth::user()->canEditStockOrders())
-                                                <a href="{{ route('stock-orders.add-atl', $order->id) }}"
+                                            {{-- add-atl wants a Purchase Order id. This used to
+                                                 pass the Sales Order's, which opened an
+                                                 unrelated PO's form or 404'd. An ATL can
+                                                 draw from several POs; the first allocation
+                                                 is the one it is opened against. --}}
+                                            @php $atlPoId = $atl->allocations->first()?->purchase_order_id ?? $atl->purchase_order_id; @endphp
+                                            @if (Auth::user()->canEditStockOrders() && $atlPoId)
+                                                <a href="{{ route('stock-orders.add-atl', $atlPoId) }}"
                                                    class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary" title="Edit ATL">
                                                     <i class="bi bi-pencil me-1"></i> Pen
                                                 </a>

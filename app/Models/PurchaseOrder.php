@@ -147,6 +147,36 @@ public function isFuelTrade(): bool
         return $this->po_type === 'FUEL_TRADE';
     }
 
+    /**
+     * Purchase orders an ATL can still draw volume from.
+     *
+     * The supervisor's rule for the PO dropdown: list the POs that still have
+     * remaining quantity. "Remaining" is judged on any product, not one in
+     * particular, so a PO holding only Premium is still offered.
+     *
+     * A collection rather than a scope because the balance is computed in PHP
+     * from each PO's items and its allocations, which SQL cannot express.
+     *
+     * @return \Illuminate\Support\Collection<int, self>
+     */
+    public static function availableForAllocation(): \Illuminate\Support\Collection
+    {
+        return self::query()
+            ->where('status', '!=', 'Cancelled')
+            ->with(['items.allocations', 'allocations'])
+            ->get()
+            ->filter(function (self $po) {
+                foreach (self::PRODUCTS as $product) {
+                    if ($po->getAvailableBalanceForProduct($product) > 0) {
+                        return true;
+                    }
+                }
+
+                return false;
+            })
+            ->values();
+    }
+
     public function isBuyBack(): bool
     {
         return $this->po_type === 'BUY_BACK';

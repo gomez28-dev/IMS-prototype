@@ -466,22 +466,9 @@ class StockOrderController extends Controller
                 ->with('error', "Cannot issue ATL: Sales Order {$order->formatted_so_number} has not been cleared by Accounting (Status: {$order->clearing_status}).");
         }
 
-        // The supervisor's rule: the dropdown lists POs that still have remaining
-        // quantity. "Remaining" is judged on any product, not one in
-        // particular, so a PO holding only Premium is still offered.
-        $availablePos = PurchaseOrder::where('status', '!=', 'Cancelled')
-            ->with(['items.allocations', 'allocations'])
-            ->get()
-            ->filter(function ($po) {
-                foreach (PurchaseOrder::PRODUCTS as $option) {
-                    if ($po->getAvailableBalanceForProduct($option) > 0) {
-                        return true;
-                    }
-                }
-
-                return false;
-            })
-            ->values();
+        // The supervisor's rule: the dropdown lists POs that still have
+        // remaining quantity. See PurchaseOrder::availableForAllocation().
+        $availablePos = PurchaseOrder::availableForAllocation();
 
         $mobileTankers = StorageTank::where('category', 'tanker')
             ->where('is_active', true)
@@ -1186,6 +1173,10 @@ public function storeStockRequestPo(Request $request): RedirectResponse
             'An ATL can only be raised against a purchase order the VP has approved.'
         );
 
+        // No allocation pool here on purpose. This action raises another ATL
+        // against the one PO in the route, and storeAtl() records a single
+        // product and quantity against it. The multi-PO Allocate table belongs
+        // to the Fuel Trade path, where the order chooses which POs to draw on.
         return view('wetstock.stock-orders.form', [
             'mode' => 'add_atl',
             'purchaseOrder' => $purchaseOrder,
