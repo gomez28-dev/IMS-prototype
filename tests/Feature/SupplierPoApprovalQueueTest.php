@@ -115,11 +115,14 @@ class SupplierPoApprovalQueueTest extends TestCase
             ->assertDontSee('PO-QUEUE-REJECT');
     }
 
-    public function test_purchasing_cannot_open_the_approval_queue(): void
+    public function test_purchasing_can_see_the_approval_queue_but_not_approve(): void
     {
+        // The queue is now visible to anyone who can reach Module 3, so
+        // Purchasing can see what is waiting. Ruling on it is still the VP's:
+        // test_purchasing_cannot_approve_a_supplier_po below pins that.
         $this->actingAs($this->purchasing)
             ->get(route('stock-orders.approvals'))
-            ->assertStatus(403);
+            ->assertOk();
     }
 
     public function test_purchasing_cannot_approve_a_supplier_po(): void

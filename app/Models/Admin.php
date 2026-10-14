@@ -65,7 +65,27 @@ class Admin extends Authenticatable
 
     public function canAccessStockOrders(): bool
     {
-        return in_array($this->role, ['admin', 'purchasing', 'vp', 'audit', 'viewer']);
+        // Module 2 and Module 3 are connected through stock, so every role that
+        // can work in wet stock can work here too. Before this the two lists were
+        // disjoint: the operations roles could not open Stock Orders at all.
+        return in_array($this->role, [
+            'admin',
+            'ops_admin', 'ops_mgr', 'ops_wh', 'ops_log',
+            'hod',
+            'purchasing', 'vp', 'audit', 'viewer',
+        ], true);
+    }
+
+    /**
+     * Whether the VP approval queue is worth showing this user.
+     *
+     * Anyone who can reach Module 3 can see what is waiting on the VP. That is
+     * visibility, not authority: Approve and Reject stay on
+     * canApproveStockOrders(), which is the VP and an administrator.
+     */
+    public function canViewStockApprovals(): bool
+    {
+        return $this->canAccessStockOrders();
     }
 
     public function canEditStockOrders(): bool

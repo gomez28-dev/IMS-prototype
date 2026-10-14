@@ -197,8 +197,10 @@ Route::post('/warehouses/{warehouse}/tanks', [WetStock\StorageTankController::cl
         });
     });
 
-    // Module 3: Stock Orders & ATL Issuance (Gated to admin, purchasing, vp, audit, viewer)
-    Route::prefix('stock-orders')->name('stock-orders.')->middleware('role:admin,purchasing,vp,audit,viewer')->group(function () {
+    // Module 3: Stock Orders & ATL Issuance.
+    // Gated to everyone who can work with stock: the Module 2 operations roles,
+    // administration, purchasing, the VP, and the read-only roles.
+    Route::prefix('stock-orders')->name('stock-orders.')->middleware('role:admin,ops_admin,ops_mgr,ops_wh,ops_log,hod,purchasing,vp,audit,viewer')->group(function () {
         // Module 3 was split into three dedicated pages. These routes come
         // first so "purchase-orders" is never captured by a "{po}" wildcard.
         Route::prefix('purchase-orders')->name('purchase-orders.')->group(function () {

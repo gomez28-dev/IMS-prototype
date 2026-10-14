@@ -440,36 +440,66 @@ class Module3DedicatedPagesTest extends TestCase
         );
     }
 
-    public function test_approvals_link_is_hidden_from_purchasing(): void
+    public function test_approvals_link_is_shown_to_purchasing(): void
     {
-        $this->assertStringNotContainsString(
+        // Visibility widened: the queue is open to anyone who can reach Module 3,
+        // because M2 is connected to stock. Purchasing still cannot approve it,
+        // which test_purchasing_cannot_approve_a_supplier_po pins.
+        $this->assertStringContainsString(
             'Approvals',
             $this->sidebarFor('purchasing'),
-            'Purchasing must not see the Approvals entry.'
+            'Purchasing must be able to see what is waiting on the VP.'
         );
     }
 
-    public function test_approvals_link_is_hidden_from_other_roles(): void
+    public function test_approvals_link_is_shown_to_the_read_only_roles(): void
     {
-        // Only these roles can reach Module 3 at all (canAccessStockOrders);
-        // ops_admin and friends are blocked by the route middleware before a
-        // sidebar is ever rendered, so they are not asserted here.
         foreach (['audit', 'viewer'] as $role) {
-            $this->assertStringNotContainsString(
+            $this->assertStringContainsString(
                 'Approvals',
                 $this->sidebarFor($role),
-                "Role {$role} must not see the Approvals entry."
+                "Role {$role} can reach Module 3, so it can see the Approvals entry."
             );
         }
     }
 
+    public function test_approvals_link_is_hidden_from_an_m1_only_role(): void
+    {
+        $user = Admin::create([
+            'username' => 'm1only_' . uniqid(),
+            'password' => bcrypt('secret'),
+            'name' => 'Sales Person',
+            'role' => 'sales',
+        ]);
+
+        // Read from the portal, which every signed-in user can reach. The
+        // sidebarFor() helper cannot be used here: it loads a Module 3 page,
+        // and a Module 1 role is refused before a sidebar is ever rendered.
+        $html = $this->actingAs($user)
+            ->get(route('portal'))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringNotContainsString(
+            route('stock-orders.approvals'),
+            $html,
+            'A Module 1 role has no business with the stock approval queue.'
+        );
+        $this->assertStringNotContainsString(
+            'Enter Stock Orders',
+            $html,
+            'A Module 1 role must not be offered Module 3 at all.'
+        );
+    }
+
     /**
-     * Module 3 routes are gated to admin, purchasing, vp, audit and viewer.
-     * A role outside that list must be refused outright.
+     * Module 3 routes are gated to everyone who can work with stock: the Module 2
+     * operations roles, administration, purchasing, the VP and the read-only
+     * roles. A role outside that list must be refused outright.
      */
     public function test_roles_outside_stock_orders_are_refused(): void
     {
-        foreach (['ops_admin', 'sales'] as $role) {
+        foreach (['sales', 'accounting'] as $role) {
             $user = Admin::create([
                 'username' => 'blk_' . $role . '_' . uniqid(),
                 'password' => bcrypt('secret'),
@@ -480,6 +510,26 @@ class Module3DedicatedPagesTest extends TestCase
             $this->actingAs($user)
                 ->get(route('stock-orders.purchase-orders.index'))
                 ->assertForbidden();
+        }
+    }
+
+    /**
+     * The reverse of the widening: the Module 2 operations roles can now open
+     * Stock Orders, because M2 is connected to stocks.
+     */
+    public function test_module_2_operations_roles_can_reach_stock_orders(): void
+    {
+        foreach (['ops_admin', 'ops_mgr', 'ops_wh', 'ops_log', 'hod'] as $role) {
+            $user = Admin::create([
+                'username' => 'm3ok_' . $role . '_' . uniqid(),
+                'password' => bcrypt('secret'),
+                'name' => ucfirst($role),
+                'role' => $role,
+            ]);
+
+            $this->actingAs($user)
+                ->get(route('stock-orders.purchase-orders.index'))
+                ->assertOk();
         }
     }
 }

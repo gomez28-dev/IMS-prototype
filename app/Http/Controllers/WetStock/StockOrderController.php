@@ -1321,9 +1321,11 @@ public function storeStockRequestPo(Request $request): RedirectResponse
 
     public function approvals(Request $request): View
     {
-        // The queue is a VP/Admin screen. The sidebar already hides it from
-        // everyone else, but the URL has to be closed off too.
-        abort_unless(Auth::user()->canApproveStockOrders(), 403);
+        // Anyone who can reach Module 3 may read the queue, because M2 is
+        // connected to stock and its operators need to see what is waiting on
+        // the VP. Approving is a separate question and stays with the VP: see
+        // canApproveStockOrders() on approve() and reject().
+        abort_unless(Auth::user()->canViewStockApprovals(), 403);
 
         // Two queues: Purchase Orders waiting on the VP, and ATLs waiting on
         // the VP. The PO tab stays the default so the existing link is

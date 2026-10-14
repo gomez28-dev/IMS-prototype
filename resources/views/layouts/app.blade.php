@@ -719,7 +719,7 @@
                 ->count()
             : 0;
 
-        $__pendingPoApprovalsCount = Auth::user()->canApproveStockOrders()
+        $__pendingPoApprovalsCount = Auth::user()->canViewStockApprovals()
             ? \App\Models\PurchaseOrder::where('request_status', 'RECEIVED')->count()
             : 0;
     @endphp
@@ -778,7 +778,7 @@
                     <a class="nav-link d-flex align-items-center {{ request()->routeIs('stock-orders.wet-stock-requests.*') ? 'active' : '' }}" href="{{ route('stock-orders.wet-stock-requests.index') }}">
                         <i class="bi bi-droplet-half me-2"></i> Wet Stock Requests
                     </a>
-                    @if (Auth::user()->canApproveStockOrders())
+                    @if (Auth::user()->canViewStockApprovals())
                         <a class="nav-link d-flex align-items-center" href="{{ route('stock-orders.approvals') }}">
                             <i class="bi bi-check2-circle me-2"></i> Approvals
                             @if ($__pendingPoApprovalsCount > 0)
@@ -935,7 +935,7 @@
                     <i class="bi bi-droplet-half"></i>
                     <span class="nav-label">Wet Stock Requests</span>
                 </a>
-                @if (Auth::user()->canApproveStockOrders())
+                @if (Auth::user()->canViewStockApprovals())
                 <a href="{{ route('stock-orders.approvals') }}" class="sidebar-nav-link {{ request()->routeIs('stock-orders.approvals') ? 'active' : '' }}" title="Approvals">
                     <i class="bi bi-check2-circle"></i>
                     <span class="nav-label">Approvals</span>
