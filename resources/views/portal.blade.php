@@ -54,7 +54,7 @@
                         <h4 class="fw-bold text-dark mb-2">Stock Orders</h4>
                         <p class="text-muted small">Manage Purchase Orders, Fuel Trade direct pick-ups, PO Buy Back, and issue Authority to Load (ATL).</p>
                     </div>
-                    <a href="{{ route('stock-orders.dashboard') }}" class="btn btn-primary-custom w-100 py-2 fs-6">
+                    <a href="{{ route('stock-orders.purchase-orders.index') }}" class="btn btn-primary-custom w-100 py-2 fs-6">
                         Enter Stock Orders <i class="bi bi-arrow-right ms-1"></i>
                     </a>
                 </div>

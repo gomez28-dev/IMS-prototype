@@ -719,8 +719,11 @@
                 ->count()
             : 0;
 
+        // POs and ATLs both waiting on the VP. These are the same two queries the
+        // Approvals page runs, so the badge can never disagree with the page.
         $__pendingPoApprovalsCount = Auth::user()->canViewStockApprovals()
-            ? \App\Models\PurchaseOrder::where('request_status', 'RECEIVED')->count()
+            ? \App\Models\PurchaseOrder::pendingVpApproval()->count()
+                + \App\Models\PurchaseOrderDelivery::pendingVpApproval()->count()
             : 0;
     @endphp
     {{-- ============ MOBILE SIDEBAR DRAWER (< 992px, preserved) ============ --}}

@@ -1336,31 +1336,19 @@ public function storeStockRequestPo(Request $request): RedirectResponse
         }
 
         $pendingOrders = PurchaseOrder::with(['warehouse', 'client', 'requester', 'deliveries'])
-            ->where('request_status', 'RECEIVED')
+            ->pendingVpApproval()
             ->latest()
             ->paginate(15);
 
-        // Every Doyen-issued ATL the VP has not yet ruled on. The supervisor
-        // asked for all of them in the queue, so this is "not approved and not
-        // rejected" rather than "submitted": a draft still waiting on its author
-        // is the VP's to see and to approve or send back.
-        //
-        // It used to be the narrower FOR_APPROVAL only, and filtered on the sales
-        // order being cleared by Accounting - which meant an ATL raised for an
-        // uncleared order, or against a stock request rather than a sales order,
-        // never appeared at all.
-        //
-        // Client-provided ATLs stay out: that is the client's own document, which
-        // the system records rather than issues, so there is nothing to approve.
+        // Every Doyen-issued ATL the VP has not yet ruled on: a draft still waiting
+        // on its author is the VP's to see and to approve or send back. It used to
+        // be the narrower FOR_APPROVAL only, and filtered on the sales order being
+        // cleared by Accounting - which meant an ATL raised for an uncleared order,
+        // or against a stock request rather than a sales order, never appeared at
+        // all. Both queries below are shared with the sidebar badge so the number
+        // on the badge is exactly what this page lists.
         $pendingAtls = PurchaseOrderDelivery::query()
-            ->whereIn('approval_status', [
-                PurchaseOrderDelivery::APPROVAL_DRAFT,
-                PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL,
-            ])
-            ->where(function ($q) {
-                $q->whereNull('atl_source')
-                    ->orWhere('atl_source', PurchaseOrderDelivery::SOURCE_DOYEN_ISSUED);
-            })
+            ->pendingVpApproval()
             ->with(['order', 'purchaseOrder', 'stockRequest', 'allocations'])
             ->latest()
             ->paginate(15);
@@ -1682,15 +1670,19 @@ public function storeStockRequestPo(Request $request): RedirectResponse
             abort(403, 'This ATL was rejected, so no ATL PDF is available.');
         }
 
-        // An ATL document is not released until the VP has approved. Where the
-        // ATL came from a PO, that is the PO approval; where it came straight
-        // from a Module 2 stock request, it is the ATL's own approval.
-        if ($delivery->purchaseOrder) {
-            if (!$delivery->purchaseOrder->isVpApproved()) {
-                abort(403, 'The ATL PDF is released only after the VP has approved this purchase order.');
-            }
-        } elseif ($delivery->approval_status !== PurchaseOrderDelivery::APPROVAL_APPROVED) {
+        // An ATL document is not released until the VP has approved the ATL. This
+        // is its own check, not the PO's: an ATL raised against an approved PO was
+        // still a document someone had to sign off, and the previous `elseif` let
+        // any ATL on an approved PO skip the check entirely, so a draft or a
+        // pending one could print itself.
+        if ($delivery->approval_status !== PurchaseOrderDelivery::APPROVAL_APPROVED) {
             abort(403, 'The ATL PDF is released only after the VP has approved this ATL.');
+        }
+
+        // A PO that is still in the Approvals queue has not been signed off either,
+        // so nothing may be drawn or printed from it while it waits there.
+        if ($delivery->purchaseOrder && !$delivery->purchaseOrder->isVpApproved()) {
+            abort(403, 'The ATL PDF is released only after the VP has approved this purchase order.');
         }
 
         $po = $delivery->purchaseOrder;

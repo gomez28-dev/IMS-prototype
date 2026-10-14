@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -138,6 +139,29 @@ class PurchaseOrderDelivery extends Model
     public function isClientProvided(): bool
     {
         return $this->atl_source === self::SOURCE_CLIENT_PROVIDED;
+    }
+
+    /**
+     * ATLs the VP has not yet ruled on: neither approved nor rejected.
+     *
+     * "Not ruled on" rather than "submitted", because the supervisor asked for
+     * every ATL to be visible while it waits. Both the Approvals queue and the
+     * sidebar badge read this, so it is defined once.
+     *
+     * Client-provided ATLs stay out. That is the client's own document, which
+     * the system records rather than issues, so there is nothing here to approve.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopePendingVpApproval(Builder $query): Builder
+    {
+        return $query
+            ->whereIn('approval_status', [self::APPROVAL_DRAFT, self::APPROVAL_FOR_APPROVAL])
+            ->where(function ($q) {
+                $q->whereNull('atl_source')
+                    ->orWhere('atl_source', self::SOURCE_DOYEN_ISSUED);
+            });
     }
 
     public function isApproved(): bool

@@ -142,6 +142,24 @@ public function scopeCreatedPos(Builder $query): Builder
         ->where('po_type', '!=', self::TYPE_FUEL_TRADE);
 }
 
+    /**
+     * Purchase orders still waiting on the VP.
+     *
+     * The sidebar badge and the Approvals queue both count this, so it lives
+     * here rather than being written twice. createdPos() keeps the per-order Fuel
+     * Trade placeholders out: those are raised by the ATL flow itself and are
+     * created unapproved, so they are not the VP's to sign off.
+     *
+     * @param  Builder  $query
+     * @return Builder
+     */
+    public function scopePendingVpApproval(Builder $query): Builder
+    {
+        return $query
+            ->createdPos()
+            ->where('request_status', 'RECEIVED');
+    }
+
 public function isFuelTrade(): bool
     {
         return $this->po_type === 'FUEL_TRADE';

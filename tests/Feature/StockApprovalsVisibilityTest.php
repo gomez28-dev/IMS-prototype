@@ -173,4 +173,118 @@ class StockApprovalsVisibilityTest extends TestCase
 
         $this->assertSame('CONFIRMED', $po->fresh()->request_status);
     }
+
+    // ---- The badge tells the truth -----------------------------------------
+
+    public function test_the_sidebar_badge_counts_pending_pos_and_atls_together(): void
+    {
+        $vp = $this->admin('vp');
+
+        // One PO waiting, one ATL waiting.
+        $po = $this->pendingPo();
+        $atl = PurchaseOrderDelivery::create([
+            'purchase_order_id' => $po->id,
+            'delivery_channel' => 'SUPPLIER_DOYEN_PICKUP',
+            'order_type' => 'PICK_UP',
+            'atl_type' => 'DITC_ATL',
+            'atl_number' => 'ATL-BADGE-'.rand(1000, 9999),
+            'product' => 'Diesel',
+            'qty_to_receive' => 5000,
+            'receiving_date' => now()->format('Y-m-d'),
+            'approval_status' => PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL,
+        ]);
+
+        $html = $this->actingAs($vp)->get(route('stock-orders.purchase-orders.index'))->getContent();
+
+        // The badge used to count pending POs only, so an ATL waiting on the same
+        // VP was invisible from the sidebar: the number under-reported the queue
+        // the link next to it opened.
+        $this->assertStringContainsString(
+            '>2<',
+            $html,
+            'Two items are waiting on the VP, so the badge should say 2.'
+        );
+
+        $this->assertStringContainsString($atl->atl_number, $this->queueHtml($vp));
+    }
+
+    public function test_the_badge_does_not_count_an_atl_the_vp_has_already_ruled_on(): void
+    {
+        $vp = $this->admin('vp');
+        $po = $this->pendingPo();
+
+        foreach ([
+            PurchaseOrderDelivery::APPROVAL_APPROVED,
+            PurchaseOrderDelivery::APPROVAL_REJECTED,
+        ] as $status) {
+            PurchaseOrderDelivery::create([
+                'purchase_order_id' => $po->id,
+                'delivery_channel' => 'SUPPLIER_DOYEN_PICKUP',
+                'order_type' => 'PICK_UP',
+                'atl_type' => 'DITC_ATL',
+                'atl_number' => 'ATL-DONE-'.rand(1000, 9999),
+                'product' => 'Diesel',
+                'qty_to_receive' => 5000,
+                'receiving_date' => now()->format('Y-m-d'),
+                'approval_status' => $status,
+            ]);
+        }
+
+        // A client-provided ATL is the client's own document; there is nothing on
+        // it for the VP to approve, so it must not inflate the number.
+        PurchaseOrderDelivery::create([
+            'purchase_order_id' => $po->id,
+            'delivery_channel' => 'SUPPLIER_DOYEN_PICKUP',
+            'order_type' => 'PICK_UP',
+            'atl_type' => 'CLIENT_ATL',
+            'client_atl_number' => 'CLIENT-'.rand(1000, 9999),
+            'product' => 'Diesel',
+            'qty_to_receive' => 5000,
+            'receiving_date' => now()->format('Y-m-d'),
+            'atl_source' => PurchaseOrderDelivery::SOURCE_CLIENT_PROVIDED,
+            'approval_status' => PurchaseOrderDelivery::APPROVAL_DRAFT,
+        ]);
+
+        $html = $this->actingAs($vp)->get(route('stock-orders.purchase-orders.index'))->getContent();
+
+        $this->assertStringContainsString(
+            '>1<',
+            $html,
+            'Only the one PO is still waiting, so the badge should say 1.'
+        );
+    }
+
+    public function test_a_fuel_trade_placeholder_does_not_join_the_po_queue(): void
+    {
+        $vp = $this->admin('vp');
+        $this->pendingPo();
+
+        // The ATL flow raises one of these per sales order when its ATL names a PO
+        // that does not exist yet. It is created unapproved, so it was landing in
+        // the VP's PO queue as though someone had asked for it to be signed off.
+        PurchaseOrder::create([
+            'po_number' => 'FT-PLACEHOLDER-'.rand(1000, 9999),
+            'po_type' => PurchaseOrder::TYPE_FUEL_TRADE,
+            'supplier_name' => 'Placeholder Depot',
+            'po_date' => now()->toDateString(),
+            'qty_ordered' => 10000,
+            'request_status' => 'RECEIVED',
+        ]);
+
+        $html = $this->actingAs($vp)->get(route('stock-orders.purchase-orders.index'))->getContent();
+
+        $this->assertStringContainsString(
+            '>1<',
+            $html,
+            'The placeholder is not the VP to approve, so only the real PO counts.'
+        );
+    }
+
+    protected function queueHtml(Admin $vp): string
+    {
+        return $this->actingAs($vp)
+            ->get(route('stock-orders.approvals', ['tab' => 'atls']))
+            ->assertOk()
+            ->getContent();
+    }
 }
