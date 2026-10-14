@@ -9,7 +9,28 @@
             <h2 class="fw-bold text-dark mb-1">Wet Stock Requests</h2>
             <p class="text-muted small mb-0">Incoming wet stock replenishment requests and the depot deliveries raised against them.</p>
         </div>
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+            {{-- The controller has always honoured ?search= on this page; only
+                 the field was missing. Styled like M1 so the two read as one set. --}}
+            <form method="GET" action="{{ route('stock-orders.wet-stock-requests.index') }}"
+                  class="d-flex gap-2 align-items-center">
+                @if (request('warehouse_id'))
+                    <input type="hidden" name="warehouse_id" value="{{ request('warehouse_id') }}">
+                @endif
+                <div class="input-group">
+                    <span class="input-group-text bg-white border-end-0">
+                        <i class="bi bi-search text-muted"></i>
+                    </span>
+                    <input type="text" name="search" class="form-control border-start-0"
+                           placeholder="Search REQ#, PO# or remarks..." value="{{ request('search') }}">
+                </div>
+                <button type="submit" class="btn btn-primary-custom">Search</button>
+                @if (request('search'))
+                    <a href="{{ route('stock-orders.wet-stock-requests.index') }}"
+                       class="btn btn-outline-secondary">Reset</a>
+                @endif
+            </form>
+
             <a href="{{ route('wetstock.supplier-orders.index') }}" class="btn btn-secondary-custom">
                 <i class="bi bi-box-seam me-1"></i> Incoming Stock Log
             </a>
