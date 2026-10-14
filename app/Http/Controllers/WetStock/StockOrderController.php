@@ -1338,30 +1338,41 @@ public function storeStockRequestPo(Request $request): RedirectResponse
             ->latest()
             ->paginate(15);
 
-        // Only Doyen-issued ATLs submitted for approval, and only those whose
-        // sales order is actually cleared. Client-provided ATLs are recorded
-        // only and never need approval.
+        // Every Doyen-issued ATL the VP has not yet ruled on. The supervisor
+        // asked for all of them in the queue, so this is "not approved and not
+        // rejected" rather than "submitted": a draft still waiting on its author
+        // is the VP's to see and to approve or send back.
+        //
+        // It used to be the narrower FOR_APPROVAL only, and filtered on the sales
+        // order being cleared by Accounting - which meant an ATL raised for an
+        // uncleared order, or against a stock request rather than a sales order,
+        // never appeared at all.
+        //
+        // Client-provided ATLs stay out: that is the client's own document, which
+        // the system records rather than issues, so there is nothing to approve.
         $pendingAtls = PurchaseOrderDelivery::query()
-            ->where('approval_status', PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL)
+            ->whereIn('approval_status', [
+                PurchaseOrderDelivery::APPROVAL_DRAFT,
+                PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL,
+            ])
             ->where(function ($q) {
                 $q->whereNull('atl_source')
                     ->orWhere('atl_source', PurchaseOrderDelivery::SOURCE_DOYEN_ISSUED);
             })
-            ->whereHas('order', function ($q) {
-                $q->where('clearing_status', 'Approved');
-            })
-            ->with(['order', 'purchaseOrder', 'allocations'])
+            ->with(['order', 'purchaseOrder', 'stockRequest', 'allocations'])
             ->latest()
             ->paginate(15);
 
         $counts = [
             'pos' => PurchaseOrder::where('request_status', 'RECEIVED')->count(),
-            'atls' => PurchaseOrderDelivery::where('approval_status', PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL)
+            'atls' => PurchaseOrderDelivery::whereIn('approval_status', [
+                PurchaseOrderDelivery::APPROVAL_DRAFT,
+                PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL,
+            ])
                 ->where(function ($q) {
                     $q->whereNull('atl_source')
                         ->orWhere('atl_source', PurchaseOrderDelivery::SOURCE_DOYEN_ISSUED);
                 })
-                ->whereHas('order', fn ($q) => $q->where('clearing_status', 'Approved'))
                 ->count(),
         ];
 
@@ -1383,7 +1394,11 @@ public function storeStockRequestPo(Request $request): RedirectResponse
             return back()->with('error', 'Client-provided ATLs are recorded only and do not need approval.');
         }
 
-        if ($delivery->approval_status !== PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL) {
+        // Anything the queue lists is the VP's to rule on, drafts included.
+        if (! in_array($delivery->approval_status, [
+            PurchaseOrderDelivery::APPROVAL_DRAFT,
+            PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL,
+        ], true)) {
             return back()->with('error', 'Only ATLs awaiting approval can be approved.');
         }
 
@@ -1416,7 +1431,10 @@ public function storeStockRequestPo(Request $request): RedirectResponse
             return back()->with('error', 'Client-provided ATLs are recorded only and cannot be rejected.');
         }
 
-        if ($delivery->approval_status !== PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL) {
+        if (! in_array($delivery->approval_status, [
+            PurchaseOrderDelivery::APPROVAL_DRAFT,
+            PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL,
+        ], true)) {
             return back()->with('error', 'Only ATLs awaiting approval can be rejected.');
         }
 

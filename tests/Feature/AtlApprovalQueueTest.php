@@ -51,32 +51,39 @@ class AtlApprovalQueueTest extends TestCase
         $response->assertDontSee('ATL-Q-1');
     }
 
-    public function test_atl_tab_lists_only_atls_waiting_for_approval(): void
+    public function test_atl_tab_lists_everything_the_vp_has_not_ruled_on(): void
     {
         $this->atl('ATL-WAITING', PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL, 'Approved');
         $this->atl('ATL-DRAFT', PurchaseOrderDelivery::APPROVAL_DRAFT, 'Approved');
         $this->atl('ATL-DONE', PurchaseOrderDelivery::APPROVAL_APPROVED, 'Approved');
+        $this->atl('ATL-SENTBACK', PurchaseOrderDelivery::APPROVAL_REJECTED, 'Approved');
 
         $response = $this->actingAs($this->vp)
             ->get(route('stock-orders.approvals', ['tab' => 'atls']));
 
+        // A draft is still the VP's to rule on: the supervisor asked for every
+        // newly created ATL in the queue, not only the submitted ones. What has
+        // been approved or sent back has had its ruling and leaves.
         $response->assertStatus(200);
         $response->assertSee('ATL-WAITING');
-        $response->assertDontSee('ATL-DRAFT');
+        $response->assertSee('ATL-DRAFT');
         $response->assertDontSee('ATL-DONE');
+        $response->assertDontSee('ATL-SENTBACK');
     }
 
-    public function test_atl_with_unapproved_clearance_cannot_reach_the_queue(): void
+    public function test_an_atl_on_an_uncleared_order_still_reaches_the_queue(): void
     {
-        // Defence in depth: the issuance gate should stop this, but if such a
-        // row ever existed it must not be offered for approval.
+        // The queue used to filter these out on clearing_status, so a pending
+        // ATL was invisible to the VP until Accounting cleared the order. The
+        // supervisor asked for all of them, so the filter is gone. Issuing one is
+        // still gated; this is only about the queue showing what exists.
         $this->atl('ATL-UNCLEARED', PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL, 'Pending');
 
         $response = $this->actingAs($this->vp)
             ->get(route('stock-orders.approvals', ['tab' => 'atls']));
 
         $response->assertStatus(200);
-        $response->assertDontSee('ATL-UNCLEARED');
+        $response->assertSee('ATL-UNCLEARED');
     }
 
     public function test_vp_can_approve_an_atl(): void
