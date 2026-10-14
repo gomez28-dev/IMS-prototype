@@ -136,13 +136,14 @@
 
                         @if (! $isCleared)
                             <div class="alert alert-warning border-0 rounded-3 mb-4 small">
-                                <i class="bi bi-info-circle me-1"></i>
+                                <i class="bi bi-exclamation-triangle me-1"></i>
                                 Accounting clearance is <strong>{{ $order->clearing_status ?: 'Pending' }}</strong> for this order.
-                                You can still save the ATL as a <strong>draft</strong>, but it cannot be submitted for VP approval yet.
+                                Every ATL goes to the VP for approval, so this one cannot be created until
+                                Accounting clears the order.
                             </div>
                         @endif
 
-                        @error('submit_for_approval')
+                        @error('atl_source')
                             <div class="alert alert-danger border-0 rounded-3 mb-4 small">{{ $message }}</div>
                         @enderror
 
@@ -483,17 +484,25 @@
                                   placeholder="Dip requirements, refinery safety passes, calibration notes... ">{{ old('additional_remarks') }}</textarea>
                     </div>
 
+                    {{-- One submit button serves three forms, so the label has to say
+                         which one it is. On the Fuel Trade form the ATL is created and
+                         queued in a single action; the Prepare form submits a purchase
+                         order, not an ATL. --}}
+                    @php
+                        $submitLabel = match ($mode) {
+                            'fuel_trade' => 'Create ATL & Send for Approval',
+                            'add_atl' => 'Create ATL',
+                            default => 'Submit for Approval',
+                        };
+                    @endphp
                     <div class="d-flex justify-content-end gap-2 flex-wrap">
                         <a href="{{ route('stock-orders.atls.index') }}" class="btn btn-light border rounded-pill px-4">Cancel</a>
-                        <button type="submit" name="submit_for_approval" value="0" class="btn btn-outline-secondary rounded-pill px-4" id="saveDraftBtn">
-                            <i class="bi bi-save me-1"></i> Save Draft
-                        </button>
-                        <button type="submit" name="submit_for_approval" value="1"
+                        <button type="submit"
                                 class="btn btn-primary-custom rounded-pill px-4 shadow-sm {{ $isCleared ? '' : 'disabled' }}"
                                 id="submitBtn"
                                 @disabled(! $isCleared)
-                                title="{{ $isCleared ? 'Submit to the VP approval queue' : 'Blocked until Accounting clears this order' }}">
-                            <i class="bi bi-patch-check me-1"></i> Submit for Approval
+                                title="{{ $isCleared ? ($mode === 'fuel_trade' ? 'Create the ATL and send it to the VP approval queue' : 'Save and send for VP approval') : 'Blocked until Accounting clears this order' }}">
+                            <i class="bi bi-patch-check me-1"></i> {{ $submitLabel }}
                         </button>
                     </div>
                 </form>

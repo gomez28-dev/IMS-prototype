@@ -183,7 +183,6 @@ class WetStockRequestController extends Controller
             'plate_number' => ['nullable', 'string', 'max:32'],
             'storage_tank_id' => ['nullable', 'exists:storage_tanks,id'],
             'additional_remarks' => ['nullable', 'string', 'max:500'],
-            'submit_for_approval' => ['nullable', 'boolean'],
         ]);
 
         // The PO has to be one the pool still offers. A crafted POST naming a
@@ -249,11 +248,11 @@ class WetStockRequestController extends Controller
             'plate_number' => $validated['plate_number'] ?? null,
             'additional_remarks' => $validated['additional_remarks'] ?? null,
             'atl_category' => PurchaseOrderDelivery::CATEGORY_DOYEN_STOCKS,
-            // Every new ATL goes to the VP. Drafting before Accounting clears
-            // stays possible, so this is FOR_APPROVAL only once it is submitted.
-            'approval_status' => ($validated['submit_for_approval'] ?? false)
-                ? PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL
-                : PurchaseOrderDelivery::APPROVAL_DRAFT,
+            // Every new ATL goes to the VP the moment it is created. A stock
+            // request has no Accounting clearance gate of its own, so there is
+            // nothing to hold it back.
+            'approval_status' => PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL,
+            'atl_source' => PurchaseOrderDelivery::SOURCE_DOYEN_ISSUED,
             'status' => 'Pending',
             'lift_status' => PurchaseOrderDelivery::LIFT_UNLIFTED,
             'issued_at' => now(),

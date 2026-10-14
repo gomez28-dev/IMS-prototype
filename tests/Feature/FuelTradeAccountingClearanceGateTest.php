@@ -87,7 +87,7 @@ class FuelTradeAccountingClearanceGateTest extends TestCase
         $response->assertSessionHas('error');
     }
 
-    public function test_can_save_an_atl_as_a_draft_when_clearance_is_not_approved(): void
+    public function test_an_atl_cannot_be_created_at_all_when_clearance_is_not_approved(): void
     {
         $order = Order::create([
             'account' => $this->client->name,
@@ -110,18 +110,17 @@ class FuelTradeAccountingClearanceGateTest extends TestCase
             'receiving_date' => now()->addDays(2)->format('Y-m-d'),
             'atl_type' => 'DITC_ATL',
             'atl_number' => 'ATL-123',
-            // Explicitly saving a draft, not submitting for approval.
-            'submit_for_approval' => 0,
         ];
 
         $response = $this->actingAs($this->purchasingUser)
             ->post(route('stock-orders.store-fuel-trade-po', $order), $payload);
 
-        // Drafting is allowed before Accounting clears the order.
-        $response->assertSessionHas('success');
-
-        $atl = \App\Models\PurchaseOrderDelivery::latest('id')->firstOrFail();
-        $this->assertEquals('DRAFT', $atl->approval_status);
+        // There used to be a Save Draft path that let an ATL be created here and
+        // held back from the VP queue. Every ATL is now queued the moment it
+        // exists, so there is nothing to hold back and the order has to be cleared
+        // before an ATL can be raised at all.
+        $response->assertSessionHasErrors();
+        $this->assertNull(\App\Models\PurchaseOrderDelivery::latest('id')->first());
     }
 
     public function test_cannot_submit_atl_for_approval_when_clearance_is_not_approved(): void

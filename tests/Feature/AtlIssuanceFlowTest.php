@@ -24,54 +24,51 @@ class AtlIssuanceFlowTest extends TestCase
         ]);
     }
 
-    public function test_draft_can_be_saved_before_accounting_clears_the_order(): void
+    public function test_an_atl_cannot_be_issued_before_accounting_clears_the_order(): void
     {
         $order = $this->fuelTradeOrder('SO-DRAFT', 'Pending');
         $po = $this->supplierPo('PO-DRAFT', 50000);
 
+        // There used to be a Save Draft button that let an ATL be created here
+        // and held back from the VP queue. Every ATL now enters the queue as soon
+        // as it is created, so an uncleared order has nothing to create.
         $response = $this->actingAs($this->purchasing)->post(
             route('stock-orders.store-fuel-trade-po', $order->id),
-            $this->payload($po, ['submit_for_approval' => 0])
+            $this->payload($po)
         );
 
-        $response->assertRedirect();
-        $response->assertSessionHas('success');
-
-        $atl = PurchaseOrderDelivery::latest('id')->firstOrFail();
-        $this->assertEquals('DRAFT', $atl->approval_status);
-        $this->assertEquals('UNLIFTED', $atl->lift_status);
-        $this->assertEquals('DOYEN_ISSUED', $atl->atl_source);
-        // A draft must not sit in the VP approval queue.
-        $this->assertEquals(0, PurchaseOrderDelivery::where('approval_status', 'FOR_APPROVAL')->count());
+        $response->assertSessionHasErrors('atl_source');
+        $this->assertNull(PurchaseOrderDelivery::latest('id')->first());
     }
 
-    public function test_submit_for_approval_is_blocked_until_clearance_is_approved(): void
+    public function test_an_atl_for_an_uncleared_order_is_refused_even_from_the_m3_form(): void
     {
         $order = $this->fuelTradeOrder('SO-GATE', 'Pending');
         $po = $this->supplierPo('PO-GATE', 50000);
 
         $response = $this->actingAs($this->purchasing)->post(
             route('stock-orders.store-fuel-trade-po', $order->id),
-            $this->payload($po, ['submit_for_approval' => 1])
+            $this->payload($po)
         );
 
-        $response->assertSessionHasErrors();
+        $response->assertSessionHasErrors('atl_source');
         $this->assertNull(PurchaseOrderDelivery::latest('id')->first());
     }
 
-    public function test_cleared_order_can_be_submitted_for_approval(): void
+    public function test_a_cleared_order_goes_straight_to_the_vp_queue(): void
     {
         $order = $this->fuelTradeOrder('GO', 'Approved');
         $po = $this->supplierPo('PO-SUBMIT', 50000);
 
         $response = $this->actingAs($this->purchasing)->post(
             route('stock-orders.store-fuel-trade-po', $order->id),
-            $this->payload($po, ['submit_for_approval' => 1])
+            $this->payload($po)
         );
 
         $response->assertSessionHas('success');
 
         $atl = PurchaseOrderDelivery::latest('id')->firstOrFail();
+        // No checkbox is consulted any more: a Doyen-issued ATL is always queued.
         $this->assertEquals('FOR_APPROVAL', $atl->approval_status);
         $this->assertNotNull($atl->issued_at);
         $this->assertEquals($order->id, $atl->order_id);
@@ -87,7 +84,6 @@ class AtlIssuanceFlowTest extends TestCase
             $this->payload($po, [
                 'atl_source' => 'CLIENT_PROVIDED',
                 'client_atl_number' => 'ATL-CLI-9',
-                'submit_for_approval' => 0,
             ])
         );
 
@@ -96,7 +92,7 @@ class AtlIssuanceFlowTest extends TestCase
         $atl = PurchaseOrderDelivery::latest('id')->firstOrFail();
         $this->assertEquals('CLIENT_PROVIDED', $atl->atl_source);
         $this->assertEquals('ATL-CLI-9', $atl->client_atl_number);
-        // Client ATLs skip VP approval entirely, even if submit was pressed.
+        // Client ATLs skip VP approval entirely, even though every other ATL is queued.
         $this->assertNotEquals('FOR_APPROVAL', $atl->approval_status);
         $this->assertTrue($atl->isClientProvided());
     }
@@ -111,7 +107,6 @@ class AtlIssuanceFlowTest extends TestCase
             $this->payload($po, [
                 'atl_source' => 'CLIENT_PROVIDED',
                 'client_atl_number' => '',
-                'submit_for_approval' => 0,
             ])
         )->assertSessionHasErrors(['client_atl_number']);
     }
@@ -123,7 +118,7 @@ class AtlIssuanceFlowTest extends TestCase
 
         $this->actingAs($this->purchasing)->post(
             route('stock-orders.store-fuel-trade-po', $order->id),
-            $this->payload($po, ['submit_for_approval' => 0])
+            $this->payload($po)
         )->assertSessionHas('success');
 
         $atl = PurchaseOrderDelivery::latest('id')->firstOrFail();

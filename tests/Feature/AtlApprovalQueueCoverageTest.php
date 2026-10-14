@@ -261,7 +261,7 @@ class AtlApprovalQueueCoverageTest extends TestCase
     {
         // Built through the HTTP POST rather than the model, so the two things
         // that decide queueability are actually pinned: approval_status, and
-        // atl_source being left null rather than set to client-provided.
+        // atl_source being Doyen-issued rather than client-provided.
         $request = StockRequest::create([
             'request_number' => 'REQ-E2E-'.rand(100, 999),
             'request_type' => StockRequest::TYPE_PICKUP,
@@ -288,7 +288,6 @@ class AtlApprovalQueueCoverageTest extends TestCase
                 'atl_type' => 'DITC_ATL',
                 'atl_number' => 'ATL-E2E-'.uniqid(),
                 'receiving_date' => now()->addDays(3)->format('Y-m-d'),
-                'submit_for_approval' => 1,
             ])
             ->assertSessionHas('success');
 
@@ -297,15 +296,22 @@ class AtlApprovalQueueCoverageTest extends TestCase
         $this->assertSame(
             PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL,
             $atl->approval_status,
-            'Ticking the box should put it straight into the VP queue.'
+            'There is no checkbox any more: a Doyen-issued ATL is queued on creation.'
         );
-        $this->assertNull($atl->atl_source, 'Doyen-issued, so nothing is set to client-provided.');
+        $this->assertSame(
+            PurchaseOrderDelivery::SOURCE_DOYEN_ISSUED,
+            $atl->atl_source,
+            'Stamped explicitly, so the queue is reading a deliberate decision.'
+        );
 
         $this->assertStringContainsString($atl->atl_number, $this->queueHtml());
     }
 
-    public function test_an_atl_saved_as_a_draft_is_still_queued(): void
+    public function test_an_atl_from_a_stock_request_needs_no_checkbox_to_be_queued(): void
     {
+        // This form used to carry a "Submit to the VP for approval" checkbox, and
+        // unticking it left the ATL in DRAFT. Drafting has been withdrawn, so the
+        // same POST with no approval field at all must still queue.
         $request = StockRequest::create([
             'request_number' => 'REQ-E2ED-'.rand(100, 999),
             'request_type' => StockRequest::TYPE_PICKUP,
@@ -322,7 +328,6 @@ class AtlApprovalQueueCoverageTest extends TestCase
 
         $po = $this->po();
 
-        // Box unchecked: a draft. It must still reach the queue.
         $this->actingAs($this->purchasing)
             ->post(route('stock-orders.wet-stock-requests.atls.store', $request->id), [
                 'purchase_order_id' => $po->id,
@@ -338,7 +343,7 @@ class AtlApprovalQueueCoverageTest extends TestCase
 
         $atl = PurchaseOrderDelivery::where('request_id', $request->id)->firstOrFail();
 
-        $this->assertSame(PurchaseOrderDelivery::APPROVAL_DRAFT, $atl->approval_status);
+        $this->assertSame(PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL, $atl->approval_status);
         $this->assertStringContainsString($atl->atl_number, $this->queueHtml());
     }
 }

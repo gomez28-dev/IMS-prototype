@@ -189,16 +189,10 @@
                         </div>
 
                         <div class="col-12">
-                            <div class="form-check">
-                                <input class="form-check-input @error('submit_for_approval') is-invalid @enderror"
-                                       type="checkbox" value="1" id="submit_for_approval"
-                                       name="submit_for_approval" checked>
-                                <label class="form-check-label small" for="submit_for_approval">
-                                    Submit to the VP for approval
-                                </label>
-                                @error('submit_for_approval')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
+                            <div class="alert alert-info py-2 px-3 small mb-0">
+                                <i class="bi bi-info-circle me-1"></i>
+                                This ATL goes straight to the VP approval queue. Nothing lifts
+                                until it is approved.
                             </div>
                         </div>
                     </div>

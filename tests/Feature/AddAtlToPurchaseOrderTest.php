@@ -115,6 +115,59 @@ class AddAtlToPurchaseOrderTest extends TestCase
         $this->assertEquals($this->supplier->company_name, $po->fresh()->supplier_name);
     }
 
+    public function test_an_atl_added_to_a_po_reaches_the_vp_queue(): void
+    {
+        $po = $this->po('CONFIRMED');
+
+        $this->actingAs($this->purchasing)
+            ->post(route('stock-orders.store-atl', $po->id), $this->payload())
+            ->assertSessionHas('success');
+
+        $delivery = PurchaseOrderDelivery::where('atl_number', 'ATL-NEW-1')->firstOrFail();
+
+        // This method used to set neither approval_status nor atl_source, so the
+        // row landed with a null approval_status. The queue matches DRAFT or
+        // FOR_APPROVAL, so every ATL added this way was invisible to the VP and
+        // could never be signed off.
+        $this->assertSame(
+            PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL,
+            $delivery->approval_status
+        );
+        $this->assertSame(
+            PurchaseOrderDelivery::SOURCE_DOYEN_ISSUED,
+            $delivery->atl_source
+        );
+
+        $this->assertSame(
+            1,
+            PurchaseOrderDelivery::pendingVpApproval()->count(),
+            'The queue must actually list it.'
+        );
+
+        $this->assertSame(
+            1,
+            PurchaseOrderDelivery::where('approval_status', PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL)->count()
+        );
+    }
+
+    public function test_a_client_atl_number_records_a_client_atl_instead_of_queueing(): void
+    {
+        $po = $this->po('CONFIRMED');
+
+        $this->actingAs($this->purchasing)
+            ->post(route('stock-orders.store-atl', $po->id), $this->payload([
+                'client_atl_number' => 'CLIENT-9001',
+            ]))
+            ->assertSessionHas('success');
+
+        $delivery = PurchaseOrderDelivery::where('client_atl_number', 'CLIENT-9001')->firstOrFail();
+
+        // A client-provided ATL is the client's own document, so there is nothing
+        // on it for the VP to approve - the same carve-out the other ATL forms make.
+        $this->assertTrue($delivery->isClientProvided());
+        $this->assertSame(0, PurchaseOrderDelivery::pendingVpApproval()->count());
+    }
+
     public function test_adding_an_atl_records_the_per_product_allocation(): void
     {
         $po = $this->po('CONFIRMED');

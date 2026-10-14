@@ -547,18 +547,20 @@ class StockOrderController extends Controller
         }
 
         $isClientProvided = $request->input('atl_source') === PurchaseOrderDelivery::SOURCE_CLIENT_PROVIDED;
-        $submitForApproval = (bool) $request->input('submit_for_approval');
 
         if (!$order->canPrepareAtl()) {
             return redirect()->route('stock-orders.purchase-orders.index')
                 ->with('error', "Cannot issue ATL: Sales Order {$order->formatted_so_number} is not open for ATL preparation.");
         }
 
-        // Drafting is always allowed, even before Accounting clears the order.
-        // Only submitting for VP approval is gated on clearance.
-        if ($submitForApproval && !$isClientProvided && $order->clearing_status !== 'Approved') {
+        // Every Doyen-issued ATL now goes straight to the VP queue, so there is no
+        // longer a draft to fall back on. That makes Accounting's clearance the
+        // gate on issuing an ATL at all rather than only on submitting one, and
+        // the message names that blocker instead of pointing at a draft option
+        // that no longer exists.
+        if (!$isClientProvided && $order->clearing_status !== 'Approved') {
             return back()->withInput()->withErrors([
-                'submit_for_approval' => "Cannot submit for approval: Sales Order {$order->formatted_so_number} has not been cleared by Accounting (Status: {$order->clearing_status}). Save it as a draft instead.",
+                'atl_source' => "Cannot issue ATL: Sales Order {$order->formatted_so_number} has not been cleared by Accounting (Status: {$order->clearing_status}). Every ATL now goes to the VP for approval, so the order must be cleared first.",
             ]);
         }
 
@@ -585,7 +587,6 @@ class StockOrderController extends Controller
             $validated = $request->validate([
                 'product' => ['nullable', 'string', 'max:64'],
                 'atl_source' => ['nullable', 'in:DOYEN_ISSUED,CLIENT_PROVIDED'],
-                'submit_for_approval' => ['nullable', 'boolean'],
                 'delivery_channel' => ['nullable', 'string', 'in:SUPPLIER_CLIENT_PICKUP,SUPPLIER_DOYEN_PICKUP,BUY_BACK_CLIENT_PICKUP,BUY_BACK_DOYEN_PICKUP,SUPPLIER_STOCKS_DELIVERY,BUY_BACK_STOCKS_DELIVERY'],
                 'storage_tank_id' => ['nullable', 'exists:storage_tanks,id'],
                 'supplier_so_number' => ['nullable', 'string', 'max:64'],
@@ -675,9 +676,10 @@ class StockOrderController extends Controller
                 'atl_source' => $isClientProvided
                     ? PurchaseOrderDelivery::SOURCE_CLIENT_PROVIDED
                     : PurchaseOrderDelivery::SOURCE_DOYEN_ISSUED,
-                // Client-provided ATLs are recorded only: no VP approval. A
-                // Doyen-issued ATL enters the queue only when submitted.
-                'approval_status' => ($isClientProvided || !$submitForApproval)
+                // Client-provided ATLs are recorded only, so there is nothing on
+                // them for the VP to approve. Every Doyen-issued ATL enters the
+                // queue the moment it is created.
+                'approval_status' => $isClientProvided
                     ? PurchaseOrderDelivery::APPROVAL_DRAFT
                     : PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL,
                 'lift_status' => PurchaseOrderDelivery::LIFT_UNLIFTED,
@@ -722,11 +724,9 @@ class StockOrderController extends Controller
                     . count($validated['drawdowns']) . " PO(s) covering {$productSummary}.",
             ]);
 
-            $outcome = match (true) {
-                $isClientProvided => 'recorded (client-provided, no VP approval needed)',
-                $submitForApproval => 'submitted for VP approval',
-                default => 'saved as a draft',
-            };
+            $outcome = $isClientProvided
+                ? 'recorded (client-provided, no VP approval needed)'
+                : 'sent to the VP for approval';
 
             return redirect()->route('stock-orders.sales-orders.show', $order->id)
                 ->with('success', "Authority to Load (ATL) #{$reference} {$outcome} and linked to Supplier PO(s).");
@@ -737,7 +737,6 @@ class StockOrderController extends Controller
             'po_number' => ['required', 'string', 'max:64'],
             'supplier_name' => ['required', 'string', 'max:128'],
             'atl_source' => ['nullable', 'in:DOYEN_ISSUED,CLIENT_PROVIDED'],
-            'submit_for_approval' => ['nullable', 'boolean'],
             'delivery_channel' => ['nullable', 'string', 'in:SUPPLIER_CLIENT_PICKUP,SUPPLIER_DOYEN_PICKUP,BUY_BACK_CLIENT_PICKUP,BUY_BACK_DOYEN_PICKUP,SUPPLIER_STOCKS_DELIVERY,BUY_BACK_STOCKS_DELIVERY'],
             'storage_tank_id' => ['nullable', 'exists:storage_tanks,id'],
             'supplier_so_number' => ['nullable', 'string', 'max:64'],
@@ -823,7 +822,7 @@ class StockOrderController extends Controller
             'atl_source' => $isClientProvided
                 ? PurchaseOrderDelivery::SOURCE_CLIENT_PROVIDED
                 : PurchaseOrderDelivery::SOURCE_DOYEN_ISSUED,
-            'approval_status' => ($isClientProvided || !$submitForApproval)
+            'approval_status' => $isClientProvided
                 ? PurchaseOrderDelivery::APPROVAL_DRAFT
                 : PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL,
             'lift_status' => PurchaseOrderDelivery::LIFT_UNLIFTED,
@@ -1276,11 +1275,26 @@ public function storeStockRequestPo(Request $request): RedirectResponse
             ])->with('error', 'That ATL would draw more than the PO has remaining.');
         }
 
+        // The form decides client-provided by whether a client ATL number was
+        // typed, which is also what sets atl_type below. Recording the same
+        // decision in atl_source is what keeps this ATL out of, or in, the VP's
+        // queue on the same terms as every other ATL path.
+        $isClientProvided = filled($validated['client_atl_number'] ?? null);
+
         $delivery = PurchaseOrderDelivery::create([
             'purchase_order_id' => $purchaseOrder->id,
             'delivery_channel' => $validated['delivery_channel'],
             'order_type' => $validated['order_type'],
-            'atl_type' => !empty($validated['client_atl_number']) ? 'CLIENT_ATL' : ($validated['order_type'] === 'PICK_UP' ? 'DITC_ATL' : 'NONE'),
+            'atl_type' => $isClientProvided ? 'CLIENT_ATL' : ($validated['order_type'] === 'PICK_UP' ? 'DITC_ATL' : 'NONE'),
+            'atl_source' => $isClientProvided
+                ? PurchaseOrderDelivery::SOURCE_CLIENT_PROVIDED
+                : PurchaseOrderDelivery::SOURCE_DOYEN_ISSUED,
+            // Previously this method set neither column, so approval_status landed
+            // null. The queue matches DRAFT or FOR_APPROVAL, so every ATL raised
+            // this way was invisible to the VP and could never be signed off.
+            'approval_status' => $isClientProvided
+                ? PurchaseOrderDelivery::APPROVAL_DRAFT
+                : PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL,
             'dr_number' => $validated['dr_number'] ?? null,
             'atl_number' => $validated['atl_number'] ?? null,
             'client_atl_number' => $validated['client_atl_number'] ?? null,
@@ -1354,16 +1368,8 @@ public function storeStockRequestPo(Request $request): RedirectResponse
             ->paginate(15);
 
         $counts = [
-            'pos' => PurchaseOrder::where('request_status', 'RECEIVED')->count(),
-            'atls' => PurchaseOrderDelivery::whereIn('approval_status', [
-                PurchaseOrderDelivery::APPROVAL_DRAFT,
-                PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL,
-            ])
-                ->where(function ($q) {
-                    $q->whereNull('atl_source')
-                        ->orWhere('atl_source', PurchaseOrderDelivery::SOURCE_DOYEN_ISSUED);
-                })
-                ->count(),
+            'pos' => PurchaseOrder::pendingVpApproval()->count(),
+            'atls' => PurchaseOrderDelivery::pendingVpApproval()->count(),
         ];
 
         return view('wetstock.stock-orders.approvals', compact(
