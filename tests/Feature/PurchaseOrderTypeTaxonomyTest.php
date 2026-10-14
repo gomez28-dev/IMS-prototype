@@ -31,7 +31,7 @@ class PurchaseOrderTypeTaxonomyTest extends TestCase
         ]);
     }
 
-    protected function po(string $poType, string $poNumber = ''): PurchaseOrder
+    protected function po(string $poType, string $poNumber = '', string $requestStatus = 'CONFIRMED'): PurchaseOrder
     {
         $po = PurchaseOrder::create([
             'po_number' => $poNumber ?: 'PO-TYPE-'.uniqid(),
@@ -40,7 +40,7 @@ class PurchaseOrderTypeTaxonomyTest extends TestCase
             'supplier_name' => $this->supplier->company_name,
             'qty_ordered' => 10000,
             'total_amount' => 500000.00,
-            'request_status' => 'CONFIRMED',
+            'request_status' => $requestStatus,
             'status' => 'Pending',
             'prepared_by' => $this->purchasing->id,
         ]);
@@ -150,7 +150,9 @@ class PurchaseOrderTypeTaxonomyTest extends TestCase
 
     public function test_editing_a_po_cannot_change_its_category(): void
     {
-        $po = $this->po('BUY_BACK');
+        // Unapproved, because an approved PO is locked to edits altogether and
+        // would 403 before this could be tested.
+        $po = $this->po('BUY_BACK', '', 'RECEIVED');
 
         // The form no longer shows the category, and updateSupplierPo has no
         // po_type rule, so a crafted POST cannot move the PO either.

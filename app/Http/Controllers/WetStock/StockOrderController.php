@@ -117,6 +117,15 @@ class StockOrderController extends Controller
             abort(403);
         }
 
+        // An approved PO is a signed document the supplier is already working to,
+        // and ATLs may already have been drawn against its quantities. The
+        // supervisor's rule is that approval closes the PO to edits, and that is
+        // what the detail page's Edit-or-PDF switch already assumes - without
+        // this, a direct URL still reopened the form.
+        if ($purchaseOrder->isVpApproved()) {
+            abort(403, 'An approved purchase order can no longer be edited. Raise a new PO for any change.');
+        }
+
         $purchaseOrder->load(['items', 'supplier', 'deliveries.preparer']);
 
         // Deactivated suppliers stay selectable on the PO they are already
@@ -246,7 +255,14 @@ class StockOrderController extends Controller
             abort(403);
         }
 
-        $wasApproved = $purchaseOrder->isVpApproved();
+        // The same lock as editSupplierPo, checked here too because this is the
+        // route a crafted POST would hit directly. It used to deliberately allow
+        // the edit and return the PO to RECEIVED for re-approval, which silently
+        // un-approved a document ATLs had already been drawn from.
+        if ($purchaseOrder->isVpApproved()) {
+            abort(403, 'An approved purchase order can no longer be edited. Raise a new PO for any change.');
+        }
+
         $drawnByProduct = $purchaseOrder->drawnByProduct();
 
         $rules = [
@@ -265,20 +281,13 @@ class StockOrderController extends Controller
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'items.*.unit' => ['nullable', 'string', 'max:16'],
             'items.*.unit_price' => ['nullable', 'numeric', 'min:0'],
-        ];
-
-        // Once the VP has approved, the number identifies a document the
-        // supplier already holds, so it is locked rather than revalidated.
-        if ($wasApproved) {
-            $rules['po_number'] = ['nullable', 'string', 'max:64'];
-        } else {
-            // The trailing id excludes the PO being edited, so re-saving it
-            // with its own number still works.
-            $rules['po_number'] = [
+            // The trailing id excludes the PO being edited, so re-saving it with
+            // its own number still works.
+            'po_number' => [
                 'required', 'string', 'max:64',
                 Rule::unique('purchase_orders', 'po_number')->ignore($purchaseOrder->id),
-            ];
-        }
+            ],
+        ];
 
         $validated = $request->validate($rules);
 
@@ -338,20 +347,7 @@ class StockOrderController extends Controller
             'remarks' => $validated['remarks'] ?? null,
         ];
 
-        // The number only moves while the PO is still unapproved.
-        if (! $wasApproved) {
-            $attributes['po_number'] = $validated['po_number'];
-        }
-
-        // Anything that actually changed on an approved PO puts it back in
-        // the queue, so the signed version always matches what was released.
-        $changed = $this->supplierPoDiffers($purchaseOrder, $attributes, $lines);
-
-        if ($wasApproved && $changed) {
-            $attributes['request_status'] = 'RECEIVED';
-            $attributes['approved_by'] = null;
-            $attributes['approved_at'] = null;
-        }
+        $attributes['po_number'] = $validated['po_number'];
 
         $purchaseOrder->update($attributes);
 
@@ -360,61 +356,11 @@ class StockOrderController extends Controller
         AuditLog::create([
             'admin_id' => Auth::id(),
             'action' => 'updated',
-            'description' => "Purchasing edited PO #{$purchaseOrder->po_number}."
-                . ($wasApproved && $changed ? ' Returned for VP re-approval.' : ''),
+            'description' => "Purchasing edited PO #{$purchaseOrder->po_number}.",
         ]);
 
-        $message = "Supplier PO #{$purchaseOrder->po_number} updated.";
-
-        if ($wasApproved && $changed) {
-            $message .= ' It has been returned for VP approval.';
-        }
-
         return redirect()->route('stock-orders.purchase-orders.show', $purchaseOrder->id)
-            ->with('success', $message);
-    }
-
-    /**
-     * Has this edit actually changed anything the VP would care about?
-     *
-     * Compared field by field rather than trusting the form, so an untouched
-     * PO stays approved even if the user simply opened and saved it.
-     *
-     * @param  array<string, mixed>  $attributes
-     * @param  array<string, array{quantity: int, unit_price: mixed}>  $lines
-     */
-    protected function supplierPoDiffers(PurchaseOrder $purchaseOrder, array $attributes, array $lines): bool
-    {
-        foreach ($attributes as $field => $value) {
-            $current = $purchaseOrder->{$field};
-
-            // Dates are stored as date strings on the model.
-            $value = $value instanceof \DateTimeInterface ? $value->format('Y-m-d') : $value;
-            $current = $current instanceof \DateTimeInterface ? $current->format('Y-m-d') : $current;
-
-            if ((float) $value != (float) $current) {
-                return true;
-            }
-        }
-
-        // Compare the product lines themselves, since a quantity or price
-        // change does not show up in the PO-level totals alone.
-        $currentLines = $purchaseOrder->items
-            ->mapWithKeys(fn ($item) => [$item->product => [
-                'quantity' => (int) $item->quantity_ordered,
-                'unit_price' => (float) $item->unit_price,
-            ]])
-            ->all();
-
-        $newLines = collect($lines)->map(fn ($l) => [
-            'quantity' => (int) $l['quantity'],
-            'unit_price' => (float) ($l['unit_price'] ?? 0),
-        ])->all();
-
-        ksort($currentLines);
-        ksort($newLines);
-
-        return $currentLines != $newLines;
+            ->with('success', "Supplier PO #{$purchaseOrder->po_number} updated.");
     }
 
     /**

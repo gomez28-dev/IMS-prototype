@@ -174,7 +174,7 @@ class PurchaseOrderActionColumnTest extends TestCase
         $response->assertDontSee('Confirm Refinery Pick Up / Lift');
     }
 
-    public function test_the_action_column_offers_exactly_print_view_and_pen(): void
+    public function test_an_approved_row_offers_print_and_view_but_no_edit(): void
     {
         $po = $this->po('CONFIRMED');
 
@@ -183,13 +183,14 @@ class PurchaseOrderActionColumnTest extends TestCase
 
         $response->assertStatus(200);
 
-        // Print | View | Pen.
+        // An approved PO can no longer be edited, so Print and View are the row's
+        // two actions. Offering Edit here was a link to a 403.
         $response->assertSee(route('stock-orders.po-pdf', $po->id), false);
         $response->assertSee(route('stock-orders.purchase-orders.show', $po->id), false);
-        $response->assertSee(route('stock-orders.edit-supplier-po', $po->id), false);
+        $response->assertDontSee(route('stock-orders.edit-supplier-po', $po->id), false);
         $response->assertSee('> Print', false);
         $response->assertSee('> View', false);
-        $response->assertSee('> Pen', false);
+        $response->assertDontSee('> Edit<', false);
 
         // Work that used to clutter the list now lives on the detail page.
         // Note: the Approvals route itself still appears in the sidebar, so the
@@ -197,7 +198,24 @@ class PurchaseOrderActionColumnTest extends TestCase
         $response->assertDontSee('Review for Approval');
         $response->assertDontSee(route('stock-orders.wet-stock-requests.show', $po->id), false);
         $response->assertDontSee('ATL PDF');
-        $response->assertDontSee('> Edit<', false);
+    }
+
+    public function test_an_unapproved_row_offers_edit_and_view_but_no_print(): void
+    {
+        $po = $this->po('RECEIVED');
+
+        $response = $this->actingAs($this->purchasing)
+            ->get(route('stock-orders.purchase-orders.index'));
+
+        $response->assertStatus(200);
+
+        // Before approval there is nothing signed to print, and the PO is still
+        // the VP's to send back, so it stays editable.
+        $response->assertSee(route('stock-orders.edit-supplier-po', $po->id), false);
+        $response->assertSee(route('stock-orders.purchase-orders.show', $po->id), false);
+        $response->assertDontSee(route('stock-orders.po-pdf', $po->id), false);
+        $response->assertSee('> Edit', false);
+        $response->assertSee('> View', false);
     }
 
     public function test_the_pen_action_is_hidden_from_roles_that_cannot_edit(): void

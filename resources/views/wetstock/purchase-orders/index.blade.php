@@ -232,28 +232,28 @@
                                         <div class="extra-small text-muted mt-1">{{ $po->computed_status }}</div>
                                     </td>
                                     <td class="pe-3 text-end">
-                                        {{-- Exactly three actions, per the whiteboard: Print, View, Pen.
-                                             Approval, ATL PDFs, scanned docs and tracking all live on
-                                             the PO detail page, so the list stays navigation only. --}}
+                                        {{-- Exactly two actions besides View, and which two
+                                             depends on where the PO is in its life: Print is
+                                             released only once the VP has approved, and an
+                                             approved PO can no longer be edited. So each state
+                                             offers Print XOR Edit. The routes enforce the same
+                                             thing, so this is a convenience rather than the
+                                             gate. --}}
                                         <div class="d-inline-flex gap-1 align-items-center flex-wrap justify-content-end">
-                                            {{-- Print is only released once the VP has approved, which
-                                                 the route enforces as well as this link. --}}
                                             @if ($po->isVpApproved())
                                                 <a href="{{ route('stock-orders.po-pdf', $po->id) }}"
                                                    class="btn btn-sm btn-outline-danger rounded-pill px-2 py-1" title="Print Purchase Order">
                                                     <i class="bi bi-printer me-1"></i> Print
+                                                </a>
+                                            @elseif (Auth::user()->canEditStockOrders())
+                                                <a href="{{ route('stock-orders.edit-supplier-po', $po->id) }}" class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary" title="Edit purchase order">
+                                                    <i class="bi bi-pencil me-1"></i> Edit
                                                 </a>
                                             @endif
 
                                             <a href="{{ route('stock-orders.purchase-orders.show', $po->id) }}" class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary" title="Open purchase order">
                                                 <i class="bi bi-eye me-1"></i> View
                                             </a>
-
-                                            @if (Auth::user()->canEditStockOrders())
-                                                <a href="{{ route('stock-orders.edit-supplier-po', $po->id) }}" class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary" title="Edit purchase order">
-                                                    <i class="bi bi-pencil me-1"></i> Pen
-                                                </a>
-                                            @endif
                                         </div>
                                     </td>
                                 </tr>

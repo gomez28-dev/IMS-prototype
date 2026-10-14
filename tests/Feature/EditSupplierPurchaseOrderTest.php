@@ -92,7 +92,7 @@ class EditSupplierPurchaseOrderTest extends TestCase
 
     public function test_edit_form_is_prefilled_from_the_po(): void
     {
-        $po = $this->po('CONFIRMED', ['Diesel' => 10000, 'Premium' => 5000]);
+        $po = $this->po('RECEIVED', ['Diesel' => 10000, 'Premium' => 5000]);
 
         $response = $this->actingAs($this->purchasing)
             ->get(route('stock-orders.edit-supplier-po', $po->id));
@@ -181,58 +181,65 @@ class EditSupplierPurchaseOrderTest extends TestCase
         $this->assertEquals('RECEIVED', $po->fresh()->request_status);
     }
 
-    public function test_editing_an_approved_po_sends_it_back_for_re_approval(): void
-    {
-        $po = $this->po('CONFIRMED', ['Diesel' => 10000]);
-
-        $this->actingAs($this->purchasing)
-            ->post(route('stock-orders.update-supplier-po', $po->id), $this->payload())
-            ->assertSessionHas('success');
-
-        $po = $po->fresh();
-        $this->assertEquals('RECEIVED', $po->request_status);
-        // The old sign-off must not linger.
-        $this->assertNull($po->approved_by);
-        $this->assertNull($po->approved_at);
-    }
-
-    public function test_saving_an_approved_po_unchanged_keeps_its_approval(): void
+    public function test_an_approved_po_cannot_be_edited_at_all(): void
     {
         $po = $this->po('CONFIRMED', ['Diesel' => 10000]);
         $po->update(['approved_by' => $this->vp->id, 'approved_at' => now()]);
+        $before = $po->fresh()->toArray();
 
-        // Resubmit exactly what is already stored.
+        // This used to silently accept the edit and drop the PO back to RECEIVED
+        // for re-approval. The supervisor's rule is that approval closes the PO,
+        // which also means an ATL already drawn from it can never have its basis
+        // rewritten underneath it.
         $this->actingAs($this->purchasing)
-            ->post(route('stock-orders.update-supplier-po', $po->id), [
-                'po_number' => $po->po_number,
-                'supplier_id' => $this->supplier->id,
-                'po_date' => $po->po_date->format('Y-m-d'),
-                'items' => [['product' => 'Diesel', 'quantity' => 10000, 'unit_price' => 50.00]],
-            ])
-            ->assertSessionHas('success');
+            ->post(route('stock-orders.update-supplier-po', $po->id), $this->payload())
+            ->assertForbidden();
 
-        $this->assertEquals('CONFIRMED', $po->fresh()->request_status);
-        $this->assertEquals($this->vp->id, $po->fresh()->approved_by);
+        $this->actingAs($this->purchasing)
+            ->get(route('stock-orders.edit-supplier-po', $po->id))
+            ->assertForbidden();
+
+        $after = $po->fresh()->toArray();
+        unset($before['updated_at'], $after['updated_at']);
+
+        $this->assertEquals($before, $after, 'Nothing about an approved PO may move.');
     }
 
-    public function test_an_approved_po_number_cannot_be_changed(): void
+    public function test_every_approved_state_is_locked(): void
     {
-        $po = $this->po('CONFIRMED', ['Diesel' => 10000]);
-        $original = $po->po_number;
+        foreach (['CONFIRMED', 'FOR_DELIVERY', 'COMPLETED'] as $status) {
+            $po = $this->po($status, ['Diesel' => 10000]);
 
-        $this->actingAs($this->purchasing)
-            ->post(route('stock-orders.update-supplier-po', $po->id), $this->payload([
-                'po_number' => 'PO-HIJACKED',
-            ]))
-            ->assertSessionHas('success');
+            $this->actingAs($this->purchasing)
+                ->get(route('stock-orders.edit-supplier-po', $po->id))
+                ->assertForbidden();
 
-        // A crafted POST cannot rename a PO the supplier already holds.
-        $this->assertEquals($original, $po->fresh()->po_number);
+            $this->actingAs($this->purchasing)
+                ->post(route('stock-orders.update-supplier-po', $po->id), $this->payload())
+                ->assertForbidden();
+        }
+    }
+
+    public function test_an_unapproved_po_can_still_be_edited(): void
+    {
+        // The lock is on approval, not on the PO existing: everything before the
+        // VP signs off has to stay editable.
+        foreach (['REQUESTED', 'RECEIVED'] as $status) {
+            $po = $this->po($status, ['Diesel' => 10000]);
+
+            $this->actingAs($this->purchasing)
+                ->get(route('stock-orders.edit-supplier-po', $po->id))
+                ->assertOk();
+
+            $this->actingAs($this->purchasing)
+                ->post(route('stock-orders.update-supplier-po', $po->id), $this->payload())
+                ->assertSessionHas('success');
+        }
     }
 
     public function test_quantity_cannot_drop_below_what_an_atl_already_drew(): void
     {
-        $po = $this->po('CONFIRMED', ['Diesel' => 10000]);
+        $po = $this->po('RECEIVED', ['Diesel' => 10000]);
 
         $delivery = PurchaseOrderDelivery::create([
             'purchase_order_id' => $po->id,
@@ -266,7 +273,7 @@ class EditSupplierPurchaseOrderTest extends TestCase
 
     public function test_a_product_that_has_been_drawn_from_cannot_be_removed(): void
     {
-        $po = $this->po('CONFIRMED', ['Diesel' => 10000, 'Premium' => 5000]);
+        $po = $this->po('RECEIVED', ['Diesel' => 10000, 'Premium' => 5000]);
 
         $delivery = PurchaseOrderDelivery::create([
             'purchase_order_id' => $po->id,
@@ -312,7 +319,7 @@ class EditSupplierPurchaseOrderTest extends TestCase
 
     public function test_an_atl_without_an_item_link_still_counts_as_drawn(): void
     {
-        $po = $this->po('CONFIRMED', ['Diesel' => 10000]);
+        $po = $this->po('RECEIVED', ['Diesel' => 10000]);
 
         // Fuel Trade ATLs record no purchase_order_item_id, so the guard has to
         // aggregate on the PO id and product instead.
@@ -344,7 +351,7 @@ class EditSupplierPurchaseOrderTest extends TestCase
 
     public function test_the_po_type_cannot_be_changed_by_an_edit(): void
     {
-        $po = $this->po('CONFIRMED', ['Diesel' => 10000]);
+        $po = $this->po('RECEIVED', ['Diesel' => 10000]);
         $po->update(['po_type' => 'BUY_BACK']);
 
         // A crafted POST must not be able to move a PO between categories.
