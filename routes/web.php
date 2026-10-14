@@ -214,6 +214,13 @@ Route::post('/warehouses/{warehouse}/tanks', [WetStock\StorageTankController::cl
         Route::prefix('wet-stock-requests')->name('wet-stock-requests.')->group(function () {
             Route::get('/', [WetStock\WetStockRequestController::class, 'index'])->name('index');
             Route::get('/{purchaseOrder}', [WetStock\WetStockRequestController::class, 'show'])->name('show');
+
+            // ATLs for one replenishment request. Keyed on the request rather
+            // than a purchase order: the ATL draws from whichever PO still has
+            // volume, so the request is what the page is about.
+            Route::get('/request/{stockRequest}/atls', [WetStock\WetStockRequestController::class, 'atls'])->name('atls');
+            Route::get('/request/{stockRequest}/atls/create', [WetStock\WetStockRequestController::class, 'createAtl'])->name('atls.create');
+            Route::post('/request/{stockRequest}/atls', [WetStock\WetStockRequestController::class, 'storeAtl'])->name('atls.store');
         });
 
         // Legacy page URLs now redirect to the dedicated pages they became.

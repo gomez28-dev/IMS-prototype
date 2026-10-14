@@ -136,6 +136,58 @@ class StockRequest extends Model
         return $this->hasMany(PurchaseOrderDelivery::class, 'request_id');
     }
 
+    /**
+     * Volume an ATL has committed against this request, per product.
+     *
+     * A request may carry several ATLs, drawing on more than one PO between
+     * them, so anything asking "how much is left" has to total all of them.
+     * Read from the allocation rows rather than the delivery's own product,
+     * because a multi-PO ATL records each product's volume separately.
+     *
+     * @return array<string, int>
+     */
+    public function drawnByProduct(): array
+    {
+        $totals = [];
+
+        foreach ($this->deliveries()->with('allocations')->get() as $delivery) {
+            foreach ($delivery->allocations as $allocation) {
+                $product = $allocation->product ?: ($delivery->product ?: 'Unspecified');
+
+                $totals[$product] = ($totals[$product] ?? 0) + (int) $allocation->quantity;
+            }
+        }
+
+        return $totals;
+    }
+
+    /**
+     * Product-aware totals for the per-request ATL page: what was asked for,
+     * what an ATL has committed, and what is still outstanding.
+     *
+     * @return array{requested: array<string, int>, drawn: array<string, int>, pending: array<string, int>}
+     */
+    public function atlVolumeTotals(): array
+    {
+        $requested = ['Diesel' => 0, 'Unleaded' => 0, 'Premium' => 0];
+
+        foreach ($this->lines as $line) {
+            $product = $line->product ?: 'Unspecified';
+
+            $requested[$product] = ($requested[$product] ?? 0) + (int) $line->qty_requested;
+        }
+
+        $drawn = $this->drawnByProduct();
+
+        $pending = [];
+
+        foreach ($requested as $product => $qty) {
+            $pending[$product] = max(0, $qty - (int) ($drawn[$product] ?? 0));
+        }
+
+        return compact('requested', 'drawn', 'pending');
+    }
+
 /**
  * Volume totals per product, for the Stock Request page's stat cards.
  *

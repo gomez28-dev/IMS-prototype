@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\WetStock;
 
 use App\Http\Controllers\Controller;
+use App\Models\Client;
 use App\Models\PurchaseOrder;
-use App\Models\StockRequest;
 use App\Models\PurchaseOrderDelivery;
+use App\Models\StockRequest;
+use App\Models\Warehouse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 /**
@@ -82,12 +85,61 @@ class WetStockRequestController extends Controller
             'stockRequests' => $stockRequests,
             'legacyRequests' => $legacyRequests,
             'incomingDeliveries' => $incomingDeliveries,
-            'warehouses' => \App\Models\Warehouse::orderBy('name')->get(),
+            'warehouses' => Warehouse::orderBy('name')->get(),
             'warehouseId' => $warehouseId,
             'stats' => $this->stats(),
             // Product-aware cards. Given the request's own builder so they total
             // exactly what the filters left on the page, search term included.
             'volumes' => StockRequest::volumeTotals($stockRequestQuery),
+        ]);
+    }
+
+    /**
+     * The ATLs raised against one replenishment request.
+     *
+     * Laid out like the M1 Deliveries page: an info card, product-aware totals,
+     * the ATLs themselves, and an Add ATL button. Several ATLs may exist for one
+     * request, each drawing on whichever PO still has volume.
+     */
+    public function atls(StockRequest $stockRequest): View
+    {
+        $stockRequest->load(['lines', 'warehouse', 'requester']);
+
+        $atls = $stockRequest->deliveries()
+            ->with(['purchaseOrder', 'allocations.purchaseOrder', 'lifter'])
+            ->orderByDesc('id')
+            ->get();
+
+        return view('wetstock.wet-stock-requests.atls', [
+            'request' => $stockRequest,
+            'atls' => $atls,
+            'volumes' => $stockRequest->atlVolumeTotals(),
+        ]);
+    }
+
+    /**
+     * Raise another ATL against this request, choosing the PO to draw on.
+     */
+    public function createAtl(StockRequest $stockRequest): View
+    {
+        if (! Auth::user()->canEditStockOrders()) {
+            abort(403);
+        }
+
+        $stockRequest->load(['lines', 'warehouse']);
+
+        // Only POs that still have volume are offered, whichever product they
+        // hold. A request does not need a PO of its own any more.
+        $availablePos = PurchaseOrder::availableForAllocation();
+
+        return view('wetstock.stock-orders.form', [
+            'mode' => 'fuel_trade',
+            'stockRequest' => $stockRequest,
+            'order' => null,
+            'purchaseOrder' => null,
+            'availablePos' => $availablePos,
+            'clients' => Client::orderBy('name')->get(),
+            'warehouses' => Warehouse::orderBy('name')->get(),
         ]);
     }
 

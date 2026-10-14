@@ -225,10 +225,19 @@
                                 <td class="small text-muted">{{ $req->remarks ?: '—' }}</td>
                                 <td class="pe-3 text-end">
                                     @if (Auth::user()->canEditStockOrders())
-                                        {{-- Prepare raises the PO from the request. The PO number
+                                        {{-- Create ATL leads to the request's own ATL page, which
+     lists what has been issued and adds more. The PO to draw
+     on is chosen there, so a request does not need a PO of its
+     own first. --}}
+<a href="{{ route('stock-orders.wet-stock-requests.atls', $req->id) }}"
+   class="btn btn-sm btn-primary rounded-pill px-3 py-1 d-block w-100" title="Issue an ATL against this request">
+    <i class="bi bi-plus-lg me-1"></i> Create ATL
+</a>
+
+{{-- Prepare raises the PO from the request. The PO number
                                              is chosen there, so nothing is typed here. --}}
                                         <a href="{{ route('stock-orders.prepare-stock-request', ['stock_request' => $req->id]) }}"
-                                           class="btn btn-sm btn-primary rounded-pill px-3 py-1" title="Raise a purchase order against this request">
+                                           class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1 d-block w-100 mt-1" title="Raise a purchase order against this request">
                                             <i class="bi bi-pencil-square me-1"></i> Prepare &amp; Submit
                                         </a>
                                     @endif
