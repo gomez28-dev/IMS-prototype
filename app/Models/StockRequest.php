@@ -162,6 +162,47 @@ class StockRequest extends Model
     }
 
     /**
+     * What can still be ATL'd against this request, per product.
+     *
+     * Asked for, less what has already arrived, less what an ATL has committed.
+     * The three ATLs a request may carry share one budget, which is why the
+     * drawn figure is totalled across all of them rather than the latest.
+     *
+     * @return array<string, int>
+     */
+    public function pendingByProduct(): array
+    {
+        $requested = [];
+
+        foreach ($this->lines as $line) {
+            $product = $line->product ?: 'Unspecified';
+
+            $requested[$product] = ($requested[$product] ?? 0) + (int) $line->qty_requested;
+        }
+
+        $received = [];
+
+        foreach ($this->lines as $line) {
+            $product = $line->product ?: 'Unspecified';
+
+            $received[$product] = ($received[$product] ?? 0) + (int) $line->qty_received;
+        }
+
+        $drawn = $this->drawnByProduct();
+
+        $pending = [];
+
+        foreach ($requested as $product => $qty) {
+            $pending[$product] = max(
+                0,
+                $qty - (int) ($received[$product] ?? 0) - (int) ($drawn[$product] ?? 0)
+            );
+        }
+
+        return $pending;
+    }
+
+    /**
      * Product-aware totals for the per-request ATL page: what was asked for,
      * what an ATL has committed, and what is still outstanding.
      *

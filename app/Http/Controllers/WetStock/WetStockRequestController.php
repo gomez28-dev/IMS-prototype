@@ -3,11 +3,14 @@
 namespace App\Http\Controllers\WetStock;
 
 use App\Http\Controllers\Controller;
-use App\Models\Client;
+use App\Models\AtlAllocation;
+use App\Models\AuditLog;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderDelivery;
 use App\Models\StockRequest;
+use App\Models\StorageTank;
 use App\Models\Warehouse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
@@ -132,15 +135,139 @@ class WetStockRequestController extends Controller
         // hold. A request does not need a PO of its own any more.
         $availablePos = PurchaseOrder::availableForAllocation();
 
-        return view('wetstock.stock-orders.form', [
-            'mode' => 'fuel_trade',
-            'stockRequest' => $stockRequest,
-            'order' => null,
-            'purchaseOrder' => null,
+        return view('wetstock.wet-stock-requests.create-atl', [
+            'request' => $stockRequest,
             'availablePos' => $availablePos,
-            'clients' => Client::orderBy('name')->get(),
-            'warehouses' => Warehouse::orderBy('name')->get(),
+            'pending' => $stockRequest->pendingByProduct(),
+            'tanks' => StorageTank::where('is_active', true)
+                ->with('warehouse')
+                ->orderBy('name')
+                ->get(),
         ]);
+    }
+
+    /**
+     * Store an ATL raised against a replenishment request.
+     *
+     * The request does not need a purchase order of its own: this draws on
+     * whichever PO still has volume. Three things are checked before anything is
+     * written - the PO is really allocatable and approved, it has that product's
+     * volume left, and the request has that product's pending volume left.
+     */
+    public function storeAtl(Request $request, StockRequest $stockRequest): RedirectResponse
+    {
+        if (! Auth::user()->canEditStockOrders()) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'purchase_order_id' => ['required', 'exists:purchase_orders,id'],
+            'product' => ['required', 'string', 'in:Diesel,Premium,Unleaded'],
+            'qty_to_receive' => ['required', 'integer', 'min:1'],
+            'order_type' => ['required', 'in:DELIVERY,PICK_UP'],
+            'delivery_channel' => ['required', 'string'],
+            'atl_type' => ['required', 'in:DITC_ATL,CLIENT_ATL,NONE'],
+            'atl_number' => ['nullable', 'string', 'max:64'],
+            'dr_number' => ['nullable', 'string', 'max:64'],
+            'reference_no' => ['nullable', 'string', 'max:64'],
+            'receiving_date' => ['required', 'date'],
+            'driver_name' => ['nullable', 'string', 'max:128'],
+            'plate_number' => ['nullable', 'string', 'max:32'],
+            'storage_tank_id' => ['nullable', 'exists:storage_tanks,id'],
+            'additional_remarks' => ['nullable', 'string', 'max:500'],
+            'submit_for_approval' => ['nullable', 'boolean'],
+        ]);
+
+        // The PO has to be one the pool still offers. A crafted POST naming a
+        // drained or cancelled PO is refused here rather than silently accepted.
+        $po = PurchaseOrder::availableForAllocation()
+            ->firstWhere('id', (int) $validated['purchase_order_id']);
+
+        if (! $po) {
+            return back()->withInput()->withErrors([
+                'purchase_order_id' => 'That purchase order has no volume left to draw on.',
+            ]);
+        }
+
+        if (! $po->isVpApproved()) {
+            return back()->withInput()->withErrors([
+                'purchase_order_id' => "PO {$po->po_number} has not been approved by the VP yet.",
+            ]);
+        }
+
+        $product = $validated['product'];
+        $qty = (int) $validated['qty_to_receive'];
+
+        $balance = $po->getAvailableBalanceForProduct($product);
+
+        if ($balance < $qty) {
+            return back()->withInput()->withErrors([
+                'qty_to_receive' => "PO {$po->po_number} has ".number_format($balance)
+                    ." L of {$product} left, not ".number_format($qty).' L.',
+            ]);
+        }
+
+        $pending = $stockRequest->pendingByProduct();
+
+        if (! array_key_exists($product, $pending)) {
+            return back()->withInput()->withErrors([
+                'product' => "This request does not ask for {$product}.",
+            ]);
+        }
+
+        if ($qty > $pending[$product]) {
+            return back()->withInput()->withErrors([
+                'qty_to_receive' => 'Only '.number_format($pending[$product])
+                    ." L of {$product} is still outstanding on this request. "
+                    .'Asked for '.number_format($stockRequest->lines->where('product', $product)->sum('qty_requested'))
+                    .' L, less what has arrived and what an ATL already covers.',
+            ]);
+        }
+
+        $delivery = PurchaseOrderDelivery::create([
+            'purchase_order_id' => $po->id,
+            'request_id' => $stockRequest->id,
+            'storage_tank_id' => $validated['storage_tank_id'] ?? null,
+            'delivery_channel' => $validated['delivery_channel'],
+            'order_type' => $validated['order_type'],
+            'atl_type' => $validated['atl_type'],
+            'atl_number' => $validated['atl_number'] ?? null,
+            'dr_number' => $validated['dr_number'] ?? null,
+            'reference_no' => $validated['reference_no'] ?? null,
+            'product' => $product,
+            'qty_to_receive' => $qty,
+            'receiving_date' => $validated['receiving_date'],
+            'driver_name' => $validated['driver_name'] ?? null,
+            'plate_number' => $validated['plate_number'] ?? null,
+            'additional_remarks' => $validated['additional_remarks'] ?? null,
+            'atl_category' => PurchaseOrderDelivery::CATEGORY_DOYEN_STOCKS,
+            // Every new ATL goes to the VP. Drafting before Accounting clears
+            // stays possible, so this is FOR_APPROVAL only once it is submitted.
+            'approval_status' => ($validated['submit_for_approval'] ?? false)
+                ? PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL
+                : PurchaseOrderDelivery::APPROVAL_DRAFT,
+            'status' => 'Active',
+            'lift_status' => PurchaseOrderDelivery::LIFT_UNLIFTED,
+            'issued_at' => now(),
+        ]);
+
+        AtlAllocation::create([
+            'purchase_order_delivery_id' => $delivery->id,
+            'purchase_order_id' => $po->id,
+            'product' => $product,
+            'quantity' => $qty,
+        ]);
+
+        AuditLog::create([
+            'admin_id' => Auth::id(),
+            'action' => 'created',
+            'description' => "ATL {$delivery->atl_number} raised for request "
+                .$stockRequest->request_number." against PO {$po->po_number} for "
+                .number_format($qty)." L of {$product}.",
+        ]);
+
+        return redirect()->route('stock-orders.wet-stock-requests.atls', $stockRequest)
+            ->with('success', "ATL {$delivery->atl_number} raised against PO {$po->po_number}.");
     }
 
     /**
