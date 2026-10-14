@@ -127,6 +127,47 @@ class AtlAllocateProductDefaultTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/<option value="Diesel"\s+selected>/', $html);
     }
 
+    public function test_the_form_and_the_server_agree_on_the_product(): void
+    {
+        $order = $this->order(null);
+        $po = $this->poWith(['Premium' => 100000], $order);
+
+        $html = $this->atlForm($order);
+
+        // The form carries the product in a hidden field the server reads back.
+        // It used to be hard-coded to Diesel, so a legacy Premium order showed
+        // Premium, submitted Premium, and was rejected as "not required".
+        $this->assertMatchesRegularExpression(
+            '/<input[^>]*name="product"[^>]*value="Premium"/',
+            $html,
+            'The posted product must be the one the page pre-selected.'
+        );
+    }
+
+    public function test_the_product_the_form_offers_can_actually_be_saved(): void
+    {
+        $order = $this->order(null);
+        $po = $this->poWith(['Premium' => 100000], $order);
+
+        // What the browser would post for the pre-selected row.
+        $response = $this->actingAs($this->purchasing)
+            ->post(route('stock-orders.store-fuel-trade-po', $order->id), [
+                'product' => 'Premium',
+                'receiving_date' => now()->addDays(2)->format('Y-m-d'),
+                'driver_name' => 'Juan Dela Cruz',
+                'plate_number' => 'NBD-1234',
+                'location' => 'Petron Limay Terminal',
+                'atl_type' => 'DITC_ATL',
+                'atl_number' => 'ATL-'.uniqid(),
+                'drawdowns' => [
+                    ['purchase_order_id' => $po->id, 'product' => 'Premium', 'quantity' => 50000],
+                ],
+            ]);
+
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect(route('stock-orders.sales-orders.show', $order->id));
+    }
+
     // ---- It stays overridable ----------------------------------------------
 
     public function test_the_other_products_remain_selectable(): void

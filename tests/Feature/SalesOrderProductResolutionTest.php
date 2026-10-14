@@ -164,6 +164,62 @@ class SalesOrderProductResolutionTest extends TestCase
         $this->assertSame('Unspecified', $order->resolvedProduct());
     }
 
+    // ---- Multi-product orders ----------------------------------------------
+
+    public function test_a_multi_product_order_is_not_labelled_after_one_of_them(): void
+    {
+        $order = Order::create([
+            'so_number' => 'SO-MIXED-'.rand(1000, 9999),
+            'account' => 'Venture Commercial & Industrial Corp.',
+            'date' => now()->toDateString(),
+            'location' => 'Valenzuela',
+            'status' => 'Active',
+            'terms' => '30 Days',
+            'qty_ordered' => 30000,
+            'fulfillment_type' => Order::FULFILLMENT_FUEL_TRADE,
+            'order_category' => Order::CATEGORY_CLIENT_ORDER,
+        ]);
+
+        OrderItem::create(['order_id' => $order->id, 'product_type' => 'D', 'qty' => 20000]);
+        OrderItem::create(['order_id' => $order->id, 'product_type' => 'U', 'qty' => 10000]);
+
+        $this->assertSame(['Diesel', 'Unleaded'], $order->resolvedProducts());
+        // Naming one of them would be a claim the data does not support.
+        $this->assertSame('Mixed', $order->resolvedProduct());
+        $this->assertNull($order->resolvedProductCode());
+    }
+
+    public function test_an_untyped_line_is_not_folded_into_a_typed_line_product(): void
+    {
+        $order = Order::create([
+            'so_number' => 'SO-PART-'.rand(1000, 9999),
+            'account' => 'Venture Commercial & Industrial Corp.',
+            'date' => now()->toDateString(),
+            'location' => 'Valenzuela',
+            'status' => 'Active',
+            'terms' => '30 Days',
+            'qty_ordered' => 8000,
+            'fulfillment_type' => Order::FULFILLMENT_FUEL_TRADE,
+            'order_category' => Order::CATEGORY_CLIENT_ORDER,
+        ]);
+
+        OrderItem::create(['order_id' => $order->id, 'product_type' => 'P', 'qty' => 5000]);
+        OrderItem::create(['order_id' => $order->id, 'product_type' => null, 'qty' => 3000]);
+
+        // A PO on Premium must not capture the 3,000 untyped L: they belong to
+        // a partly-typed order, where the recovered product is the typed line's.
+        $this->purchaseOrderFor($order, 'Premium');
+
+        $requirements = $order->fresh()->productRequirements();
+
+        $this->assertSame(5000, $requirements['Premium'] ?? 0);
+        $this->assertNotSame(
+            8000,
+            $requirements['Premium'] ?? 0,
+            'Untyped volume must not be attributed to a product a typed line established.'
+        );
+    }
+
     // ---- The page ----------------------------------------------------------
 
     public function test_the_atl_details_page_shows_the_real_product(): void

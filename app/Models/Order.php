@@ -184,40 +184,68 @@ class Order extends Model
      */
     public function resolvedProduct(): string
     {
-        // The order's own line, when a product was captured at entry.
-        $own = $this->items->first(fn (OrderItem $item) => filled($item->product_type));
+        $products = $this->resolvedProducts();
 
-        if ($own) {
-            return $own->product_name;
+        if ($products === []) {
+            return 'Unspecified';
         }
 
-        // The PO raised against this order. PurchaseOrder::linkedOrder() is the
-        // reliable direction of that link; Order::linkedPurchaseOrder() reads a
-        // column that predates the dedicated stock request tables.
-        $fromPo = PurchaseOrder::where('linked_order_id', $this->getKey())
-            ->with('items')
-            ->get()
-            ->pluck('items')
-            ->flatten()
-            ->first(fn ($item) => filled($item->product));
+        // More than one fuel: naming one of them would overstate what is known.
+        return count($products) === 1 ? $products[0] : 'Mixed';
+    }
 
-        if ($fromPo) {
-            return $fromPo->product;
+    /**
+     * Every distinct product this order covers.
+     *
+     * An order may be for more than one fuel, and naming a single one would be
+     * a claim the data does not support. So a multi-product order reads 'Mixed'
+     * rather than being silently labelled after whichever product came first.
+     *
+     * @return array<int, string>
+     */
+    public function resolvedProducts(): array
+    {
+        $products = [];
+
+        foreach ($this->items as $item) {
+            if (filled($item->product_type)) {
+                $products[] = $item->product_name;
+            }
         }
 
-        // An ATL already issued against this order.
-        $fromAtl = PurchaseOrderDelivery::where('order_id', $this->getKey())
-            ->with('allocations')
-            ->get()
-            ->pluck('allocations')
-            ->flatten()
-            ->first(fn ($allocation) => filled($allocation->product));
+        if ($products === []) {
+            $fromPo = PurchaseOrder::where('linked_order_id', $this->getKey())
+                ->with('items')
+                ->orderBy('id')
+                ->get()
+                ->pluck('items')
+                ->flatten()
+                ->filter(fn ($item) => filled($item->product))
+                ->pluck('product')
+                ->all();
 
-        if ($fromAtl) {
-            return $fromAtl->product;
+            if ($fromPo !== []) {
+                $products = $fromPo;
+            }
         }
 
-        return 'Unspecified';
+        if ($products === []) {
+            $fromAtl = PurchaseOrderDelivery::where('order_id', $this->getKey())
+                ->with('allocations')
+                ->orderBy('id')
+                ->get()
+                ->pluck('allocations')
+                ->flatten()
+                ->filter(fn ($allocation) => filled($allocation->product))
+                ->pluck('product')
+                ->all();
+
+            if ($fromAtl !== []) {
+                $products = $fromAtl;
+            }
+        }
+
+        return array_values(array_unique($products));
     }
 
     /**
@@ -430,12 +458,17 @@ class Order extends Model
      */
     public function productRequirements(?string $fallbackProduct = null): array
     {
-        // With no explicit fallback, use the product the order is actually for.
-        // Every order raised before the product_type column existed needs this:
-        // without it they all defaulted to Diesel whatever they were really for.
-        if ($fallbackProduct === null || $fallbackProduct === '') {
-            $resolved = $this->resolvedProduct();
+        // An order raised before the product_type column existed has no typed
+        // line at all, so its product can be recovered from the PO it raised.
+        $anyTyped = $this->items->contains(fn (OrderItem $item) => filled($item->product_type));
 
+        if ($fallbackProduct === null || $fallbackProduct === '') {
+            $resolved = ! $anyTyped ? $this->resolvedProduct() : null;
+
+            // On a partly-typed order the recovered product belongs to a typed
+            // line. Booking an untyped line's volume under it would attribute
+            // fuel to a product nothing on the record supports, so a partly
+            // typed order keeps the neutral default instead.
             $fallbackProduct = in_array($resolved, self::PRODUCT_TYPES, true) ? $resolved : 'Diesel';
         }
 

@@ -93,26 +93,6 @@ class PurchaseOrderController extends Controller
 
         $deliveries = $atlQuery->orderByDesc('id')->get();
 
-        // A multi-product ATL records each product's volume on its allocation
-        // rows, so the per-product figures are summed from there.
-        $atlByProduct = [];
-        foreach ($deliveries as $delivery) {
-            foreach ($delivery->allocations as $allocation) {
-                $product = $allocation->product ?: 'Unspecified';
-                $atlByProduct[$product] = ($atlByProduct[$product] ?? 0) + (int) $allocation->quantity;
-            }
-        }
-        ksort($atlByProduct);
-
-        $totals = [
-            'ordered' => (int) $purchaseOrder->qty_ordered,
-            'atl_issued' => (int) $purchaseOrder->deliveries()->sum('qty_to_receive'),
-            'lifted' => (int) $purchaseOrder->deliveries()
-                ->where('lift_status', PurchaseOrderDelivery::LIFT_LIFTED)
-                ->sum('qty_to_receive'),
-        ];
-        $totals['remaining'] = max(0, $totals['ordered'] - $totals['atl_issued']);
-
         // Card figures ignore the table's search, since they describe the PO
         // rather than the filtered ATL list.
         $volumes = PurchaseOrder::volumeTotals($purchaseOrder->id);
@@ -126,9 +106,7 @@ class PurchaseOrderController extends Controller
         return view('wetstock.purchase-orders.show', compact(
             'purchaseOrder',
             'deliveries',
-            'totals',
             'volumes',
-            'atlByProduct',
             'priceByProduct',
             'atlSearch'
         ));

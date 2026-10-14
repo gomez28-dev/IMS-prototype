@@ -132,7 +132,7 @@ public function store(Request $request): RedirectResponse
         ->values();
 
     if ($lines->isEmpty()) {
-        return $this->backToPopUp(['create' => 1])
+        return $this->backToPopUp($request, ['create' => 1])
             ->withInput()
             ->withErrors(['lines' => 'Add at least one product with a quantity.']);
     }
@@ -187,7 +187,7 @@ private function validatePopUp(Request $request, array $rules, array $query): ar
 
     if ($validator->fails()) {
         throw ValidationException::withMessages($validator->errors()->messages())
-            ->redirectTo($this->popUpUrl($query));
+            ->redirectTo($this->popUpUrl($request, $query));
     }
 
     return $validator->validated();
@@ -196,19 +196,26 @@ private function validatePopUp(Request $request, array $rules, array $query): ar
 /**
  * Where the index sends the browser so the pop-up reopens on failure.
  *
+ * The list's own filters are carried over. The list is paginated, so returning
+ * to an unfiltered page 1 can leave the request being edited off-screen, and the
+ * pop-up then has nothing to populate itself from.
+ *
  * @param  array<string, mixed>  $query
  */
-private function popUpUrl(array $query): string
+private function popUpUrl(Request $request, array $query): string
 {
-    return route('wetstock.stock-requests.index', $query);
+    return route('wetstock.stock-requests.index', array_merge(
+        $request->only(['search', 'warehouse_id', 'page']),
+        $query
+    ));
 }
 
 /**
  * @param  array<string, mixed>  $query
  */
-private function backToPopUp(array $query): RedirectResponse
+private function backToPopUp(Request $request, array $query): RedirectResponse
 {
-    return redirect()->to($this->popUpUrl($query));
+    return redirect()->to($this->popUpUrl($request, $query));
 }
 
 /**
@@ -241,7 +248,7 @@ private function backToPopUp(array $query): RedirectResponse
         ->filter(fn ($row) => filled($row['product'] ?? null) && (int) ($row['qty'] ?? 0) > 0);
 
     if ($usableRows->isEmpty()) {
-        return $this->backToPopUp(['edit' => $stockRequest->id])
+        return $this->backToPopUp($request, ['edit' => $stockRequest->id])
             ->withInput()
             ->withErrors(['lines' => 'Add at least one product with a quantity.']);
     }

@@ -97,8 +97,8 @@
                          the action looked like it did not exist.
 
                          Several ATLs may be raised against one order: each is a
-                         draw against the POs below, and the order as a whole
-                         cannot be over-drawn. --}}
+                         draw against the POs below, and the volume drawn across
+                         all of them is capped at what the order asked for. --}}
                     @if (Auth::user()->canEditStockOrders())
                         @if ($order->canBeIssuedAtl())
                             <a href="{{ route('stock-orders.create-fuel-trade-po', $order->id) }}"
@@ -209,10 +209,15 @@
                                                  is the one it is opened against. --}}
                                             @php $atlPoId = $atl->allocations->first()?->purchase_order_id ?? $atl->purchase_order_id; @endphp
                                             @if (Auth::user()->canEditStockOrders() && $atlPoId)
-                                                <a href="{{ route('stock-orders.add-atl', $atlPoId) }}"
-                                                   class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary" title="Edit ATL">
-                                                    <i class="bi bi-pencil me-1"></i> Pen
-                                                </a>
+                                                {{-- createAtl refuses a PO the VP has not approved, so offering
+                                                     the link on one is a dead end that 403s. --}}
+                                                @php $atlPo = $atl->allocations->first()?->purchaseOrder ?? $atl->purchaseOrder; @endphp
+                                                @if ($atlPo?->isVpApproved())
+                                                    <a href="{{ route('stock-orders.add-atl', $atlPoId) }}"
+                                                       class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary" title="Edit ATL">
+                                                        <i class="bi bi-pencil me-1"></i> Pen
+                                                    </a>
+                                                @endif
                                             @endif
                                         </div>
                                     </td>

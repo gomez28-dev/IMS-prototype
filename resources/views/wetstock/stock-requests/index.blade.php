@@ -826,16 +826,21 @@ document.addEventListener('DOMContentLoaded', function () {
     // Arriving with ?edit={id} is how a rejected edit comes back: the pop-up
     // reopens on that request rather than resetting to a blank create form.
     // Clicking its Pen button reuses the populate logic above.
+    //
+    // If the row cannot be found - the list is paginated, and a rejected edit
+    // returns to the unfiltered first page - the pop-up must stay shut. Showing
+    // it blank would read as "Create Request" with the banner "That request was
+    // not saved", and sending would create a second request instead of editing.
     @if ($openEdit)
         const penForOpenEdit = document.querySelector(
             '[data-request-mode="edit"][data-request-id="{{ (int) $openEdit }}"]'
         );
         if (penForOpenEdit) {
             penForOpenEdit.click();
-        }
-        const editModal = document.getElementById('requestFormModal');
-        if (editModal && window.bootstrap) {
-            window.bootstrap.Modal.getOrCreateInstance(editModal).show();
+            const editModal = document.getElementById('requestFormModal');
+            if (editModal && window.bootstrap) {
+                window.bootstrap.Modal.getOrCreateInstance(editModal).show();
+            }
         }
     @endif
 });

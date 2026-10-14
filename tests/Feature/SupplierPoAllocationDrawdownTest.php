@@ -579,4 +579,103 @@ class SupplierPoAllocationDrawdownTest extends TestCase
         $response->assertSessionHasErrors();
         $this->assertNull(PurchaseOrderDelivery::where('atl_number', 'ATL-MPX-01')->first());
     }
+
+    public function test_the_direct_po_fallback_cannot_over_draw_the_order(): void
+    {
+        // When no PO has remaining volume the form falls back to raising an
+        // ad-hoc PO. That path attributes volume to the order too, so it has to
+        // carry the same cap as the drawdown branch.
+        $po = PurchaseOrder::create([
+            'po_number' => 'PO-FALLBACK-'.rand(1000, 9999),
+            'po_type' => 'STANDARD_REPLENISHMENT',
+            'supplier_name' => 'Petron Bataan',
+            'qty_ordered' => 50000,
+            'request_status' => 'CONFIRMED',
+            'status' => 'Pending',
+        ]);
+        PurchaseOrderItem::create([
+            'purchase_order_id' => $po->id,
+            'product' => 'Diesel',
+            'quantity_ordered' => 50000,
+        ]);
+
+        $order = Order::create([
+            'account' => $this->client->name,
+            'location' => 'Valenzuela',
+            'so_number' => 'SO-FB-'.rand(1000, 9999),
+            'date' => now(),
+            'qty_ordered' => 10000,
+            'price' => 50.00,
+            'status' => 'Active',
+            'clearing_status' => 'Approved',
+            'fulfillment_type' => 'FUEL_TRADE',
+            'order_category' => 'CLIENT_ORDER',
+        ]);
+
+        $submit = fn (int $qty) => $this->actingAs($this->purchasingUser)
+            ->post(route('stock-orders.store-fuel-trade-po', $order->id), [
+                'po_number' => 'PO-FB-'.uniqid(),
+                'supplier_name' => 'Petron Bataan',
+                'product' => 'Diesel',
+                'qty_to_receive' => $qty,
+                'receiving_date' => now()->addDays(2)->format('Y-m-d'),
+                'driver_name' => 'Driver',
+                'plate_number' => 'ABC-1111',
+                'atl_type' => 'DITC_ATL',
+                'atl_number' => 'ATL-FB-'.uniqid(),
+            ]);
+
+        $submit(10000)->assertSessionHasNoErrors();
+        $submit(1)->assertSessionHasErrors('drawdowns');
+
+        $this->assertSame(['Diesel' => 10000], $order->drawnByProduct());
+    }
+
+    public function test_the_direct_po_fallback_cannot_drive_an_existing_po_negative(): void
+    {
+        $po = PurchaseOrder::create([
+            'po_number' => 'PO-REUSE-'.rand(1000, 9999),
+            'po_type' => 'STANDARD_REPLENISHMENT',
+            'supplier_name' => 'Petron Bataan',
+            'qty_ordered' => 30000,
+            'request_status' => 'CONFIRMED',
+            'status' => 'Pending',
+        ]);
+        PurchaseOrderItem::create([
+            'purchase_order_id' => $po->id,
+            'product' => 'Diesel',
+            'quantity_ordered' => 30000,
+        ]);
+
+        $order = Order::create([
+            'account' => $this->client->name,
+            'location' => 'Valenzuela',
+            'so_number' => 'SO-REUSE-'.rand(1000, 9999),
+            'date' => now(),
+            'qty_ordered' => 80000,
+            'price' => 50.00,
+            'status' => 'Active',
+            'clearing_status' => 'Approved',
+            'fulfillment_type' => 'FUEL_TRADE',
+            'order_category' => 'CLIENT_ORDER',
+        ]);
+
+        // Typing an existing PO number reaches the reuse path, which used to
+        // allocate against it with no balance check at all.
+        $this->actingAs($this->purchasingUser)
+            ->post(route('stock-orders.store-fuel-trade-po', $order->id), [
+                'po_number' => $po->po_number,
+                'supplier_name' => 'Petron Bataan',
+                'product' => 'Diesel',
+                'qty_to_receive' => 50000,
+                'receiving_date' => now()->addDays(2)->format('Y-m-d'),
+                'driver_name' => 'Driver',
+                'plate_number' => 'ABC-1111',
+                'atl_type' => 'DITC_ATL',
+                'atl_number' => 'ATL-REUSE-'.uniqid(),
+            ])
+            ->assertSessionHasErrors('po_number');
+
+        $this->assertSame(30000, $po->fresh()->getAvailableBalanceForProduct('Diesel'));
+    }
 }

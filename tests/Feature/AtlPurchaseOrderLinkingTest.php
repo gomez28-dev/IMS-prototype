@@ -63,7 +63,7 @@ class AtlPurchaseOrderLinkingTest extends TestCase
         return $order;
     }
 
-    protected function po(?Order $order = null, int $qty = 100000, string $number = null): PurchaseOrder
+    protected function po(?Order $order = null, int $qty = 100000, string $number = null, string $status = 'CONFIRMED'): PurchaseOrder
     {
         $supplier = Supplier::create([
             'company_name' => 'Linking Refinery '.rand(1000, 9999),
@@ -78,7 +78,7 @@ class AtlPurchaseOrderLinkingTest extends TestCase
             'supplier_name' => $supplier->company_name,
             'po_date' => now()->toDateString(),
             'qty_ordered' => $qty,
-            'request_status' => 'CONFIRMED',
+            'request_status' => $status,
         ]);
 
         PurchaseOrderItem::create([
@@ -159,6 +159,27 @@ class AtlPurchaseOrderLinkingTest extends TestCase
     }
 
     // ---- The allocation pool -----------------------------------------------
+
+    public function test_pen_is_not_offered_on_an_atl_whose_po_is_not_approved(): void
+    {
+        $order = $this->order();
+        $po = $this->po($order, 100000, null, 'RECEIVED');
+        $this->atl($order, $po);
+
+        $html = $this->actingAs($this->purchasing)
+            ->get(route('stock-orders.sales-orders.show', $order->id))
+            ->assertOk()
+            ->getContent();
+
+        // createAtl aborts 403 unless the PO is VP-approved. Such a PO is still
+        // in the allocation pool, so an ATL can exist against one; offering Pen
+        // would be a link that always fails.
+        $this->assertStringNotContainsString(
+            route('stock-orders.add-atl', $po->id),
+            $html,
+            'A link to a page that always 403s is worse than no link.'
+        );
+    }
 
     public function test_the_pool_offers_a_po_with_volume_left(): void
     {

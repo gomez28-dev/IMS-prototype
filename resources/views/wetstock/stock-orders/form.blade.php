@@ -146,7 +146,12 @@
                             <div class="alert alert-danger border-0 rounded-3 mb-4 small">{{ $message }}</div>
                         @enderror
 
-                        <input type="hidden" name="product" value="Diesel">
+                        {{-- Carries the product the order is for, so the server
+                             reads the same requirement map the page rendered.
+                             Hard-coding Diesel here made the two disagree: the
+                             form would pre-select the order's real product and
+                             the save would reject it as "not required". --}}
+                        <input type="hidden" name="product" value="{{ $defaultReqProduct }}">
                         <input type="hidden" id="targetOrderQty" value="{{ $order->qty_ordered }}">
                         <input type="hidden" id="soRequirements" value="{{ json_encode($soRequirements) }}">
 

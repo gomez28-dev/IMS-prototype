@@ -496,6 +496,50 @@ class StockOrderController extends Controller
         return $order->productRequirements($fallbackProduct);
     }
 
+    /**
+     * Refuse an ATL that would take the order past what it asked for.
+     *
+     * Several ATLs may be raised against one order, so the check runs against
+     * this ATL plus every earlier one against the same order. It is one method
+     * because every route that can attribute volume to an order has to apply
+     * it; leaving a second route unchecked lets the order be over-drawn from
+     * whichever screen a user happens to start from.
+     *
+     * @param  iterable<string, int>  $drawnNow  volume this ATL draws, per product
+     * @param  array<string, int>  $requirements  what the order asks for, per product
+     * @return RedirectResponse|null null when the ATL is within the order
+     */
+    private function guardOrderNotOverDrawn(
+        Order $order,
+        iterable $drawnNow,
+        array $requirements,
+        ?string $field = 'drawdowns'
+    ): ?RedirectResponse {
+        $alreadyDrawn = $order->drawnByProduct();
+
+        foreach ($requirements as $product => $requiredQty) {
+            $drawnQty = (int) ($drawnNow[$product] ?? 0);
+            $previous = (int) ($alreadyDrawn[$product] ?? 0);
+            $cumulative = $drawnQty + $previous;
+
+            if ($cumulative <= $requiredQty) {
+                continue;
+            }
+
+            return back()->withInput()->withErrors([
+                $field => $previous > 0
+                    ? 'This ATL draws '.number_format($drawnQty)." L of {$product}, which with the "
+                        .number_format($previous).' L already ATL\'d would take the total to '
+                        .number_format($cumulative).' L, over the Sales Order requirement ('
+                        .number_format($requiredQty).' L).'
+                    : 'This Sales Order only requires '.number_format($requiredQty)
+                        ." L of {$product}, but ".number_format($cumulative).' L was drawn.',
+            ]);
+        }
+
+        return null;
+    }
+
     public function storeFuelTradePo(Request $request, Order $order): RedirectResponse
     {
         if (!Auth::user()->canEditStockOrders()) {
@@ -527,6 +571,15 @@ class StockOrderController extends Controller
             $defaultProduct = 'Diesel';
         }
 
+        // What this Sales Order requires, per product. Orders created before
+        // multi-product lines existed have no lines, so they fall back to a
+        // single requirement equal to the order's whole ordered volume.
+        //
+        // Computed before the drawdown branch because the direct-PO fallback
+        // below needs it too, and that branch runs precisely when the drawdown
+        // block is skipped.
+        $requirements = $this->salesOrderProductRequirements($order, $defaultProduct);
+
         // Drawdown engine submission (multi-PO or single-PO drawdown)
         if ($request->has('drawdowns') && is_array($request->input('drawdowns'))) {
             $validated = $request->validate([
@@ -552,11 +605,6 @@ class StockOrderController extends Controller
                 'drawdowns.*.product' => ['nullable', 'string', 'in:Diesel,Premium,Unleaded'],
                 'drawdowns.*.quantity' => ['required', 'integer', 'min:1'],
             ]);
-
-            // What this Sales Order requires, per product. Orders created before
-            // multi-product lines existed have no lines, so they fall back to a
-            // single requirement equal to the order's whole ordered volume.
-            $requirements = $this->salesOrderProductRequirements($order, $defaultProduct);
 
             // Each allocation row carries its own product.
             $drawdowns = collect($validated['drawdowns'])->map(fn (array $dd): array => [
@@ -587,24 +635,8 @@ class StockOrderController extends Controller
             // for several per order, so the check runs against the running
             // total instead: an ATL may be a partial draw, but the order as a
             // whole can never be over-drawn.
-            $alreadyDrawn = $order->drawnByProduct();
-
-            foreach ($requirements as $requiredProduct => $requiredQty) {
-                $drawnQty = (int) ($drawnByProduct[$requiredProduct] ?? 0);
-                $previous = (int) ($alreadyDrawn[$requiredProduct] ?? 0);
-                $cumulative = $drawnQty + $previous;
-
-                if ($cumulative > $requiredQty) {
-                    return back()->withInput()->withErrors([
-                        'drawdowns' => $previous > 0
-                            ? "This ATL draws ".number_format($drawnQty)." L of {$requiredProduct}, which with the "
-                                .number_format($previous).' L already ATL\'d would take the total to '
-                                .number_format($cumulative).' L, over the Sales Order requirement ('
-                                .number_format($requiredQty).' L).'
-                            : "This Sales Order only requires ".number_format($requiredQty)
-                                ." L of {$requiredProduct}, but ".number_format($cumulative).' L was drawn.',
-                    ]);
-                }
+            if ($refusal = $this->guardOrderNotOverDrawn($order, $drawnByProduct, $requirements)) {
+                return $refusal;
             }
 
             // 2. Verify each PO has sufficient remaining balance for that product
@@ -725,6 +757,30 @@ class StockOrderController extends Controller
         ]);
 
         $po = PurchaseOrder::where('po_number', $validated['po_number'])->first();
+
+        // This branch attributes volume to the order just as the drawdown branch
+        // does, so it carries the same cap. Reusing an existing PO by typing its
+        // number is also a way to reach it, so that PO's balance is checked too.
+        if ($refusal = $this->guardOrderNotOverDrawn(
+            $order,
+            [$validated['product'] => (int) $validated['qty_to_receive']],
+            $requirements
+        )) {
+            return $refusal;
+        }
+
+        if ($po) {
+            $balance = $po->getAvailableBalanceForProduct($validated['product']);
+
+            if ($balance < (int) $validated['qty_to_receive']) {
+                return back()->withInput()->withErrors([
+                    'po_number' => "PO {$po->po_number} only has ".number_format($balance)
+                        ." L of {$validated['product']} left, not "
+                        .number_format($validated['qty_to_receive']).' L.',
+                ]);
+            }
+        }
+
         if (!$po) {
             $po = PurchaseOrder::create([
                 'po_number' => $validated['po_number'],
