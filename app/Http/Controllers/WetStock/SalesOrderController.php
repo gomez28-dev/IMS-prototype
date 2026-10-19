@@ -40,6 +40,20 @@ class SalesOrderController extends Controller
             });
         }
 
+        // Newest SO number first, which means the number rather than the
+        // column: one sequence is shared across formats, so BB-3010, 2092,
+        // FT-2091 and 2090 are consecutive and the prefix decides nothing.
+        // Sorting the string would put 999 above 1363.
+        //
+        // Rows with no numeric part at all - a migration in this repo already
+        // references so_number LIKE '%CANCEL ORDER%' - would cast to 0 and sort
+        // among the oldest, so they are pushed to the end and ordered among
+        // themselves. Ties on the number break on the full string.
+        $query
+            ->orderByRaw("CASE WHEN so_number REGEXP '[0-9]+' THEN 0 ELSE 1 END")
+            ->orderByRaw("CAST(SUBSTRING_INDEX(so_number, '-', -1) AS UNSIGNED) DESC")
+            ->orderBy('so_number');
+
         // Computed before paginate(), which would otherwise leave a LIMIT behind for
         // the totals to embed as a subquery.
         $stats = $this->stats($query);

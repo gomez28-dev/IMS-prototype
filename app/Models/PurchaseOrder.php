@@ -455,4 +455,26 @@ public function isFuelTrade(): bool
 
         return $this->isRevised() ? "{$base}-Revised" : $base;
     }
+
+    /**
+     * Badge colours matching computed_status, mirroring Order's accessor so the
+     * two lists read as one set.
+     *
+     * PurchaseOrder writes its revised label without spaces ("Fulfilled-Revised")
+     * where Order writes them ("Fulfilled - Revised"), so both spellings are
+     * matched rather than assuming one.
+     */
+    public function getComputedStatusBadgeClassAttribute(): string
+    {
+        $status = $this->computed_status;
+
+        return match ($status) {
+            'Fulfilled' => 'bg-success-subtle text-success border border-success-subtle',
+            'Fulfilled - Revised', 'Fulfilled-Revised' => 'bg-success-subtle text-success border border-success border-2',
+            'Cancelled' => 'bg-danger-subtle text-danger border border-danger-subtle',
+            'Cancelled - Revised', 'Cancelled-Revised' => 'bg-danger-subtle text-danger border border-danger border-2',
+            'Pending - Revised', 'Pending-Revised' => 'bg-warning-subtle text-warning-emphasis border border-warning border-2',
+            default => 'bg-warning-subtle text-warning-emphasis border border-warning-subtle',
+        };
+    }
 }

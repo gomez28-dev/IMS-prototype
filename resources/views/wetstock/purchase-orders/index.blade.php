@@ -17,32 +17,6 @@
                     <i class="bi bi-card-checklist text-primary me-2"></i>Purchase Orders
                 </h3>
             </div>
-            {{-- Approvals and Deliveries/ATLs used to sit here as buttons. Both
-                 are in the left navigation, which is where they are role-gated,
-                 so the header keeps only Create P.O. and the search box. --}}
-            <div class="d-flex gap-2 align-items-center flex-wrap">
-                <form method="GET" action="{{ route('stock-orders.purchase-orders.index') }}"
-                      class="d-flex gap-2 align-items-center">
-                    <div class="input-group">
-                        <span class="input-group-text bg-white border-end-0">
-                            <i class="bi bi-search text-muted"></i>
-                        </span>
-                        <input type="text" name="search" class="form-control border-start-0"
-                               placeholder="Search PO # or Supplier..." value="{{ request('search') }}">
-                    </div>
-                    <button type="submit" class="btn btn-primary-custom">Search</button>
-                    @if (request('search'))
-                        <a href="{{ route('stock-orders.purchase-orders.index') }}"
-                           class="btn btn-outline-secondary">Reset</a>
-                    @endif
-                </form>
-
-                @if (Auth::user()->canEditStockOrders())
-                <a href="{{ route('stock-orders.create-supplier-po') }}" class="btn btn-primary-custom shadow-sm">
-                    <i class="bi bi-plus-lg me-1"></i> Create P.O.
-                </a>
-                @endif
-            </div>
         </div>
 
         {{-- Fuel Trade Queue Card (if pending SOs exist) --}}
@@ -154,6 +128,35 @@
             @endforeach
         </div>
 
+        {{-- The search and Create P.O. sit directly above the table rather than
+             in the page header, so each reads as a control for the columns it
+             affects: the search over PO # and Supplier, the button over Action.
+             Approvals and Deliveries/ATLs used to sit here too; both are in the
+             left navigation now, which is where they are role-gated. --}}
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <form method="GET" action="{{ route('stock-orders.purchase-orders.index') }}"
+                  class="d-flex gap-2 align-items-center flex-wrap">
+                <div class="input-group">
+                    <span class="input-group-text bg-white border-end-0">
+                        <i class="bi bi-search text-muted"></i>
+                    </span>
+                    <input type="text" name="search" class="form-control border-start-0"
+                           placeholder="Search PO # or Supplier..." value="{{ request('search') }}">
+                </div>
+                <button type="submit" class="btn btn-primary-custom">Search</button>
+                @if (request('search'))
+                    <a href="{{ route('stock-orders.purchase-orders.index') }}"
+                       class="btn btn-outline-secondary">Reset</a>
+                @endif
+            </form>
+
+            @if (Auth::user()->canEditStockOrders())
+                <a href="{{ route('stock-orders.create-supplier-po') }}" class="btn btn-primary-custom shadow-sm">
+                    <i class="bi bi-plus-lg me-1"></i> Create P.O.
+                </a>
+            @endif
+        </div>
+
         {{-- Purchase Orders Master Table --}}
         <div class="card card-custom border-0 shadow-sm">
             <div class="card-body p-0">
@@ -182,54 +185,68 @@
                                     <td>
                                         <strong>{{ $po->supplier_name ?: ($po->client->name ?? '—') }}</strong>
                                     </td>
-                                    {{-- Qty / Price / Amount, broken out per product. Amount is the stored
-                                             total; the line columns are the per-product detail
-                                             behind it. Legacy POs with no item rows fall back
-                                             to the PO's single ordered volume. --}}
-                                    <td class="text-end">
+                                        {{-- Qty / Price / Amount, broken out per product. Amount is the
+                                             stored total; the line columns are the per-product detail
+                                             behind it. Legacy POs with no item rows fall back to the
+                                             PO's single ordered volume.
+
+                                             Qty and Price are marked up the way the Orders Dashboard
+                                             marks up its own: one centred line per product, keyed by
+                                             its initial. These were monospace - a face used nowhere else
+                                             in the system - which made these three columns read as a
+                                             different table from the rest. Amount follows the Dashboard's
+                                             text-nowrap cell. --}}
+                                    <td class="text-center">
                                         @if ($po->items->isNotEmpty())
-                                            @foreach ($po->items as $it)
-                                                <div class="small font-monospace">
-                                                    {{ \Illuminate\Support\Str::substr($it->product, 0, 1) }} &mdash; {{ number_format($it->quantity_ordered) }}
-                                                </div>
-                                            @endforeach
+                                            <div class="pl-block">
+                                                @foreach ($po->items as $it)
+                                                    <div class="pl-row" title="{{ $it->product }}">
+                                                        <span class="pl-key">{{ \Illuminate\Support\Str::substr($it->product, 0, 1) }}</span> - {{ number_format($it->quantity_ordered) }}
+                                                    </div>
+                                                @endforeach
+                                            </div>
                                         @else
-                                            <div class="small font-monospace">{{ number_format($po->qty_ordered) }}</div>
+                                            <div class="pl-row">{{ number_format($po->qty_ordered) }}</div>
                                         @endif
                                     </td>
-                                    <td class="text-end">
+                                    <td class="text-center">
                                         @if ($po->items->isNotEmpty())
-                                            @foreach ($po->items as $it)
-                                                <div class="small font-monospace">
-                                                    {{ \Illuminate\Support\Str::substr($it->product, 0, 1) }} &mdash; {{ number_format((float) $it->unit_price, 2) }}
-                                                </div>
-                                            @endforeach
+                                            <div class="pl-block">
+                                                @foreach ($po->items as $it)
+                                                    <div class="pl-row" title="{{ $it->product }}">
+                                                        <span class="pl-key">{{ \Illuminate\Support\Str::substr($it->product, 0, 1) }}</span> - {{ number_format((float) $it->unit_price, 2) }}
+                                                    </div>
+                                                @endforeach
+                                            </div>
                                         @else
-                                            <div class="small text-muted">&mdash;</div>
+                                            <div class="pl-row text-muted">&mdash;</div>
                                         @endif
                                     </td>
-                                    <td class="text-end">
+                                    <td class="text-nowrap">
                                         @php
                                             // Legacy POs predate the stored total, so fall
                                             // back to summing their own line items.
                                             $amount = (float) ($po->total_amount
                                                 ?: $po->items->sum(fn ($i) => $i->quantity_ordered * (float) $i->unit_price));
                                         @endphp
-                                        <div class="fw-bold font-monospace">{{ number_format($amount, 2) }}</div>
+                                        <div class="fw-bold">{{ number_format($amount, 2) }}</div>
                                     </td>
                                     <td class="text-center">
-                                        @if ($po->request_status === 'REQUESTED')
-                                            <span class="badge bg-secondary-subtle text-secondary border rounded-pill px-3 py-1">1. REQUESTED</span>
-                                        @elseif ($po->request_status === 'RECEIVED')
-                                            <span class="badge bg-warning-subtle text-warning border rounded-pill px-3 py-1">2. RECEIVED (Pending VP)</span>
-                                        @elseif ($po->request_status === 'CONFIRMED')
-                                            <span class="badge bg-info-subtle text-info border rounded-pill px-3 py-1">3. CONFIRMED (Approved)</span>
-                                        @elseif ($po->request_status === 'FOR_DELIVERY')
-                                            <span class="badge bg-primary rounded-pill px-3 py-1 text-white">4. FOR DELIVERY</span>
-                                        @elseif ($po->request_status === 'COMPLETED')
-                                            <span class="badge bg-success-subtle text-success border rounded-pill px-3 py-1">5. COMPLETED</span>
-                                        @endif
-                                        <div class="extra-small text-muted mt-1">{{ $po->computed_status }}</div>
+                                        {{-- One label, not two. This cell previously stacked a
+                                             numbered request_status badge over computed_status,
+                                             which read as two answers to the same question - "3.
+                                             CONFIRMED (Approved)" over "Pending", "4. FOR
+                                             DELIVERY" over "Fulfilled".
+
+                                             The numbered badge is gone, at the user's direction.
+                                             Note what that costs: computed_status reads the
+                                             lifecycle column and never mentions approval, so an
+                                             approved PO now shows only "Pending" here. The one
+                                             remaining approval signal in this row is the Print
+                                             button replacing Edit in the Action cell. --}}
+                                        <span class="badge rounded-pill px-3 py-1 {{ $po->computed_status_badge_class }}">
+                                            {{ $po->computed_status }}
+                                        </span>
                                     </td>
                                     <td class="pe-3 text-end">
                                         {{-- Exactly two actions besides View, and which two

@@ -39,10 +39,6 @@
                         @endif
                     </p>
                 </div>
-                <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-3 py-2">
-                    <i class="bi bi-shield-check me-1"></i>Purchasing Allocation Pool
-                </span>
-            </div>
 
             <div class="card-body p-4">
                 <form method="POST" action="{{ $formAction }}" id="supplierPoForm">
@@ -141,7 +137,7 @@
                                             <th class="ps-3" style="width: 30%;">Product</th>
                                             <th style="width: 22%;">Volume (Liters) <span class="text-danger">*</span></th>
                                             <th style="width: 18%;">Unit</th>
-                                            <th style="width: 18%;">Price / Liter (â‚±)</th>
+                                            <th style="width: 18%;">Price / Liter (&#8369;)</th>
                                             <th style="width: 12%;">Amount</th>
                                             <th class="pe-3 text-center" style="width: 10%;">Remove</th>
                                         </tr>
@@ -168,7 +164,7 @@
                                                 </td>
                                                 <td>
                                                     <div class="input-group input-group-sm">
-                                                        <span class="input-group-text">â‚±</span>
+                                                        <span class="input-group-text">&#8369;</span>
                                                         <input type="number" step="0.01" name="items[{{ $index }}][unit_price]" class="form-control form-control-sm price-input" placeholder="0.00" value="{{ old("items.$index.unit_price", $item?->unit_price) }}" oninput="calculateTotalAmount()">
                                                     </div>
                                                 </td>
@@ -326,7 +322,7 @@ function addProductRow() {
         </td>
         <td>
             <div class="input-group input-group-sm">
-                <span class="input-group-text">â‚±</span>
+                <span class="input-group-text">&#8369;</span>
                 <input type="number" step="0.01" name="items[${rowIndex}][unit_price]" class="form-control form-control-sm price-input" placeholder="0.00" oninput="calculateTotalAmount()">
             </div>
         </td>
