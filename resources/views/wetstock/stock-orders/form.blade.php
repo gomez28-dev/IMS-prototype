@@ -216,12 +216,24 @@
 
                         {{-- Supplier PO Drawdown Engine --}}
                         <div class="card border border-primary border-opacity-25 rounded-3 mb-4 shadow-none bg-light bg-opacity-25">
-                            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
                                 <div>
                                     <h6 class="fw-bold mb-0 text-dark">
                                         <i class="bi bi-stack text-primary me-2"></i>Supplier PO Allocation Pool (Kabangga ng ATL)
                                     </h6>
                                     <small class="text-muted">Select active Supplier Purchase Order(s) to draw volume from.</small>
+
+                                    {{-- The button is disabled whenever there is no
+                                         second product to add, and a disabled
+                                         control does not reliably fire hover - so
+                                         its tooltip alone would leave the reason
+                                         invisible. This says it outright, and the
+                                         script swaps the wording when the last
+                                         remaining product gets a row. --}}
+                                    <div class="extra-small text-muted mt-1 {{ count($productOptions) <= 1 ? '' : 'd-none' }}"
+                                         data-add-product-hint-text>
+                                        This order has one product only, so there's nothing more to add.
+                                    </div>
                                 </div>
                                 @if (!empty($availablePos) && count($availablePos) > 0)
                                 {{-- Two buttons, and they do different things. Split Across
@@ -230,19 +242,31 @@
                                      order has not been given a line yet - without it a
                                      multi-fuel order could only ever allocate one fuel,
                                      because nothing else on this form appends a row. --}}
-                                <div class="d-flex gap-2 align-items-center">
-                                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3"
-                                            data-add-product
-                                            onclick="addProductRow()"
-                                            @disabled(count($productOptions) <= 1)
-                                            title="{{ count($productOptions) <= 1
-                                                ? 'This Sales Order is for one product only, so there is nothing further to add.'
-                                                : 'Add a line for another product on this order.' }}">
-                                        <i class="bi bi-plus-lg me-1"></i> Add Product
+                                <div class="d-flex gap-2 align-items-center flex-shrink-0">
+                                    {{-- flex-wrap on the header above, plus
+                                         flex-shrink-0 here, plus text-nowrap on each
+                                         button: all three are needed. Without them
+                                         the labels wrapped onto two lines and the
+                                         header grew to fit. --}}
+                                    <span class="d-inline-block"
+                                          data-add-product-hint
+                                          title="{{ count($productOptions) <= 1
+                                              ? 'This Sales Order is for one product only, so there is nothing further to add.'
+                                              : 'Add a line for another product on this order.' }}">
+                                        <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 text-nowrap"
+                                                data-add-product
+                                                onclick="addProductRow()"
+                                                @disabled(count($productOptions) <= 1)
+                                                title="{{ count($productOptions) <= 1
+                                                    ? 'This Sales Order is for one product only, so there is nothing further to add.'
+                                                    : 'Add a line for another product on this order.' }}">
+                                            <i class="bi bi-plus-lg me-1"></i> Add Product
+                                        </button>
+                                    </span>
+                                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 text-nowrap" onclick="addDrawdownRow()">
+                                        <i class="bi bi-plus-lg me-1"></i> Split Across Another PO
                                     </button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" onclick="addDrawdownRow()">
-                                    <i class="bi bi-plus-lg me-1"></i> Split Across Another PO
-                                </button>
+                                </div>
                                 @endif
                             </div>
                             <div class="card-body p-3">
@@ -324,10 +348,19 @@
                                                         Total Allocated for this ATL:
                                                         <div class="extra-small fw-normal text-muted mt-1" id="productBreakdown"></div>
                                                     </td>
-                                                    <td class="pe-2 d-flex align-items-center justify-content-between">
-                                                        <span class="fw-bold fs-6 font-monospace" id="totalDrawnDisplay">0 L</span>
-                                                        <span id="matchBadge" class="badge rounded-pill px-3 py-1">Checking...</span>
-                                                    </td>
+                                                    <td class="pe-2">
+                                                            {{-- d-flex belongs on a div inside the cell, not
+                                                                 on the <td> itself. On the cell it took the
+                                                                 element out of table layout, so the row's
+                                                                 background stopped short of the figure and
+                                                                 "1,000 L" wrapped onto two lines. The
+                                                                 figure also follows the table's own font now
+                                                                 rather than a monospace used nowhere else. --}}
+                                                            <div class="d-flex align-items-center justify-content-between gap-2">
+                                                                <span class="fw-bold fs-6 text-nowrap" id="totalDrawnDisplay">0 L</span>
+                                                                <span id="matchBadge" class="badge rounded-pill px-3 py-1 text-nowrap">Checking...</span>
+                                                            </div>
+                                                        </td>
                                                 </tr>
                                             </tfoot>
                                         </table>
@@ -739,7 +772,7 @@ function addDrawdownRow(preferredProduct) {
     }
 
     updateDrawdownRemoveButtons();
-    updateAddProductButton();
+    updateAddProductButton({ title: true });
     calculateTotalDrawn();
 }
 
@@ -761,24 +794,50 @@ function nextUnallocatedProduct() {
 /**
  * Once every product has a line there is nothing left to add, so the button
  * says so instead of stacking a duplicate row.
+ *
+ * `options.title` decides whether the tooltip wording is rewritten. The page's
+ * own call passes nothing, because Blade already rendered a more specific
+ * reason than anything guessed here would be; only the interactive calls -
+ * after a row is added or removed - have new information to put in the title.
+ *
+ * The visible hint is always rewritten, since it tracks the button rather than
+ * the reason, and the wording differs between the two reasons.
  */
-function updateAddProductButton() {
+function updateAddProductButton(options) {
     const button = document.querySelector('[data-add-product]');
     if (!button) return;
 
     const remaining = nextUnallocatedProduct();
+    const reason = remaining
+        ? 'Add a line for ' + remaining + '.'
+        : 'Every product on this order already has a line.';
 
     button.disabled = !remaining;
-    button.title = remaining
-        ? 'Add a line for ' + remaining + '.'
-        : 'Every product on this Sales Order already has a line.';
+
+    // A disabled control does not reliably fire hover, so the tooltip lives on
+    // the wrapper as well as the button.
+    const wrapper = document.querySelector('[data-add-product-hint]');
+    if (wrapper) wrapper.title = reason;
+
+    if (options && options.title) button.title = reason;
+
+    // Say it on the page too, not only in a tooltip.
+    const hint = document.querySelector('[data-add-product-hint-text]');
+    if (hint) {
+        hint.textContent = remaining
+            ? ''
+            : (soProducts.length <= 1
+                ? "This order has one product only, so there's nothing more to add."
+                : 'Every product on this order already has a line.');
+        hint.classList.toggle('d-none', !!remaining);
+    }
 }
 
 function removeDrawdownRow(btn) {
     const row = btn.closest('tr');
     row.remove();
     updateDrawdownRemoveButtons();
-    updateAddProductButton();
+    updateAddProductButton({ title: true });
     calculateTotalDrawn();
 }
 
@@ -924,11 +983,12 @@ document.addEventListener('DOMContentLoaded', function() {
     sourceInputs.forEach(function (input) {
         input.addEventListener('change', applySourceVisibility);
     });
-
-    // A single-product order starts with nothing left to add, so the
-    // state has to be resolved on load rather than only after a click.
-    updateAddProductButton();
     applySourceVisibility();
+
+    // The disabled state has to be resolved on load rather than only after a
+    // click. No title argument: Blade already rendered the reason, and
+    // overwriting it here is what lost the better wording.
+    updateAddProductButton();
 });
 </script>
 @endsection

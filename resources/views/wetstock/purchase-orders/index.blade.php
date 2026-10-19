@@ -132,11 +132,16 @@
              in the page header, so each reads as a control for the columns it
              affects: the search over PO # and Supplier, the button over Action.
              Approvals and Deliveries/ATLs used to sit here too; both are in the
-             left navigation now, which is where they are role-gated. --}}
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+             left navigation now, which is where they are role-gated.
+
+             One row, deliberately not wrapping. Wrapping is what pushed the
+             Search button under the input and dropped Create P.O. onto a line
+             of its own, so the input group is given an explicit width and keeps
+             the button beside it. --}}
+        <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
             <form method="GET" action="{{ route('stock-orders.purchase-orders.index') }}"
-                  class="d-flex gap-2 align-items-center flex-wrap">
-                <div class="input-group">
+                  class="d-flex gap-2 align-items-center">
+                <div class="input-group flex-shrink-0" style="width: 320px;">
                     <span class="input-group-text bg-white border-end-0">
                         <i class="bi bi-search text-muted"></i>
                     </span>

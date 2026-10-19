@@ -539,6 +539,14 @@
             --bs-btn-hover-border-color: var(--brand-color);
             --bs-btn-active-bg: var(--brand-color);
             --bs-btn-active-border-color: var(--brand-color);
+            /* The disabled states need remapping too. Without these Bootstrap
+               falls back to its own grey, so a disabled brand button renders
+               blue-grey and reads as a different control entirely - which is how
+               "+ Add Product" came out blue beside its orange sibling. Reduced
+               opacity carries the "unavailable" signal instead. */
+            --bs-btn-disabled-color: var(--brand-color);
+            --bs-btn-disabled-border-color: var(--brand-color);
+            --bs-btn-disabled-opacity: 0.45;
         }
 
         .btn-secondary-custom {
@@ -772,10 +780,10 @@
                 @elseif (request()->is('stock-orders*'))
                     {{-- Mobile nav mirrors the desktop sidebar: three dedicated
                          pages, then Approvals (admin/vp only), Suppliers, Reports. --}}
-                    <a class="nav-link d-flex align-items-center {{ request()->routeIs('stock-orders.purchase-orders.*') ? 'active' : '' }}" href="{{ route('stock-orders.purchase-orders.index') }}">
+                    <a class="nav-link d-flex align-items-center {{ request()->routeIs('stock-orders.purchase-orders.*') || request()->routeIs('stock-orders.create-supplier-po') || request()->routeIs('stock-orders.edit-supplier-po') || request()->routeIs('stock-orders.edit-request') ? 'active' : '' }}" href="{{ route('stock-orders.purchase-orders.index') }}">
                         <i class="bi bi-card-checklist me-2"></i> Purchase Orders
                     </a>
-                    <a class="nav-link d-flex align-items-center {{ request()->routeIs('stock-orders.sales-orders.*') ? 'active' : '' }}" href="{{ route('stock-orders.sales-orders.index') }}">
+                    <a class="nav-link d-flex align-items-center {{ request()->routeIs('stock-orders.sales-orders.*') || request()->routeIs('stock-orders.create-fuel-trade-po') ? 'active' : '' }}" href="{{ route('stock-orders.sales-orders.index') }}">
                         <i class="bi bi-bag-check me-2"></i> Sales Orders
                     </a>
                     <a class="nav-link d-flex align-items-center {{ request()->routeIs('stock-orders.wet-stock-requests.*') ? 'active' : '' }}" href="{{ route('stock-orders.wet-stock-requests.index') }}">
@@ -926,11 +934,11 @@
             @elseif (request()->is('stock-orders*'))
                 {{-- Module 3 was split into three dedicated pages. Each opens with its
                      own stat cards, so there is no separate Dashboard entry. --}}
-                <a href="{{ route('stock-orders.purchase-orders.index') }}" class="sidebar-nav-link {{ request()->routeIs('stock-orders.purchase-orders.*') || request()->routeIs('stock-orders.show') || request()->routeIs('stock-orders.create*') || request()->routeIs('stock-orders.edit*') ? 'active' : '' }}" title="Purchase Orders">
+                <a href="{{ route('stock-orders.purchase-orders.index') }}" class="sidebar-nav-link {{ request()->routeIs('stock-orders.purchase-orders.*') || request()->routeIs('stock-orders.show') || request()->routeIs('stock-orders.create-supplier-po') || request()->routeIs('stock-orders.edit-supplier-po') || request()->routeIs('stock-orders.edit-request') ? 'active' : '' }}" title="Purchase Orders">
                     <i class="bi bi-card-checklist"></i>
                     <span class="nav-label">Purchase Orders</span>
                 </a>
-                <a href="{{ route('stock-orders.sales-orders.index') }}" class="sidebar-nav-link {{ request()->routeIs('stock-orders.sales-orders.*') || request()->routeIs('stock-orders.atls.*') ? 'active' : '' }}" title="Sales Orders">
+                <a href="{{ route('stock-orders.sales-orders.index') }}" class="sidebar-nav-link {{ request()->routeIs('stock-orders.sales-orders.*') || request()->routeIs('stock-orders.atls.*') || request()->routeIs('stock-orders.create-fuel-trade-po') ? 'active' : '' }}" title="Sales Orders">
                     <i class="bi bi-bag-check"></i>
                     <span class="nav-label">Sales Orders</span>
                 </a>

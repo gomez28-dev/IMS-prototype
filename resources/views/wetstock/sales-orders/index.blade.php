@@ -19,11 +19,10 @@
                 </h3>
                 <p class="text-muted small mb-0 mt-1">Fuel Trade and Buy Back pick-up orders, whatever their clearance status.</p>
             </div>
-            <div class="d-flex gap-2">
-                <a href="{{ route('stock-orders.purchase-orders.index') }}" class="btn btn-outline-secondary">
-                    <i class="bi bi-speedometer2 me-1"></i> Stock Orders Dashboard
-                </a>
-            </div>
+            {{-- A "Stock Orders Dashboard" button used to sit here. It linked to
+                 stock-orders.purchase-orders.index - the Purchase Orders page -
+                 under a label that promised somewhere else entirely, so it is
+                 gone rather than relabelled. --}}
         </div>
 
         @php

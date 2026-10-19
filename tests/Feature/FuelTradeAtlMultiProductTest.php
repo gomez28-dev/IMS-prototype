@@ -227,6 +227,25 @@ class FuelTradeAtlMultiProductTest extends TestCase
         $this->assertStringNotContainsString('>Premium<', $select);
     }
 
+    public function test_the_add_product_button_is_enabled_when_a_product_is_missing(): void
+    {
+        $order = $this->order([['Diesel', 300], ['Unleaded', 200]]);
+        $this->po('PO-MP-'.rand(1000, 9999), ['Diesel' => 1000, 'Unleaded' => 1000]);
+
+        $html = $this->formHtml($order);
+
+        preg_match('/<button[^>]*onclick="addProductRow\(\)"[^>]*>/s', $html, $matches);
+        $button = $matches[0] ?? '';
+
+        $this->assertNotSame('', $button, 'The button should be rendered.');
+        $this->assertStringNotContainsString(
+            'disabled',
+            $button,
+            'Unleaded has no line yet, so there is something to add.'
+        );
+        $this->assertStringContainsString('btn-outline-primary', $button);
+    }
+
     public function test_a_single_product_order_disables_the_add_product_button(): void
     {
         // SO 1360 in the screenshot: one product, so there is nothing left to
@@ -236,9 +255,37 @@ class FuelTradeAtlMultiProductTest extends TestCase
 
         $html = $this->formHtml($order);
 
-        $this->assertStringContainsString('Add Product', $html);
-        // Disabled, with the reason available.
-        $this->assertStringContainsString('disabled', $html);
+        preg_match('/<button[^>]*onclick="addProductRow\(\)"[^>]*>/s', $html, $matches);
+        $button = $matches[0] ?? '';
+
+        $this->assertNotSame('', $button);
+        $this->assertStringContainsString('disabled', $button);
+        $this->assertStringContainsString(
+            'one product only',
+            $html,
+            'The reason should be available, not just a greyed-out button.'
+        );
+    }
+
+    public function test_both_pool_buttons_are_styled_the_same(): void
+    {
+        $order = $this->order([['Diesel', 300], ['Unleaded', 200]]);
+        $this->po('PO-MP-'.rand(1000, 9999), ['Diesel' => 1000, 'Unleaded' => 1000]);
+
+        $html = $this->formHtml($order);
+
+        preg_match('/<button[^>]*onclick="addProductRow\(\)"[^>]*>/s', $html, $add);
+        preg_match('/<button[^>]*onclick="addDrawdownRow\(\)"[^>]*>/s', $html, $split);
+
+        $this->assertNotSame('', $add[0] ?? '');
+        $this->assertNotSame('', $split[0] ?? '');
+
+        // .btn-outline-primary is remapped to --brand-color in the layout, so
+        // the two buttons read as the same orange outline.
+        $this->assertStringContainsString('btn-outline-primary', $add[0]);
+        $this->assertStringContainsString('btn-outline-primary', $split[0]);
+        $this->assertStringContainsString('rounded-pill', $add[0]);
+        $this->assertStringContainsString('rounded-pill', $split[0]);
     }
 
     public function test_the_per_product_total_breakdown_is_still_there(): void
