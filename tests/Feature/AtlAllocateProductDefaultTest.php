@@ -172,15 +172,26 @@ class AtlAllocateProductDefaultTest extends TestCase
 
     public function test_the_other_products_remain_selectable(): void
     {
-        $order = $this->order('P');
-        $this->poWith(['Premium' => 100000]);
+        // The dropdown offers what this Sales Order asks for, and only that. It
+        // used to list all three fuels, which offered Premium on an order that
+        // never mentioned it - and storeFuelTradePo then refused it on save.
+        $order = $this->order('D', 60000);
+        OrderItem::create([
+            'order_id' => $order->id,
+            'product_type' => 'U',
+            'qty' => 40000,
+        ]);
+        $this->poWith(['Premium' => 100000, 'Diesel' => 100000, 'Unleaded' => 100000]);
 
         $html = $this->atlForm($order);
 
-        // Pre-selected, not locked: a PO can genuinely hold more than one.
+        // Pre-selected, not locked: a PO can genuinely hold more than one, and
+        // an order can ask for more than one fuel.
         $this->assertStringContainsString('<option value="Diesel"', $html);
         $this->assertStringContainsString('<option value="Unleaded"', $html);
-        $this->assertMatchesRegularExpression('/<option value="Premium"\s+selected>/', $html);
+        // The PO holds Premium, but this order does not ask for it.
+        $this->assertStringNotContainsString('<option value="Premium"', $html);
+        $this->assertMatchesRegularExpression('/<option value="Diesel"\s+selected>/', $html);
     }
 
     public function test_an_added_row_defaults_to_the_same_product(): void

@@ -21,7 +21,7 @@ use Tests\TestCase;
  * The Create form's header carried a "Purchasing Allocation Pool" badge, and
  * its price column was headed and prefixed with a garbled peso sign - three
  * bytes of UTF-8 that had been round-tripped through Windows-1252, so the page
- * rendered "â‚±".
+ * rendered "a double-encoded peso sign".
  *
  * And the list's Status column showed two labels drawn from the same idea: a
  * numbered request_status badge over a computed_status line. The user elected to
@@ -211,17 +211,19 @@ class PurchaseOrdersListPresentationTest extends TestCase
 
     public function test_no_garbled_peso_sign_survives_anywhere(): void
     {
+        // Assembled from code points rather than pasted, so this file does not
+        // itself become a second place the mojibake has to be hunted down.
+        $mojibake = "\u{00E2}\u{201A}\u{00B1}";
+
         foreach ([
             'resources/views/wetstock/stock-orders/create-po.blade.php',
             'resources/views/wetstock/purchase-orders/index.blade.php',
             'resources/views/wetstock/purchase-orders/show.blade.php',
             'resources/views/dashboard.blade.php',
         ] as $file) {
-            $source = file_get_contents(base_path($file));
-
             $this->assertStringNotContainsString(
-                "\u{00E2}\u{201A}\u{00B1}",
-                $source,
+                $mojibake,
+                file_get_contents(base_path($file)),
                 "{$file} still holds the double-encoded peso sign."
             );
         }

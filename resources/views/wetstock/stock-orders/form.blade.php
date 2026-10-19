@@ -7,9 +7,26 @@
 @section('content')
 <div class="row justify-content-center">
     <div class="col-md-10 col-lg-9">
+        @php
+            // The Issue ATL page is opened from Sales Orders, so it goes back
+            // there rather than to the module index - which used to drop the
+            // user on Purchase Orders, a different list entirely.
+            //
+            // The list's page number and search come back with them, so leaving
+            // and returning lands on the same rows. Page 1 is the index's own
+            // default and is left off.
+            $isSalesOrderAtl = $mode === 'fuel_trade';
+            $backUrl = $isSalesOrderAtl
+                ? route('stock-orders.sales-orders.index', array_filter([
+                    'page' => request('page') !== '1' ? request('page') : null,
+                    'search' => request('search'),
+                ], fn ($value) => $value !== null && $value !== ''))
+                : route('stock-orders.index');
+            $backLabel = $isSalesOrderAtl ? 'Back to Sales Orders' : 'Back to Stock Orders';
+        @endphp
         <div class="mb-3">
-            <a href="{{ route('stock-orders.index') }}" class="text-decoration-none text-secondary small">
-                <i class="bi bi-arrow-left me-1"></i> Back to Stock Orders
+            <a href="{{ $backUrl }}" class="text-decoration-none text-secondary small">
+                <i class="bi bi-arrow-left me-1"></i> {{ $backLabel }}
             </a>
         </div>
 
@@ -81,7 +98,15 @@
                                 $soRequirements = $order->productRequirements();
                                 $requiredProducts = array_keys($soRequirements);
                                 $defaultReqProduct = $requiredProducts[0] ?? 'Diesel';
-                                $productOptions = ['Diesel', 'Premium', 'Unleaded'];
+
+                                // Only the products this Sales Order actually asks
+                                // for. This was hard-coded to all three fuels, so the
+                                // dropdown offered Premium on an order that never
+                                // mentioned it - and storeFuelTradePo refuses that on
+                                // save, which reads as the form lying. The JS clones
+                                // these options into every added row, so restricting
+                                // them here holds the whole table to the same list.
+                                $productOptions = $requiredProducts ?: ['Diesel'];
                             @endphp
 
                         {{-- ATL source: Doyen issues the ATL, or the client provides it --}}
@@ -199,7 +224,23 @@
                                     <small class="text-muted">Select active Supplier Purchase Order(s) to draw volume from.</small>
                                 </div>
                                 @if (!empty($availablePos) && count($availablePos) > 0)
-                                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" onclick="addDrawdownRow()">
+                                {{-- Two buttons, and they do different things. Split Across
+                                     Another PO adds a row for the SAME product against a
+                                     different PO. Add Product adds a row for a product this
+                                     order has not been given a line yet - without it a
+                                     multi-fuel order could only ever allocate one fuel,
+                                     because nothing else on this form appends a row. --}}
+                                <div class="d-flex gap-2 align-items-center">
+                                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3"
+                                            data-add-product
+                                            onclick="addProductRow()"
+                                            @disabled(count($productOptions) <= 1)
+                                            title="{{ count($productOptions) <= 1
+                                                ? 'This Sales Order is for one product only, so there is nothing further to add.'
+                                                : 'Add a line for another product on this order.' }}">
+                                        <i class="bi bi-plus-lg me-1"></i> Add Product
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" onclick="addDrawdownRow()">
                                     <i class="bi bi-plus-lg me-1"></i> Split Across Another PO
                                 </button>
                                 @endif
@@ -513,10 +554,30 @@
 
 <script>
 let ddIndex = 1;
+
+// The products this Sales Order requires, and the only ones any row may be
+// allocated against. Rendered by Blade from Order::productRequirements().
+// Only defined inside the fuel_trade branch, and this script is shared by all
+// three modes, so it falls back rather than fataling on Add ATL and Prepare.
+const soProducts = @json($productOptions ?? []);
+
 const productOptionsHtml = (function () {
     const sel = document.querySelector('.dd-product-select');
     return sel ? sel.innerHTML : '<option value="Diesel">Diesel</option>';
 })();
+
+/**
+ * Add a line for a product this order has not been given yet.
+ *
+ * Distinct from the split button, which keeps the same product and just
+ * reaches for a different PO. Without this a multi-fuel order could only ever
+ * allocate one of its fuels.
+ */
+function addProductRow() {
+    const product = nextUnallocatedProduct();
+    if (!product) return;
+    addDrawdownRow(product);
+}
 
 function poAvailability(poSelect) {
     const opt = poSelect.options[poSelect.selectedIndex];
@@ -566,6 +627,10 @@ function updateAvailHint(row) {
  * After a PO is chosen, offer only the products that PO still holds, which is
  * what the supervisor asked for: "after maka select ng PO# may mag show na
  * kung anong product at ilang qty ang available under that PO".
+ *
+ * Intersected with what this Sales Order requires. A PO carrying Premium used
+ * to put Premium in the list of an order that never asked for it, and the save
+ * then refused it - so the form offered something it would not accept.
  */
 function refreshProductOptions(row, preferredProduct) {
     const select = row.querySelector('.dd-product-select');
@@ -575,22 +640,37 @@ function refreshProductOptions(row, preferredProduct) {
     const previous = preferredProduct || select.value;
 
     let html = '';
-    Object.keys(availability).forEach(function (product) {
-        html += '<option value="' + product + '">' + product + '</option>';
+    soProducts.forEach(function (product) {
+        if (availability[product] !== undefined) {
+            html += '<option value="' + product + '">' + product + '</option>';
+        }
     });
 
-    // No PO chosen yet, or a PO with nothing left: fall back to the full list
-    // so the select is never empty and the user can still see the products.
+    // No PO chosen yet, or one with nothing left: fall back to the products
+    // this order requires, so the select is never empty and never offers
+    // something outside the order.
     select.innerHTML = html || productOptionsHtml;
 
-    if (availability[previous] !== undefined) {
+    if (html && availability[previous] !== undefined) {
         select.value = previous;
     } else if (!html && previous) {
         select.value = previous;
     }
 }
 
-function addDrawdownRow() {
+/**
+ * Append a drawdown row.
+ *
+ * `preferredProduct` is what distinguishes the two buttons: the split button
+ * passes nothing and keeps whatever the first row is on, while the add-product
+ * button passes a product this order has not been given a line yet.
+ *
+ * When a product is named, the row also preselects a PO that actually holds
+ * it. Copying the first row's PO selection wholesale would hand back a PO with
+ * no volume of that product - which is exactly the dead end the Add Product
+ * button exists to get out of.
+ */
+function addDrawdownRow(preferredProduct) {
     const tbody = document.getElementById('drawdownRowsBody');
     if (!tbody) return;
 
@@ -629,14 +709,76 @@ function addDrawdownRow() {
     `;
     tbody.appendChild(tr);
     ddIndex++;
+
+    if (preferredProduct) {
+        const poSelect = tr.querySelector('.po-select');
+        const productSelect = tr.querySelector('.dd-product-select');
+
+        // A PO that holds the product, if one does. Left unselected otherwise,
+        // rather than preselecting a PO that cannot supply it.
+        const match = Array.from(poSelect.options).find(function (option) {
+            if (!option.value) return false;
+            const items = JSON.parse(option.getAttribute('data-items') || '{}');
+            return (items[preferredProduct] || 0) > 0;
+        });
+
+        if (match) {
+            poSelect.value = match.value;
+            productSelect.value = preferredProduct;
+            handlePoSelectChange(poSelect);
+        } else {
+            // Nothing in the pool holds this product. Say so rather than
+            // leaving a row that cannot be filled in.
+            const hint = tr.querySelector('[data-avail-hint]');
+            if (hint) {
+                hint.textContent = 'No Supplier PO holds ' + preferredProduct;
+                hint.className = 'badge rounded-pill px-2 py-1 border bg-warning-subtle text-warning-emphasis border-warning-subtle';
+            }
+            productSelect.value = preferredProduct;
+        }
+    }
+
     updateDrawdownRemoveButtons();
+    updateAddProductButton();
     calculateTotalDrawn();
+}
+
+/**
+ * The first product on this Sales Order that no row has been given yet.
+ *
+ * Returns null once every product has a line, which is what disables the
+ * button: a single-fuel order reaches that state immediately.
+ */
+function nextUnallocatedProduct() {
+    const used = {};
+    document.querySelectorAll('.drawdown-row .dd-product-select').forEach(function (select) {
+        if (select.value) used[select.value] = true;
+    });
+
+    return soProducts.find(function (product) { return !used[product]; }) || null;
+}
+
+/**
+ * Once every product has a line there is nothing left to add, so the button
+ * says so instead of stacking a duplicate row.
+ */
+function updateAddProductButton() {
+    const button = document.querySelector('[data-add-product]');
+    if (!button) return;
+
+    const remaining = nextUnallocatedProduct();
+
+    button.disabled = !remaining;
+    button.title = remaining
+        ? 'Add a line for ' + remaining + '.'
+        : 'Every product on this Sales Order already has a line.';
 }
 
 function removeDrawdownRow(btn) {
     const row = btn.closest('tr');
     row.remove();
     updateDrawdownRemoveButtons();
+    updateAddProductButton();
     calculateTotalDrawn();
 }
 
@@ -782,6 +924,10 @@ document.addEventListener('DOMContentLoaded', function() {
     sourceInputs.forEach(function (input) {
         input.addEventListener('change', applySourceVisibility);
     });
+
+    // A single-product order starts with nothing left to add, so the
+    // state has to be resolved on load rather than only after a click.
+    updateAddProductButton();
     applySourceVisibility();
 });
 </script>
