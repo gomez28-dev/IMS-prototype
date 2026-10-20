@@ -49,3 +49,9 @@ ims_db
 # Scratch folder holding the copy downloaded from Hostinger for diffing.
 # Its contents are merged selectively; the folder itself is never committed.
 Edited in hostinger/
+
+backup-*/
+*.zip
+apply-*.sh
+*.bak*
+*.broken-backup
