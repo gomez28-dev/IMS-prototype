@@ -114,7 +114,10 @@ class DeliveryAssignmentController extends Controller
             ->selectRaw("COALESCE(DATE_FORMAT(fulfilled_at, '%Y-%m'), DATE_FORMAT(updated_at, '%Y-%m')) as ym")
             ->distinct()->orderByDesc('ym')->pluck('ym')->filter()->values();
 
-        $warehouses = Warehouse::with(['activeTanks'])->orderBy('name', 'asc')->get();
+        $warehouses = Warehouse::with(['activeTanks.compartments'])->orderBy('name', 'asc')->get();
+
+        // Product-aware stock per tank/truck, only needed for the allocation pop-ups (Unassigned tab).
+        $tankStock = $activeTab === 'unassigned' ? $this->productAvailability($warehouses) : [];
 
         return view('wetstock.deliveries.index', [
             'unassignedDeliveries' => $unassignedDeliveries,
@@ -124,6 +127,7 @@ class DeliveryAssignmentController extends Controller
             'assignedCount' => $assignedCount,
             'historyCount' => $historyCount,
             'warehouses' => $warehouses,
+            'tankStock' => $tankStock,
             'activeTab' => $activeTab,
             'search' => $search,
             'historyMonth' => $filterMonth,
@@ -132,6 +136,53 @@ class DeliveryAssignmentController extends Controller
             'historyMonths' => $historyMonths,
             'now' => $now,
         ]);
+    }
+
+    /**
+     * What each active tank / truck can supply, per product, using the same numbers
+     * allocate() validates against (effective_available), so the pop-up never offers
+     * a tank the server would reject.
+     *
+     * Shape: [tank_id => ['tanker' => bool, 'product' => code|null, 'blocked' => bool,
+     *                     'bad' => int, 'by' => [code => ['avail' => int, 'comps' => [[id, no, avail], ...]]]]]
+     * Depots fill 'avail'; trucks fill 'comps' (one entry per compartment holding that product).
+     */
+    private function productAvailability($warehouses): array
+    {
+        $map = [];
+
+        foreach ($warehouses as $warehouse) {
+            foreach ($warehouse->activeTanks as $tank) {
+                $isTruck = $tank->compartments->isNotEmpty();
+                $bad = (int) $tank->contaminated_liters;
+                $by = [];
+
+                if ($isTruck) {
+                    foreach ($tank->compartments as $c) {
+                        if (!$c->product_type) {
+                            continue;
+                        }
+                        $by[$c->product_type]['comps'][] = [
+                            'id' => $c->id,
+                            'no' => $c->compartment_no,
+                            'avail' => (int) $c->effective_available,
+                        ];
+                    }
+                } elseif ($tank->product_type) {
+                    $by[$tank->product_type] = ['avail' => (int) $tank->effective_available, 'comps' => []];
+                }
+
+                $map[$tank->id] = [
+                    'tanker' => $isTruck,
+                    'product' => $isTruck ? null : $tank->product_type,
+                    'blocked' => !$isTruck && $bad > 0 && $tank->isFullyContaminated(),
+                    'bad' => $bad,
+                    'by' => $by,
+                ];
+            }
+        }
+
+        return $map;
     }
 
     /**

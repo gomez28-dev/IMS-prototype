@@ -3,6 +3,34 @@
 @section('title', 'Assign Deliveries & Fulfillment')
 
 @section('content')
+@php
+    $pcol = ['U' => '#22a45d', 'P' => '#e5383b', 'D' => '#f2a900'];
+
+    // The product lines of a DR: one per compartment, or one stand-in line for a legacy DR.
+    $linesOf = function ($delivery) {
+        if ($delivery->items->isNotEmpty()) {
+            return $delivery->items->values()->map(fn ($i, $k) => [
+                'id' => $i->id,
+                'no' => $i->compartment_no ?: $k + 1,
+                'code' => $i->product_type ?: '-',
+                'name' => $i->product_name,
+                'qty' => (int) $i->qty_out,
+                'allocated' => $i->allocated_quantity,
+                'remaining' => $i->remaining_to_allocate,
+            ]);
+        }
+
+        return collect([[
+            'id' => null,
+            'no' => 1,
+            'code' => $delivery->product_type ?: '-',
+            'name' => $delivery->product_name,
+            'qty' => (int) $delivery->qty_out,
+            'allocated' => $delivery->allocated_quantity,
+            'remaining' => $delivery->remaining_to_allocate,
+        ]]);
+    };
+@endphp
 <style>
     .wetstock-deliveries-table {
         table-layout: auto;
@@ -96,6 +124,31 @@
     .alloc-modal .alloc-existing {
         font-size: 0.78rem;
     }
+
+    /* Product chips */
+    .needed-cell { display: flex; flex-wrap: wrap; gap: 4px; }
+    .prod-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0.15rem 0.6rem;
+        border-radius: 999px;
+        font-size: 0.74rem;
+        font-weight: 600;
+        background: #f3f4f6;
+        color: #1f2937;
+        border: 1px solid #e5e7eb;
+        white-space: nowrap;
+    }
+    .prod-chip .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--pc, #9aa5b4);
+        flex: none;
+    }
+    .prod-chip .left { font-weight: 500; color: #a16207; }
+    .prod-chip.done { background: #f0fdf4; border-color: #bbf7d0; }
 </style>
 <div class="row justify-content-center">
     <div class="col-12">
@@ -183,6 +236,7 @@
                                         <th class="py-3">ATL#</th>
                                         <th class="py-3">Client</th>
                                         <th class="py-3 text-center">Type</th>
+                                        <th class="py-3">Needed</th>
                                         <th class="py-3">Delivery Date</th>
                                         <th class="py-3 pe-3 text-end">Action</th>
                                     </tr>
@@ -215,6 +269,20 @@
                                                     <span class="badge badge-type-big-tanker rounded-pill wetstock-type-badge">BIG TANKER</span>
                                                 @endif
                                             </td>
+                                            <td>
+                                                <div class="needed-cell">
+                                                    @foreach ($linesOf($delivery) as $l)
+                                                        <span class="prod-chip {{ $l['remaining'] <= 0 ? 'done' : '' }}" style="--pc: {{ $pcol[$l['code']] ?? '#9aa5b4' }};" title="{{ $l['code'] === '-' ? 'No product set' : $l['name'] }}: {{ number_format($l['allocated']) }} of {{ number_format($l['qty']) }} L allocated">
+                                                            <span class="dot"></span>{{ $l['code'] === '-' ? 'No product' : $l['name'] }} {{ number_format($l['qty']) }} L
+                                                            @if ($l['remaining'] <= 0)
+                                                                <i class="bi bi-check2 text-success"></i>
+                                                            @elseif ($l['allocated'] > 0)
+                                                                <span class="left">&middot; {{ number_format($l['remaining']) }} L left</span>
+                                                            @endif
+                                                        </span>
+                                                    @endforeach
+                                                </div>
+                                            </td>
                                             <td class="text-muted small">
                                                 {{ $delivery->delivery_date ? $delivery->delivery_date->format('M d, Y') : '-' }}
                                             </td>
@@ -245,26 +313,8 @@
                     $otherTanks = $siteWarehouse ? $siteWarehouse->activeTanks->whereNotIn('category', ['depot', 'tanker']) : collect();
                     $latestApprovedMod = $delivery->modificationRequests->where('status', 'APPROVED')->sortByDesc('created_at')->first();
 
-                    // Lines to allocate: real compartments, or one stand-in line for a legacy DR without any
-                    $lines = $delivery->items->isNotEmpty()
-                        ? $delivery->items->map(fn ($i) => [
-                            'id' => $i->id,
-                            'no' => $i->compartment_no ?: $loop->iteration,
-                            'code' => $i->product_type ?: '-',
-                            'name' => $i->product_name,
-                            'qty' => (int) $i->qty_out,
-                            'allocated' => $i->allocated_quantity,
-                            'remaining' => $i->remaining_to_allocate,
-                        ])->values()
-                        : collect([[
-                            'id' => null,
-                            'no' => 1,
-                            'code' => $delivery->product_type ?: '-',
-                            'name' => $delivery->product_name,
-                            'qty' => (int) $delivery->qty_out,
-                            'allocated' => $delivery->allocated_quantity,
-                            'remaining' => $delivery->remaining_to_allocate,
-                        ]]);
+                    // Product lines of this DR (one per compartment)
+                    $lines = $linesOf($delivery);
                 @endphp
                 <div class="modal fade alloc-modal" id="allocModal{{ $delivery->id }}" tabindex="-1" aria-labelledby="allocModalLabel{{ $delivery->id }}" aria-hidden="true">
                     <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
@@ -329,7 +379,7 @@
                                             <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
                                                 <div>
                                                     <span class="badge bg-light text-secondary border me-1">#{{ $line['no'] }}</span>
-                                                    <span class="fw-bold text-dark">{{ $line['code'] === '-' ? 'Unspecified' : $line['code'] . ' - ' . $line['name'] }}</span>
+                                                    <span class="prod-chip fw-bold" style="--pc: {{ $pcol[$line['code']] ?? '#9aa5b4' }};"><span class="dot"></span>{{ $line['code'] === '-' ? 'No product set' : $line['name'] }}</span>
                                                     <span class="text-muted small ms-2">needs {{ number_format($line['qty']) }} L</span>
                                                 </div>
                                                 @if ($isDone)
@@ -348,6 +398,9 @@
                                                                 <i class="bi {{ ($alloc->tank->category ?? '') === 'tanker' ? 'bi-truck' : 'bi-fuel-pump' }} text-primary me-1"></i>
                                                                 <strong>{{ $alloc->tank->name ?? '—' }}</strong>
                                                                 <span class="text-muted">({{ $alloc->tank->warehouse->name ?? '—' }})</span>
+                                                                @if ($alloc->compartment)
+                                                                    <span class="badge bg-light text-secondary border">C{{ $alloc->compartment->compartment_no }}</span>
+                                                                @endif
                                                             </div>
                                                             <div class="d-flex align-items-center gap-2">
                                                                 <span class="font-monospace fw-bold">{{ number_format($alloc->quantity) }} L</span>
@@ -375,23 +428,69 @@
                                                             <label class="form-label small text-secondary mb-1">Tank / Truck</label>
                                                             <select name="storage_tank_id" class="form-select form-select-sm alloc-tank" required>
                                                                 <option value="">Select tank or truck...</option>
-                                                                @foreach ([['Depot Tanks', $depotTanks], ['Tanker Trucks', $tankerTanks], ['Other', $otherTanks]] as [$groupLabel, $group])
-                                                                    @if ($group->isNotEmpty())
-                                                                        <optgroup label="{{ $groupLabel }}">
-                                                                            @foreach ($group as $t)
-                                                                                @php
-                                                                                    $disabled = $t->isFullyContaminated() || $t->effective_available < 1 || in_array($t->id, $usedTankIds, true);
-                                                                                @endphp
-                                                                                <option value="{{ $t->id }}" data-available="{{ $t->effective_available }}" {{ $disabled ? 'disabled' : '' }}>
-                                                                                    {{ $t->name }} — {{ number_format($t->effective_available) }} L avail
-                                                                                    {{ in_array($t->id, $usedTankIds, true) ? ' [already used for this product]' : '' }}
-                                                                                    {{ $t->hasContamination() ? ' [' . number_format($t->contaminated_liters) . 'L Contaminated' . ($t->isFullyContaminated() ? ' - BLOCKED' : '') . ']' : '' }}
-                                                                                </option>
-                                                                            @endforeach
-                                                                        </optgroup>
-                                                                    @endif
+                                                                @php
+                                                                    $code = $line['code'];
+                                                                    $usedCompIds = $lineAllocs->pluck('tank_compartment_id')->filter()->all();
+                                                                    $groups = [];
+                                                                    $hiddenCount = 0;
+                                                                    foreach ([['Depot Tanks', $depotTanks], ['Tanker Trucks', $tankerTanks], ['Other', $otherTanks]] as [$gLabel, $gTanks]) {
+                                                                        $opts = [];
+                                                                        foreach ($gTanks as $t) {
+                                                                            $info = $tankStock[$t->id] ?? null;
+                                                                            if (!$info) { $hiddenCount++; continue; }
+
+                                                                            if ($code === '-') {
+                                                                                // DR line without a product: any depot works, a truck needs a product.
+                                                                                $entry = $info['tanker'] ? null : ($info['by'][$info['product']] ?? null);
+                                                                            } else {
+                                                                                $entry = $info['by'][$code] ?? null;
+                                                                            }
+                                                                            if (!$entry) { $hiddenCount++; continue; }
+
+                                                                            $compText = '';
+                                                                            if ($info['tanker']) {
+                                                                                $free = collect($entry['comps'])->reject(fn ($c) => in_array($c['id'], $usedCompIds, true))->where('avail', '>', 0);
+                                                                                $avail = (int) $free->sum('avail');
+                                                                                $compText = $free->map(fn ($c) => 'C' . $c['no'] . ' ' . number_format($c['avail']) . ' L')->implode(' · ');
+                                                                            } else {
+                                                                                $avail = (int) $entry['avail'];
+                                                                            }
+
+                                                                            $note = '';
+                                                                            $disabled = false;
+                                                                            if ($info['blocked']) { $note = ' [BLOCKED - contaminated]'; $disabled = true; }
+                                                                            elseif (!$info['tanker'] && in_array($t->id, $usedTankIds, true)) { $note = ' [already used for this product]'; $disabled = true; }
+                                                                            elseif ($avail < 1) { $note = ' [nothing available]'; $disabled = true; }
+                                                                            elseif ($info['bad'] > 0) { $note = ' [' . number_format($info['bad']) . ' L contaminated]'; }
+
+                                                                            $opts[] = [
+                                                                                'id' => $t->id,
+                                                                                'avail' => $avail,
+                                                                                'comps' => $compText,
+                                                                                'disabled' => $disabled,
+                                                                                'text' => $t->name . ' — ' . number_format($avail) . ' L ' . ($code === '-' ? '' : $line['name'] . ' ') . 'avail' . ($compText && !$disabled ? ' (' . $compText . ')' : '') . $note,
+                                                            ];
+                                                                        }
+                                                                        if ($opts) { $groups[] = ['label' => $gLabel, 'opts' => $opts]; }
+                                                                    }
+                                                                @endphp
+                                                                @foreach ($groups as $g)
+                                                                    <optgroup label="{{ $g['label'] }}">
+                                                                        @foreach ($g['opts'] as $o)
+                                                                            <option value="{{ $o['id'] }}" data-available="{{ $o['avail'] }}" data-comps="{{ $o['comps'] }}" {{ $o['disabled'] ? 'disabled' : '' }}>{{ $o['text'] }}</option>
+                                                                        @endforeach
+                                                                    </optgroup>
                                                                 @endforeach
                                                             </select>
+                                                            <div class="form-text">
+                                                                @if ($code === '-')
+                                                                    <span class="text-warning-emphasis">This line has no product set. Edit the DR and set one so trucks can be matched.</span>
+                                                                @elseif (empty($groups))
+                                                                    <span class="text-danger">No tank or truck at {{ $siteWarehouse->name }} is set up for {{ $line['name'] }}.</span>
+                                                                @else
+                                                                    Showing tanks and trucks that hold <strong>{{ $line['name'] }}</strong> at {{ $siteWarehouse->name }}@if ($hiddenCount) ({{ $hiddenCount }} with another product hidden)@endif.
+                                                                @endif
+                                                            </div>
                                                         </div>
                                                         <div class="col-6 col-md-3">
                                                             <label class="form-label small text-secondary mb-1">Liters</label>
@@ -478,10 +577,13 @@
                                                             <div>
                                                                 <i class="bi bi-fuel-pump text-primary me-1"></i>
                                                                 @if ($alloc->item)
-                                                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle">{{ $alloc->item->product_type ?: '-' }}</span>
+                                                                    <span class="prod-chip" style="--pc: {{ $pcol[$alloc->item->product_type ?? ''] ?? '#9aa5b4' }};"><span class="dot"></span>{{ $alloc->item->product_name }}</span>
                                                                 @endif
                                                                 <strong>{{ $alloc->tank->name ?? '—' }}</strong>
                                                                 <span class="text-muted">({{ $alloc->tank->warehouse->name ?? '—' }})</span>
+                                                                @if ($alloc->compartment)
+                                                                    <span class="badge bg-light text-secondary border">C{{ $alloc->compartment->compartment_no }}</span>
+                                                                @endif
                                                             </div>
                                                             <div class="d-flex align-items-center gap-2">
                                                                 <span class="font-monospace fw-bold">{{ number_format($alloc->quantity) }} L</span>
@@ -636,7 +738,7 @@
                                                 <div class="d-flex flex-wrap gap-1">
                                                     @foreach ($delivery->allocations as $alloc)
                                                         <span class="badge bg-light text-dark border px-2 py-1 small">
-                                                            @if ($alloc->item){{ $alloc->item->product_type ?: '-' }} &middot; @endif{{ $alloc->tank->name ?? '—' }} ({{ number_format($alloc->quantity) }}L)
+                                                            @if ($alloc->item){{ $alloc->item->product_name }} &middot; @endif{{ $alloc->tank->name ?? '—' }}@if ($alloc->compartment) C{{ $alloc->compartment->compartment_no }}@endif ({{ number_format($alloc->quantity) }}L)
                                                         </span>
                                                     @endforeach
                                                 </div>
@@ -711,6 +813,11 @@
                 hint.textContent = avail < remaining
                     ? 'This tank/truck covers only ' + fmt(avail) + ' L. Allocate the rest to another one.'
                     : 'Max ' + fmt(max) + ' L.';
+
+                var comps = opt.getAttribute('data-comps');
+                if (comps) {
+                    hint.textContent += ' Draws from ' + comps + '.';
+                }
             });
         });
 
