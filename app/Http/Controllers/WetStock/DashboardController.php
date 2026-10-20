@@ -23,7 +23,7 @@ class DashboardController extends Controller
                 $query->orderBy('name', 'asc');
             },
             'tanks.compartments',
-        ])->orderBy('name', 'asc')->get();
+        ])->orderBy('name', 'desc')->get();
 
         return view('wetstock.dashboard', [
             'warehouses' => $warehouses,
