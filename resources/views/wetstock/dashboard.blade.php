@@ -107,7 +107,7 @@
     <div class="card card-custom p-5 text-center"><p class="text-muted mb-0">No warehouses configured yet.</p></div>
 @else
     {{-- Valenzuela always first, then the other warehouses (San Simon) in their usual order --}}
-    @foreach ($warehouses->sortBy('name')->values() as $warehouse)
+    @foreach ($warehouses->sortByDesc('name')->values() as $warehouse)
         @php
             // Work out every unit's numbers once; the cards and pop-ups below all reuse them.
             $units = $warehouse->tanks->map(function ($t) use ($pctOf) {
