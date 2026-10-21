@@ -45,6 +45,19 @@ class TankCompartment extends Model
         return $this->hasMany(StockAdjustment::class, 'tank_compartment_id');
     }
 
+    /**
+     * Transfers that put fuel into / took fuel out of this compartment.
+     */
+    public function transfersIn(): HasMany
+    {
+        return $this->hasMany(StockTransfer::class, 'destination_compartment_id');
+    }
+
+    public function transfersOut(): HasMany
+    {
+        return $this->hasMany(StockTransfer::class, 'source_compartment_id');
+    }
+
     public function getProductNameAttribute(): ?string
     {
         return Order::PRODUCT_TYPES[$this->product_type] ?? null;
@@ -54,10 +67,19 @@ class TankCompartment extends Model
      * opening_balance is stock that was already in the truck total and has been placed
      * into this compartment ("Unassigned stock already in the truck"). It counts toward
      * the compartment only, not the tank total, which already includes it.
+     *
+     * Transfers in and out of this compartment count too. Older transfers that were not
+     * tied to a compartment stay in the truck total only (unassigned stock).
      */
     public function getStockAvailableAttribute(): int
     {
-        return max(0, (int) $this->opening_balance + (int) $this->stockIns()->sum('quantity') - (int) $this->adjustments()->sum('quantity'));
+        return max(0,
+            (int) $this->opening_balance
+            + (int) $this->stockIns()->sum('quantity')
+            + (int) $this->transfersIn()->sum('quantity')
+            - (int) $this->adjustments()->sum('quantity')
+            - (int) $this->transfersOut()->sum('quantity')
+        );
     }
 
     public function getRemainingCapacityAttribute(): int

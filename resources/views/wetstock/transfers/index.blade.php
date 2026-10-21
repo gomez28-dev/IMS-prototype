@@ -55,15 +55,15 @@
                 </h3>
                 @if (Auth::user()->canEditModule2())
                     <div class="d-flex flex-wrap gap-2">
-                        <a href="{{ route('wetstock.transfers.create', ['type' => 'transfer']) }}" class="btn btn-primary-custom btn-sm rounded-pill px-3 shadow-sm d-flex align-items-center">
+                        <button type="button" data-type="transfer" class="js-open-transfer btn btn-primary-custom btn-sm rounded-pill px-3 shadow-sm d-flex align-items-center">
                             <i class="bi bi-arrow-left-right me-1"></i> Intra-Site Transfer
-                        </a>
-                        <a href="{{ route('wetstock.transfers.create', ['type' => 'borrow']) }}" class="btn btn-secondary-custom btn-sm rounded-pill px-3 shadow-sm d-flex align-items-center">
+                        </button>
+                        <button type="button" data-type="borrow" class="js-open-transfer btn btn-secondary-custom btn-sm rounded-pill px-3 shadow-sm d-flex align-items-center">
                             <i class="bi bi-box-arrow-in-up-right me-1 text-primary"></i> Borrow Stock
-                        </a>
-                        <a href="{{ route('wetstock.transfers.create', ['type' => 'return']) }}" class="btn btn-outline-success btn-sm rounded-pill px-3 d-flex align-items-center fw-semibold">
+                        </button>
+                        <button type="button" data-type="return" class="js-open-transfer btn btn-outline-success btn-sm rounded-pill px-3 d-flex align-items-center fw-semibold">
                             <i class="bi bi-arrow-counterclockwise me-1"></i> Return Stock
-                        </a>
+                        </button>
                     </div>
                 @endif
             </div>
@@ -250,6 +250,7 @@
                                     <th class="py-3">Source Tank</th>
                                     <th class="py-3 text-center" style="width: 40px;"></th>
                                     <th class="py-3">Destination Tank</th>
+                                    <th class="py-3">Product</th>
                                     <th class="py-3 text-end">Volume</th>
                                     <th class="py-3">Operator</th>
                                     <th class="py-3">Notes</th>
@@ -264,7 +265,7 @@
                                     <td class="ps-3 fw-semibold text-dark font-monospace">{{ $tx->transfer_number }}</td>
                                     <td class="text-muted small">{{ $tx->transfer_date ? $tx->transfer_date->format('M d, Y') : '-' }}</td>
                                     <td class="tank-cell">
-                                        <div class="fw-semibold text-dark">{{ $tx->sourceTank->name }}</div>
+                                        <div class="fw-semibold text-dark">{{ $tx->sourceTank->name }}@if ($tx->sourceCompartment) <span class="badge bg-light text-secondary border ms-1">C{{ $tx->sourceCompartment->compartment_no }}</span>@endif</div>
                                         <div class="text-muted small d-flex align-items-center gap-1 mt-1">
                                             <span class="badge {{ $tx->sourceTank->isTanker() ? 'badge-type-small-tanker' : 'badge-type-pickup' }} wetstock-type-badge rounded-pill px-2 py-0">
                                                 {{ $tx->sourceTank->isTanker() ? 'Tanker' : 'Depot' }}
@@ -276,13 +277,24 @@
                                         <i class="bi bi-arrow-right text-primary fs-5"></i>
                                     </td>
                                     <td class="tank-cell">
-                                        <div class="fw-semibold text-dark">{{ $tx->destinationTank->name }}</div>
+                                        <div class="fw-semibold text-dark">{{ $tx->destinationTank->name }}@if ($tx->destinationCompartment) <span class="badge bg-light text-secondary border ms-1">C{{ $tx->destinationCompartment->compartment_no }}</span>@endif</div>
                                         <div class="text-muted small d-flex align-items-center gap-1 mt-1">
                                             <span class="badge {{ $tx->destinationTank->isTanker() ? 'badge-type-small-tanker' : 'badge-type-pickup' }} wetstock-type-badge rounded-pill px-2 py-0">
                                                 {{ $tx->destinationTank->isTanker() ? 'Tanker' : 'Depot' }}
                                             </span>
                                             <span>{{ $tx->destinationWarehouse->name }}</span>
                                         </div>
+                                    </td>
+                                    <td>
+                                        @php
+                                            // Older records have no product: a depot source still tells us what moved.
+                                            $pcode = $tx->product_type ?: ($tx->sourceTank->isTanker() ? null : $tx->sourceTank->product_type);
+                                        @endphp
+                                        @if ($pcode)
+                                            <span class="badge rounded-pill text-white" style="background: {{ ['U' => '#22a45d', 'P' => '#e5383b', 'D' => '#f2a900'][$pcode] ?? '#6c757d' }};">{{ \App\Models\Order::PRODUCT_TYPES[$pcode] ?? $pcode }}</span>
+                                        @else
+                                            <span class="text-muted small">—</span>
+                                        @endif
                                     </td>
                                     <td class="text-end fw-bold text-primary font-monospace">
                                         {{ number_format($tx->quantity) }} L
@@ -324,9 +336,20 @@
                                                         <span class="text-muted small" title="Only Operations Admin, Operations Manager, or Portal Admin can approve"><i class="bi bi-lock me-1"></i>Awaiting Approval</span>
                                                     @endif
                                                 @else
-                                                    <a href="{{ route('wetstock.transfers.edit', $tx->id) }}" class="btn btn-sm btn-outline-secondary rounded-3 px-2 py-1" title="Request Modification">
+                                                    <button type="button" class="js-open-transfer btn btn-sm btn-outline-secondary rounded-3 px-2 py-1" title="Request Modification"
+                                                        data-mode="edit"
+                                                        data-id="{{ $tx->id }}"
+                                                        data-number="{{ $tx->transfer_number }}"
+                                                        data-type="{{ $tx->type }}"
+                                                        data-source-tank="{{ $tx->source_tank_id }}"
+                                                        data-source-comp="{{ $tx->source_compartment_id }}"
+                                                        data-dest-tank="{{ $tx->destination_tank_id }}"
+                                                        data-dest-comp="{{ $tx->destination_compartment_id }}"
+                                                        data-quantity="{{ $tx->quantity }}"
+                                                        data-date="{{ $tx->transfer_date ? $tx->transfer_date->format('Y-m-d') : '' }}"
+                                                        data-notes="{{ $tx->notes }}">
                                                         <i class="bi bi-pencil me-1"></i> Modify
-                                                    </a>
+                                                    </button>
                                                 @endif
                                             @endif
 
@@ -356,6 +379,10 @@
         </div>
     </div>
 </div>
+
+@if (Auth::user()->canEditModule2())
+    @include('wetstock.transfers.partials.transfer-modal')
+@endif
 
 <script>
     // ========================================================================

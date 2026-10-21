@@ -5,6 +5,7 @@ namespace App\Http\Controllers\WetStock;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\ModificationRequest;
+use App\Models\Order;
 use App\Models\StockTransfer;
 use App\Models\StorageTank;
 use App\Models\Warehouse;
@@ -37,6 +38,8 @@ class StockTransferController extends Controller
         $baseQuery = StockTransfer::with([
             'sourceTank.warehouse',
             'destinationTank.warehouse',
+            'sourceCompartment',
+            'destinationCompartment',
             'sourceWarehouse',
             'destinationWarehouse',
             'transferredBy',
@@ -85,7 +88,41 @@ class StockTransferController extends Controller
         $availableMonths = StockTransfer::selectRaw("DATE_FORMAT(transfer_date, '%Y-%m') as ym")
             ->distinct()->orderByDesc('ym')->pluck('ym')->filter()->values();
 
+        // Data for the transfer pop-up (only people who can record transfers need it).
+        $formWarehouses = collect();
+        $tankMeta = [];
+        $compData = [];
+        $editConfig = null;
+
+        if (Auth::user()->canEditModule2()) {
+            $formWarehouses = Warehouse::with(['activeTanks.compartments'])->orderBy('name', 'asc')->get();
+            $tankMeta = $this->tankMeta($formWarehouses);
+            $compData = $this->compartmentData($formWarehouses);
+
+            // Old /transfers/{id}/edit links land here and open the pop-up for that record.
+            if ($request->filled('edit') && ($editing = StockTransfer::find((int) $request->edit))) {
+                $editConfig = [
+                    'mode' => 'edit',
+                    'id' => $editing->id,
+                    'number' => $editing->transfer_number,
+                    'action' => route('wetstock.transfers.update', $editing->id),
+                    'type' => $editing->type,
+                    'source_tank_id' => $editing->source_tank_id,
+                    'source_comp' => $editing->source_compartment_id,
+                    'destination_tank_id' => $editing->destination_tank_id,
+                    'dest_comp' => $editing->destination_compartment_id,
+                    'quantity' => $editing->quantity,
+                    'date' => $editing->transfer_date ? $editing->transfer_date->format('Y-m-d') : null,
+                    'notes' => $editing->notes,
+                ];
+            }
+        }
+
         return view('wetstock.transfers.index', [
+            'formWarehouses' => $formWarehouses,
+            'tankMeta' => $tankMeta,
+            'compData' => $compData,
+            'editConfig' => $editConfig,
             'transfers' => $transfers,
             'warehouses' => $warehouses,
             'outstandingBalances' => $outstandingBalances,
@@ -106,33 +143,22 @@ class StockTransferController extends Controller
     }
 
     /**
-     * Show form for creating a new stock transfer / borrow / return.
+     * Recording a transfer happens in the pop-up on the list page. Old links to
+     * /transfers/create land there with the pop-up open.
      */
-    public function create(Request $request): View
+    public function create(Request $request): RedirectResponse
     {
         $type = $request->get('type', 'transfer');
         if (!in_array($type, ['transfer', 'borrow', 'return'])) {
             $type = 'transfer';
         }
 
-        $warehouses = Warehouse::with(['activeTanks'])->orderBy('name', 'asc')->get();
-        $allTanks = StorageTank::with('warehouse')->where('is_active', true)->orderBy('name', 'asc')->get();
-        $outstandingBalances = StockTransfer::getOutstandingBalances();
-
-        return view('wetstock.transfers.form', [
-            'title' => match ($type) {
-                'borrow' => 'Record Cross-Site Borrowing',
-                'return' => 'Record Cross-Site Stock Return',
-                default => 'Record Intra-Site Stock Transfer',
-            },
+        return redirect()->route('wetstock.transfers.index', array_filter([
             'type' => $type,
-            'transfer' => null,
-            'warehouses' => $warehouses,
-            'allTanks' => $allTanks,
-            'outstandingBalances' => $outstandingBalances,
-            'sourceTankId' => $request->source_tank_id,
-            'destinationTankId' => $request->destination_tank_id,
-        ]);
+            'open' => $type,
+            'source_tank_id' => $request->source_tank_id,
+            'destination_tank_id' => $request->destination_tank_id,
+        ]));
     }
 
     /**
@@ -148,6 +174,8 @@ class StockTransferController extends Controller
             'type' => ['required', 'string', 'in:transfer,borrow,return'],
             'source_tank_id' => ['required', 'exists:storage_tanks,id', 'different:destination_tank_id'],
             'destination_tank_id' => ['required', 'exists:storage_tanks,id'],
+            'source_compartment_id' => ['nullable', 'integer'],
+            'destination_compartment_id' => ['nullable', 'integer'],
             'quantity' => ['required', 'integer', 'min:1'],
             'transfer_date' => ['required', 'date'],
             'notes' => ['nullable', 'string', 'max:1000'],
@@ -178,19 +206,39 @@ class StockTransferController extends Controller
             }
         }
 
-        // Safety Rule 1: Contamination check — only FULLY contaminated tanks are blocked.
-        // Partially contaminated tanks may transfer up to effective_available (contaminated
-        // volume is already excluded from that figure).
-        if ($sourceTank->isFullyContaminated()) {
-            return back()->withInput()->with('danger', "Transfer Blocked: Source tank '{$sourceTank->name}' is FULLY CONTAMINATED (" . number_format($sourceTank->contaminated_liters) . "L). Contaminated fuel cannot be transferred into other tanks/tankers.");
+        // Product & compartment check: what is moving, from which compartment, into which.
+        $route = $this->resolveRoute($request, $sourceTank, $destinationTank);
+        if (isset($route['error'])) {
+            return back()->withInput()->with('danger', $route['error']);
+        }
+        $product = $route['product'];
+        $srcComp = $route['src'];
+        $dstComp = $route['dst'];
+        $productLabel = Order::PRODUCT_TYPES[$product] ?? $product;
+
+        // Safety Rules 1 + 2: the source must actually have the fuel.
+        // Contaminated volume is already excluded from the available figures.
+        if ($srcComp) {
+            $srcAvail = $srcComp->effective_available;
+            if ($quantity > $srcAvail) {
+                return back()->withInput()->with('danger', "Transfer Blocked: Quantity ({$quantity}L) exceeds available {$productLabel} in compartment C{$srcComp->compartment_no} of '{$sourceTank->name}' (" . number_format($srcAvail) . "L available).");
+            }
+        } else {
+            // Only FULLY contaminated tanks are blocked; partial contamination is already excluded from effective_available.
+            if ($sourceTank->isFullyContaminated()) {
+                return back()->withInput()->with('danger', "Transfer Blocked: Source tank '{$sourceTank->name}' is FULLY CONTAMINATED (" . number_format($sourceTank->contaminated_liters) . "L). Contaminated fuel cannot be transferred into other tanks/tankers.");
+            }
+
+            if ($quantity > $sourceTank->effective_available) {
+                return back()->withInput()->with('danger', "Transfer Blocked: Quantity ({$quantity}L) exceeds available fuel in source tank '{$sourceTank->name}' ({$sourceTank->effective_available}L available).");
+            }
         }
 
-        // Safety Rule 2: Source available volume check
-        if ($quantity > $sourceTank->effective_available) {
-            return back()->withInput()->with('danger', "Transfer Blocked: Quantity ({$quantity}L) exceeds available fuel in source tank '{$sourceTank->name}' ({$sourceTank->effective_available}L available).");
+        // Safety Rule 3: destination remaining capacity (compartment first, then the whole tank / truck)
+        if ($dstComp && $quantity > $dstComp->remaining_capacity) {
+            return back()->withInput()->with('danger', "Transfer Blocked: Quantity ({$quantity}L) exceeds remaining capacity of compartment C{$dstComp->compartment_no} of '{$destinationTank->name}' (Capacity remaining: {$dstComp->remaining_capacity}L).");
         }
 
-        // Safety Rule 3: Destination remaining capacity check
         if ($quantity > $destinationTank->remaining_capacity) {
             return back()->withInput()->with('danger', "Transfer Blocked: Quantity ({$quantity}L) exceeds remaining capacity of destination tank '{$destinationTank->name}' (Capacity remaining: {$destinationTank->remaining_capacity}L).");
         }
@@ -202,14 +250,26 @@ class StockTransferController extends Controller
         };
         $transferNumber = $prefix . date('Ymd', strtotime($validated['transfer_date'])) . '-' . strtoupper(Str::random(5));
 
-        DB::transaction(function () use ($validated, $sourceTank, $destinationTank, $quantity, $transferNumber, $type) {
+        DB::transaction(function () use ($validated, $sourceTank, $destinationTank, $quantity, $transferNumber, $type, $product, $productLabel, $srcComp, $dstComp) {
+            // An empty destination takes the product being moved in (same rule as Add on the dashboard).
+            if ($dstComp) {
+                if ($dstComp->product_type !== $product) {
+                    $dstComp->update(['product_type' => $product]);
+                }
+            } elseif ($destinationTank->product_type !== $product) {
+                $destinationTank->update(['product_type' => $product]);
+            }
+
             $transfer = StockTransfer::create([
                 'transfer_number' => $transferNumber,
                 'source_tank_id' => $sourceTank->id,
                 'destination_tank_id' => $destinationTank->id,
+                'source_compartment_id' => $srcComp ? $srcComp->id : null,
+                'destination_compartment_id' => $dstComp ? $dstComp->id : null,
                 'source_warehouse_id' => $sourceTank->warehouse_id,
                 'destination_warehouse_id' => $destinationTank->warehouse_id,
                 'type' => $type,
+                'product_type' => $product,
                 'quantity' => $quantity,
                 'transfer_date' => $validated['transfer_date'],
                 'notes' => $validated['notes'] ?? null,
@@ -219,7 +279,7 @@ class StockTransferController extends Controller
             AuditLog::create([
                 'admin_id' => Auth::id(),
                 'action' => 'CREATED',
-                'description' => "Executed [" . strtoupper($type) . "] #{$transfer->transfer_number}: " . number_format($quantity) . "L from {$sourceTank->name} ({$sourceTank->warehouse->name}) to {$destinationTank->name} ({$destinationTank->warehouse->name})",
+                'description' => "Executed [" . strtoupper($type) . "] #{$transfer->transfer_number}: " . number_format($quantity) . "L {$productLabel} from {$sourceTank->name}" . ($srcComp ? " C{$srcComp->compartment_no}" : '') . " ({$sourceTank->warehouse->name}) to {$destinationTank->name}" . ($dstComp ? " C{$dstComp->compartment_no}" : '') . " ({$destinationTank->warehouse->name})",
             ]);
         });
 
@@ -228,28 +288,15 @@ class StockTransferController extends Controller
     }
 
     /**
-     * Show form for editing an existing transfer (Submits Modification Request).
+     * Modifying a transfer also happens in the pop-up on the list page.
      */
-    public function edit(StockTransfer $transfer): View
+    public function edit(StockTransfer $transfer): RedirectResponse
     {
         if (!Auth::user()->canEditModule2()) {
             abort(403);
         }
 
-        $warehouses = Warehouse::with(['activeTanks'])->orderBy('name', 'asc')->get();
-        $allTanks = StorageTank::with('warehouse')->where('is_active', true)->orderBy('name', 'asc')->get();
-        $outstandingBalances = StockTransfer::getOutstandingBalances();
-
-        return view('wetstock.transfers.form', [
-            'title' => "Request Modification: {$transfer->transfer_number}",
-            'type' => $transfer->type,
-            'transfer' => $transfer,
-            'warehouses' => $warehouses,
-            'allTanks' => $allTanks,
-            'outstandingBalances' => $outstandingBalances,
-            'sourceTankId' => $transfer->source_tank_id,
-            'destinationTankId' => $transfer->destination_tank_id,
-        ]);
+        return redirect()->route('wetstock.transfers.index', ['type' => $transfer->type, 'edit' => $transfer->id]);
     }
 
     /**
@@ -265,6 +312,8 @@ class StockTransferController extends Controller
             'type' => ['required', 'string', 'in:transfer,borrow,return'],
             'source_tank_id' => ['required', 'exists:storage_tanks,id', 'different:destination_tank_id'],
             'destination_tank_id' => ['required', 'exists:storage_tanks,id'],
+            'source_compartment_id' => ['nullable', 'integer'],
+            'destination_compartment_id' => ['nullable', 'integer'],
             'quantity' => ['required', 'integer', 'min:1'],
             'transfer_date' => ['required', 'date'],
             'notes' => ['nullable', 'string', 'max:1000'],
@@ -274,10 +323,20 @@ class StockTransferController extends Controller
         $sourceTank = StorageTank::with('warehouse')->findOrFail($validated['source_tank_id']);
         $destinationTank = StorageTank::with('warehouse')->findOrFail($validated['destination_tank_id']);
 
+        // Same product / compartment rules as a new record (liters are reviewed at approval, as before).
+        $route = $this->resolveRoute($request, $sourceTank, $destinationTank);
+        if (isset($route['error'])) {
+            return back()->withInput()->with('danger', $route['error']);
+        }
+
         $newValues = [
             'type' => $validated['type'],
             'source_tank_id' => $sourceTank->id,
             'destination_tank_id' => $destinationTank->id,
+            // 0 = "no compartment": a null new value would be skipped when the request is approved.
+            'source_compartment_id' => $route['src'] ? $route['src']->id : 0,
+            'destination_compartment_id' => $route['dst'] ? $route['dst']->id : 0,
+            'product_type' => $route['product'],
             'source_warehouse_id' => $sourceTank->warehouse_id,
             'destination_warehouse_id' => $destinationTank->warehouse_id,
             'quantity' => (int) $validated['quantity'],
@@ -291,6 +350,9 @@ class StockTransferController extends Controller
             $oldVal = $transfer->{$field};
             if ($field === 'transfer_date' && $oldVal) {
                 $oldVal = $oldVal->format('Y-m-d');
+            }
+            if (in_array($field, ['source_compartment_id', 'destination_compartment_id'], true)) {
+                $oldVal = (int) $oldVal;
             }
 
             if ((string)$oldVal !== (string)$newVal) {
@@ -374,5 +436,116 @@ class StockTransferController extends Controller
 
         return redirect()->route('wetstock.transfers.index', ['type' => $type])
             ->with('success', ucfirst($type) . " record {$transferNumber} was permanently deleted.");
+    }
+
+    /**
+     * Work out which product moves and between which compartments, and check they fit.
+     * Returns ['error' => message] or ['product' => code, 'src' => ?TankCompartment, 'dst' => ?TankCompartment].
+     *
+     * - A truck with compartments needs a compartment picked on that side.
+     * - The product is whatever the source holds.
+     * - A destination holding stock must hold the same product; an empty one takes the product.
+     */
+    private function resolveRoute(Request $request, StorageTank $sourceTank, StorageTank $destinationTank): array
+    {
+        $src = null;
+        $dst = null;
+
+        $srcComps = $sourceTank->compartments()->get();
+        if ($srcComps->isNotEmpty()) {
+            $src = $srcComps->firstWhere('id', (int) $request->input('source_compartment_id'));
+            if (!$src) {
+                return ['error' => "Pick the source compartment on '{$sourceTank->name}'."];
+            }
+            $product = $src->product_type;
+        } else {
+            $product = $sourceTank->product_type;
+        }
+
+        if (!$product) {
+            return ['error' => "The product being moved is unknown: the source has no product set. Set the product on '{$sourceTank->name}' first."];
+        }
+        $productLabel = Order::PRODUCT_TYPES[$product] ?? $product;
+
+        $dstComps = $destinationTank->compartments()->get();
+        if ($dstComps->isNotEmpty()) {
+            $dst = $dstComps->firstWhere('id', (int) $request->input('destination_compartment_id'));
+            if (!$dst) {
+                return ['error' => "Pick the destination compartment on '{$destinationTank->name}'."];
+            }
+            $holds = $dst->product_type;
+            $level = $dst->stock_available;
+            $where = "compartment C{$dst->compartment_no} of '{$destinationTank->name}'";
+        } else {
+            $holds = $destinationTank->product_type;
+            $level = $destinationTank->stock_available;
+            $where = "'{$destinationTank->name}'";
+        }
+
+        if ($level > 0 && $holds && $holds !== $product) {
+            $heldLabel = Order::PRODUCT_TYPES[$holds] ?? $holds;
+
+            return ['error' => "Product mismatch: {$where} holds {$heldLabel}, but this transfer moves {$productLabel}. Pick a destination with the same product (or an empty one)."];
+        }
+
+        return ['product' => $product, 'src' => $src, 'dst' => $dst];
+    }
+
+    /**
+     * Per-tank numbers for the form's drop-downs (computed once, not per option).
+     */
+    private function tankMeta($warehouses): array
+    {
+        $meta = [];
+
+        foreach ($warehouses as $warehouse) {
+            foreach ($warehouse->activeTanks as $tank) {
+                $truck = $tank->compartments->isNotEmpty();
+                $stock = (int) $tank->stock_available;
+                $bad = (int) $tank->contaminated_liters;
+
+                $meta[$tank->id] = [
+                    'truck' => $truck,
+                    'product' => $truck ? null : $tank->product_type,
+                    'product_name' => $truck ? null : $tank->product_name,
+                    'stock' => $stock,
+                    'avail' => $truck ? 0 : (int) $tank->effective_available,
+                    'room' => max(0, (int) $tank->max_capacity - $stock),
+                    'bad' => $bad,
+                    'blocked' => !$truck && $bad > 0 && $bad >= $stock,
+                ];
+            }
+        }
+
+        return $meta;
+    }
+
+    /**
+     * Compartments of every active truck, for the form's compartment pickers.
+     */
+    private function compartmentData($warehouses): array
+    {
+        $data = [];
+
+        foreach ($warehouses as $warehouse) {
+            foreach ($warehouse->activeTanks as $tank) {
+                if ($tank->compartments->isEmpty()) {
+                    continue;
+                }
+
+                $data[$tank->id] = $tank->compartments->map(fn ($c) => [
+                    'id' => $c->id,
+                    'no' => $c->compartment_no,
+                    'product' => $c->product_type,
+                    'stock' => (int) $c->stock_available,
+                    'avail' => (int) $c->effective_available,
+                    'room' => (int) $c->remaining_capacity,
+                    'cap' => (int) $c->capacity,
+                    'bad' => (int) $c->contaminated_liters,
+                ])->values()->all();
+            }
+        }
+
+        return $data;
     }
 }
