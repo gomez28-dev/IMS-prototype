@@ -268,6 +268,12 @@ class Order extends Model
      * has to be against the running total across all of them, not the most
      * recent one.
      *
+     * "Committed" is the operative word: this figure is the balance a new ATL
+     * draws against, so it has to read exactly like the validation it feeds
+     * (guardOrderNotOverDrawn). An ATL counts while it lives - one awaiting
+     * VP approval is a real draw on the supplier, and rejection is what
+     * releases the volume again. A Cancelled row released it at cancellation.
+     *
      * ATLs issued before deliveries carried an order_id are picked up through
      * their PO's linked_order_id.
      *
@@ -275,7 +281,10 @@ class Order extends Model
      */
     public function drawnByProduct(): array
     {
-        return $this->drawnByProductWhere(fn (PurchaseOrderDelivery $atl) => true);
+        return $this->drawnByProductWhere(function (PurchaseOrderDelivery $atl): bool {
+            return $atl->status !== 'Cancelled'
+                && $atl->approval_status !== PurchaseOrderDelivery::APPROVAL_REJECTED;
+        });
     }
 
     /**

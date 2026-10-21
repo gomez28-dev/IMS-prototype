@@ -99,6 +99,19 @@
                                 $requiredProducts = array_keys($soRequirements);
                                 $defaultReqProduct = $requiredProducts[0] ?? 'Diesel';
 
+                                // What is left to allocate, per product: the order's ask
+                                // minus the volume its live ATLs carry (Order::drawnByProduct
+                                // already releases rejected and cancelled ones). The display
+                                // used to quote the full order while the save-side guard
+                                // spoke in remaining terms - "short by 100 L" next to an
+                                // error that said 150 L was already ATL'd. Both now share
+                                // this figure.
+                                $atlByProduct = $order->drawnByProduct();
+                                $soRemaining = [];
+                                foreach ($soRequirements as $reqProduct => $reqQty) {
+                                    $soRemaining[$reqProduct] = max(0, (int) $reqQty - ($atlByProduct[$reqProduct] ?? 0));
+                                }
+
                                 // Only the products this Sales Order actually asks
                                 // for. This was hard-coded to all three fuels, so the
                                 // dropdown offered Premium on an order that never
@@ -223,6 +236,23 @@
                                     </h6>
                                     <small class="text-muted">Select active Supplier Purchase Order(s) to draw volume from.</small>
 
+                                    {{-- What is still un-ATL'd on this order, per product -
+                                         same figure the save-side guard enforces. The
+                                         "not issued an ATL yet" balance the supervisor
+                                         asked to see, kept in step with the per-product
+                                         breakdown the table computes below. --}}
+                                    <div class="small text-dark fw-medium mt-1" data-remaining-note>
+                                        <span class="fw-semibold">Remaining un-ATL volume:</span>
+                                        @foreach ($soRemaining as $product => $qty)
+                                            <span class="ms-1 me-2 text-nowrap">{{ $product }} remaining: {{ number_format($qty) }} L</span>
+                                        @endforeach
+                                        @if (array_sum($soRemaining) === 0)
+                                            <span class="d-block text-muted extra-small mt-1">
+                                                Every product on this Sales Order already carries its ATL.
+                                            </span>
+                                        @endif
+                                    </div>
+
                                     {{-- The button is disabled whenever there is no
                                          second product to add, and a disabled
                                          control does not reliably fire hover - so
@@ -328,7 +358,11 @@
                                                         <div class="input-group input-group-sm">
                                                             @php
                                                                 $firstAvail = $availablePos[0]->getAvailableBalanceForProduct($defaultReqProduct);
-                                                                $suggested = min($soRequirements[$defaultReqProduct] ?? $order->qty_ordered, $firstAvail);
+                                                                // Suggest the remaining un-ATL volume, not the
+                                                                // full ask: on a partly ATL'd order the old min()
+                                                                // against soRequirements would pre-fill a number
+                                                                // the save would refuse as over the remaining.
+                                                                $suggested = min($soRemaining[$defaultReqProduct] ?? $order->qty_ordered, $firstAvail);
                                                             @endphp
                                                             <input type="number" name="drawdowns[0][quantity]" class="form-control form-control-sm dd-qty-input font-monospace"
                                                                    placeholder="Liters" min="1" step="1" max="{{ $firstAvail }}" value="{{ old('drawdowns.0.quantity', $suggested) }}" required oninput="calculateTotalDrawn()">
@@ -593,6 +627,12 @@ let ddIndex = 1;
 // Only defined inside the fuel_trade branch, and this script is shared by all
 // three modes, so it falls back rather than fataling on Add ATL and Prepare.
 const soProducts = @json($productOptions ?? []);
+
+// What is still un-ATL'd per product, Blade-side of the same figure the save
+// guard enforces (order ask minus live ATL volume). The per-product breakdown
+// compares against this rather than the full ask, so the page and the
+// validation stop saying different things about the same allocation.
+const soRemaining = @json($soRemaining ?? []);
 
 const productOptionsHtml = (function () {
     const sel = document.querySelector('.dd-product-select');
@@ -868,7 +908,7 @@ function calculateTotalDrawn() {
 
     const drawnByProduct = {};
     let total = 0;
-    let overAllocated = false;
+    let overPoAvail = false;
 
     document.querySelectorAll('.drawdown-row').forEach(row => {
         const product = row.querySelector('.dd-product-select').value;
@@ -878,7 +918,21 @@ function calculateTotalDrawn() {
         total += qty;
 
         if (qty > updateAvailHint(row)) {
-            overAllocated = true;
+            overPoAvail = true;
+        }
+    });
+
+    // Every draw is measured against what is left to allocate - the same
+    // figure the save-side guard enforces - not against the order's full
+    // ask, which earlier ATLs already hold a share of.
+    let overRemaining = false;
+    let notRequired = false;
+    Object.keys(drawnByProduct).forEach(product => {
+        const remaining = soRemaining[product];
+        if (remaining === undefined) {
+            notRequired = true;
+        } else if (drawnByProduct[product] > remaining) {
+            overRemaining = true;
         }
     });
 
@@ -888,24 +942,28 @@ function calculateTotalDrawn() {
     }
 
     // Per-product breakdown so the user can see each requirement being met.
+    // The order's full ask stays on the line for context, but "of N" is the
+    // remaining balance.
     const breakdown = document.getElementById('productBreakdown');
     if (breakdown) {
         let html = '';
         Object.keys(drawnByProduct).forEach(product => {
             const drawn = drawnByProduct[product];
-            const required = requirements[product];
+            const remaining = soRemaining[product];
+            const ordered = requirements[product];
             let note;
-            if (required === undefined) {
+            if (remaining === undefined) {
                 note = '<span class="text-danger">not required by this SO</span>';
-            } else if (drawn === required) {
+            } else if (drawn === remaining) {
                 note = '<span class="text-success">&#10003; matched</span>';
-            } else if (drawn > required) {
-                note = '<span class="text-danger">over by ' + (drawn - required).toLocaleString() + ' L</span>';
+            } else if (drawn > remaining) {
+                note = '<span class="text-danger">over by ' + (drawn - remaining).toLocaleString() + ' L</span>';
             } else {
-                note = '<span class="text-warning-emphasis">short by ' + (required - drawn).toLocaleString() + ' L</span>';
+                note = '<span class="text-warning-emphasis">leaves ' + (remaining - drawn).toLocaleString() + ' L un-ATL</span>';
             }
             html += '<div>' + product + ': <strong>' + drawn.toLocaleString() + ' L</strong> of '
-                + (required === undefined ? '0 L' : required.toLocaleString() + ' L') + ' &mdash; ' + note + '</div>';
+                + (remaining === undefined ? '?' : remaining.toLocaleString() + ' L') + ' remaining'
+                + (ordered === undefined ? '' : ' (' + ordered.toLocaleString() + ' L ordered)') + ' &mdash; ' + note + '</div>';
         });
         breakdown.innerHTML = html;
     }
@@ -914,12 +972,18 @@ function calculateTotalDrawn() {
     if (badge) {
         const products = Object.keys(requirements);
         const allMatched = products.length > 0 && products.every(
-            product => (drawnByProduct[product] || 0) === requirements[product]
+            product => (drawnByProduct[product] || 0) === soRemaining[product]
         );
 
-        if (overAllocated) {
+        if (overRemaining) {
+            badge.className = 'badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-3 py-1';
+            badge.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-1"></i> Exceeds remaining balance';
+        } else if (overPoAvail) {
             badge.className = 'badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-3 py-1';
             badge.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-1"></i> Exceeds PO availability';
+        } else if (notRequired) {
+            badge.className = 'badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-3 py-1';
+            badge.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-1"></i> Not required by this SO';
         } else if (allMatched) {
             badge.className = 'badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1';
             badge.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> 100% Matched';
