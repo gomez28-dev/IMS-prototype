@@ -30,6 +30,7 @@ class StockOrdersTemplateStructureTest extends TestCase
             'resources/views/wetstock/stock-orders/form.blade.php',
             'resources/views/wetstock/purchase-orders/index.blade.php',
             'resources/views/wetstock/sales-orders/index.blade.php',
+            'resources/views/wetstock/sales-orders/show.blade.php',
             'resources/views/layouts/app.blade.php',
         ];
     }
@@ -73,6 +74,7 @@ class StockOrdersTemplateStructureTest extends TestCase
             'issue atl form' => ['resources/views/wetstock/stock-orders/form.blade.php'],
             'purchase orders list' => ['resources/views/wetstock/purchase-orders/index.blade.php'],
             'sales orders list' => ['resources/views/wetstock/sales-orders/index.blade.php'],
+            'sales order detail' => ['resources/views/wetstock/sales-orders/show.blade.php'],
             'app layout' => ['resources/views/layouts/app.blade.php'],
         ];
     }

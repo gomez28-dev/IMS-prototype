@@ -132,13 +132,12 @@ class SalesOrderController extends Controller
             ->orderBy('name')
             ->get();
 
-        // The delivery that can still be lifted: active and not yet lifted.
-        // Legacy rows carry a null lift_status, which counts as not lifted.
-        $liftableDelivery = $atls->first(fn ($atl) => $atl->status === 'Active'
-            && $atl->lift_status !== PurchaseOrderDelivery::LIFT_LIFTED);
-
+        // Lift actions are per ATL row now (each row carries its own modal
+        // where the old page-level first-liftable button hung), so the
+        // liftableDelivery pick is gone. The tanker list stays: the lift
+        // modal on a Doyen-pickup channel needs it.
         return view('wetstock.sales-orders.show', compact(
-            'order', 'atls', 'totals', 'mobileTankers', 'liftableDelivery'
+            'order', 'atls', 'totals', 'mobileTankers'
         ));
     }
 

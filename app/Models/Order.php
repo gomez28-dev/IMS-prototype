@@ -305,6 +305,29 @@ class Order extends Model
     }
 
     /**
+     * Whether any ATL serving this order is still marked lifted.
+     *
+     * The unlift path checks this before touching the order's own status:
+     * a lift marks the order Fulfilled, and reversing one of two lifted ATLs
+     * must not claim the other lift back too. Uses the same attribution rule
+     * as drawnByProductWhere - order_id first, then the legacy
+     * linked_order_id - so "this order's ATLs" means the same thing in both
+     * places.
+     */
+    public function hasLiftedAtl(): bool
+    {
+        return PurchaseOrderDelivery::where(function ($query) {
+            $query->where('order_id', $this->getKey())
+                ->orWhere(function ($legacy) {
+                    $legacy->whereNull('order_id')
+                        ->whereHas('purchaseOrder', fn ($po) => $po->where('linked_order_id', $this->getKey()));
+                });
+        })
+            ->where('lift_status', PurchaseOrderDelivery::LIFT_LIFTED)
+            ->exists();
+    }
+
+    /**
      * Totals per product across this order's ATLs, filtered by $include.
      *
      * drawnByProduct() and liftedByProduct() differ only in which ATLs count, so

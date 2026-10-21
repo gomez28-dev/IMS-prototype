@@ -914,6 +914,101 @@ class StockOrderController extends Controller
         return back()->with('success', $successMsg);
     }
 
+    /**
+     * Reverse a lift that has been recorded on an ATL.
+     *
+     * A lift is a journey: it completes the PO, fulfils the Sales Order,
+     * may auto-stock a tanker, and writes the delivery mirror Module 1
+     * derives its Delivered and Remaining figures from. A mistaken lift is
+     * therefore wrong on four screens until it is unwound as a whole - this
+     * method does the whole unwind rather than flipping one column, so
+     * M3's records and M1's dashboards stay the same statement.
+     */
+    public function unliftAtl(PurchaseOrderDelivery $delivery): RedirectResponse
+    {
+        // Same allowlist as the lift: Purchasing and Admin only.
+        if (!Auth::user()->canMarkAtlLifted()) {
+            abort(403, 'Unauthorized to reverse an ATL lift.');
+        }
+
+        if ($delivery->lift_status !== PurchaseOrderDelivery::LIFT_LIFTED) {
+            return back()->with('error', 'Only a lifted ATL can be marked Unlifted.');
+        }
+
+        // Stock that entered through the receive flow carries wet-stock
+        // ledgers of its own; this route unwinds only what the lift writes.
+        if ($delivery->received_at) {
+            return back()->with('error', 'This ATL has been received into stock, so it cannot be unlifted here.');
+        }
+
+        $order = $delivery->order ?: $delivery->purchaseOrder?->linkedOrder;
+
+        if (!$order) {
+            return back()->with('error', 'This ATL serves no Sales Order, so there is no lift to reverse here.');
+        }
+
+        // An ATL that was lifted and then unwound is back in flight: approved
+        // ones resume at Active, anything still awaiting approval resumes at
+        // Pending. lifted_at/by were the record of the lift, so they go blank.
+        $delivery->update([
+            'status' => $delivery->approval_status === PurchaseOrderDelivery::APPROVAL_APPROVED
+                ? 'Active'
+                : 'Pending',
+            'lift_status' => PurchaseOrderDelivery::LIFT_UNLIFTED,
+            'lifted_at' => null,
+            'lifted_by' => null,
+        ]);
+
+        // Any stock the lift stocked into a tanker is unrecorded with it. The
+        // receive-into-stock path is refused above, so whatever is here was
+        // written by the lift's auto StockIn.
+        StockIn::where('purchase_order_delivery_id', $delivery->id)->delete();
+
+        // The PO keeps its completed state while another lifted ATL still
+        // draws from it. Otherwise it returns to in-flight - FOR_DELIVERY,
+        // the state it sits in after dispatch, from where it can be lifted
+        // again. It does not fall back to CONFIRMED: a lifted-and-reverted
+        // ATL was dispatched, and pretending otherwise would hide it from the
+        // boards that watch in-flight volume.
+        $po = $delivery->purchaseOrder;
+        if ($po && !$po->deliveries()
+            ->where('lift_status', PurchaseOrderDelivery::LIFT_LIFTED)
+            ->exists()
+        ) {
+            $po->update([
+                'request_status' => 'FOR_DELIVERY',
+                'status' => 'For Delivery',
+            ]);
+        }
+
+        // The order only stops being Fulfilled when nothing on it is lifted
+        // anymore - reversing one of two lifted ATLs must not un-fulfil the
+        // half the client genuinely picked up.
+        if (!$order->hasLiftedAtl()) {
+            $order->update(['status' => 'Active']);
+        }
+
+        // Module 1 counts delivered from its own delivery rows, so the mirror
+        // row the lift wrote is what makes its Remaining balance fall back.
+        $mirror = $this->module1DeliveryFor($delivery, $order);
+        $mirror?->delete();
+
+        AuditLog::create([
+            'admin_id' => Auth::id(),
+            'action' => 'updated',
+            'description' => 'Reversed the lift of ATL '
+                .($delivery->atl_number ?: ($delivery->client_atl_number ?: '#'.$delivery->id))
+                ." for SO {$order->formatted_so_number}: ATL back to Unlifted"
+                .($po ? '; PO '.$po->po_number.' back to '.($po->fresh()->request_status) : '')
+                .'; Sales Order now '.($order->fresh()->status)
+                .'; Module 1 mirror removed.',
+        ]);
+
+        return back()->with('success', 'ATL '
+            .($delivery->atl_number ?: ($delivery->client_atl_number ?: '#'.$delivery->id))
+            .' is marked Unlifted. The lift records and the Module 1 mirror have been reversed.');
+    }
+
     public function updateDeliveryDocs(Request $request, PurchaseOrderDelivery $delivery): RedirectResponse
     {
         if (!Auth::user()->canEditStockOrders() && !Auth::user()->canEditModule1() && !Auth::user()->canEditModule2()) {
@@ -1480,6 +1575,26 @@ public function storeStockRequestPo(Request $request): RedirectResponse
     }
 
     /**
+     * The Module 1 delivery row an ATL lift mirrors to.
+     *
+     * Keyed the way recordLiftInModule1 writes it and unliftAtl reverses it,
+     * so both sides agree on which row belongs to which ATL: a repeated lift
+     * updates one row instead of double counting, and an unlift deletes
+     * exactly the row the lift wrote rather than any row with a similar
+     * number. (An ATL with no number at all matches no row on either side -
+     * the lift then writes fresh rows each pass, and the unlift has nothing
+     * to remove; fixture rows and the real flow always set a number.)
+     */
+    private function module1DeliveryFor(PurchaseOrderDelivery $delivery, Order $order): ?Delivery
+    {
+        $atlNumber = $delivery->atl_number ?: $delivery->client_atl_number;
+
+        return Delivery::where('order_id', $order->id)
+            ->where('atl_number', $atlNumber)
+            ->first();
+    }
+
+    /**
      * Reflect a lifted ATL into Module 1.
      *
      * Module 1 derives remaining balance from its Delivery rows, so setting
@@ -1492,9 +1607,7 @@ public function storeStockRequestPo(Request $request): RedirectResponse
     {
         $atlNumber = $delivery->atl_number ?: $delivery->client_atl_number;
 
-        $existing = Delivery::where('order_id', $order->id)
-            ->where('atl_number', $atlNumber)
-            ->first();
+        $existing = $this->module1DeliveryFor($delivery, $order);
 
         $payload = [
             'order_id' => $order->id,

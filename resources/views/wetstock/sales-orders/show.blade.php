@@ -35,14 +35,9 @@
                 <p class="text-muted small mb-0 mt-1">{{ $order->account }}</p>
             </div>
             <div class="d-flex gap-2">
-                {{-- Mark Picked Up moved here from the Purchase Orders list,
-                     which now shows created POs only and no longer carries the
-                     lift action. --}}
-                @if ($liftableDelivery && Auth::user()->canMarkAtlLifted())
-                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#confirmLiftModal{{ $liftableDelivery->id }}">
-                        <i class="bi bi-check-circle me-1"></i> Mark Picked Up
-                    </button>
-                @endif
+                {{-- Mark Picked Up lives on the ATL rows now - one action per
+                     record, not one page-level button for the first liftable
+                     ATL. The rows also carry Mark Unlifted on lifted ones. --}}
                 <a href="{{ route('stock-orders.sales-orders.index') }}" class="btn btn-outline-secondary">
                     <i class="bi bi-arrow-left me-1"></i> Back to Sales Orders
                 </a>
@@ -230,9 +225,11 @@
                                         @endif
                                     </td>
                                     <td class="pe-3 text-end">
-                                        {{-- Exactly two actions: View opens the ATL pop-up,
-                                             Pen opens the ATL form. The PDF download lives
-                                             inside the pop-up and is VP gated there. --}}
+                                        {{-- Three actions now: View opens the ATL pop-up,
+                                             Pen opens the ATL form, and Lift/Unlift acts on
+                                             the record itself - one per row, so a second ATL
+                                             can be lifted without the page-level button only
+                                             ever reaching the first. --}}
                                         <div class="d-inline-flex gap-1 justify-content-end">
                                             <button type="button" class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary"
                                                     data-bs-toggle="modal" data-bs-target="#atlDetailModal{{ $atl->id }}"
@@ -255,6 +252,27 @@
                                                         <i class="bi bi-pencil me-1"></i> Pen
                                                     </a>
                                                 @endif
+                                            @endif
+                                            {{-- The lift that used to hang on the header: same
+                                                 eligibility (dispatched and not yet marked, old
+                                                 rows counting as unlifted), but attached to the
+                                                 record it acts on. --}}
+                                            @if (Auth::user()->canMarkAtlLifted()
+                                                && $atl->status === 'Active'
+                                                && $atl->lift_status !== \App\Models\PurchaseOrderDelivery::LIFT_LIFTED
+                                                && $atl->lift_status !== \App\Models\PurchaseOrderDelivery::LIFT_CANCELLED)
+                                                <button type="button" class="btn btn-sm btn-success rounded-pill px-2 py-1"
+                                                        data-bs-toggle="modal" data-bs-target="#confirmLiftModal{{ $atl->id }}"
+                                                        title="Mark Picked Up">
+                                                    <i class="bi bi-check-circle me-1"></i> Mark Picked Up
+                                                </button>
+                                            @elseif (Auth::user()->canMarkAtlLifted()
+                                                && $atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_LIFTED)
+                                                <button type="button" class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-warning-emphasis"
+                                                        data-bs-toggle="modal" data-bs-target="#unliftModal{{ $atl->id }}"
+                                                        title="Reverse the recorded lift">
+                                                    <i class="bi bi-arrow-counterclockwise me-1"></i> Mark Unlifted
+                                                </button>
                                             @endif
                                         </div>
                                     </td>
@@ -374,81 +392,136 @@
             </div>
         </div>
     </div>
-@endforeach
 
-@if ($liftableDelivery)
-    <div class="modal fade" id="confirmLiftModal{{ $liftableDelivery->id }}" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content rounded-4 border-0 shadow">
-                <div class="modal-header border-0 pb-0">
-                    <h5 class="modal-title fw-bold text-dark">
-                        <i class="bi bi-patch-check-fill text-success me-1"></i> Confirm Pick Up / Lift
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <form method="POST" action="{{ route('stock-orders.complete-fuel-trade', $liftableDelivery->id) }}">
-                    @csrf
-                    <div class="modal-body pt-3">
-                        <div class="p-3 bg-light rounded-3 mb-3">
-                            <div class="d-flex justify-content-between small text-muted mb-1">
-                                <span>SO {{ $order->formatted_so_number }}</span>
-                                <span class="badge bg-secondary-subtle text-secondary">{{ $liftableDelivery->channel_label }}</span>
-                            </div>
-                            <div class="fw-bold fs-5 text-primary mb-1">{{ number_format($liftableDelivery->qty_to_receive) }} L of {{ $liftableDelivery->product }}</div>
-                            <div class="small text-muted">
-                                Client: <span class="fw-semibold text-dark">{{ $order->account }}</span>
-                            </div>
-                        </div>
-
-                        @if ($liftableDelivery->isTankerPickup())
-                            <div class="mb-3">
-                                <label class="form-label small fw-semibold">Target Mobile Tanker Truck <span class="text-danger">*</span></label>
-                                <select name="storage_tank_id" class="form-select" required>
-                                    <option value="">Select DITC Tanker to receive fuel...</option>
-                                    @foreach ($mobileTankers as $tank)
-                                        <option value="{{ $tank->id }}" {{ $liftableDelivery->storage_tank_id == $tank->id ? 'selected' : '' }}>
-                                            {{ $tank->name }} ({{ $tank->warehouse->name ?? 'Depot' }}) — Remaining: {{ number_format($tank->remaining_capacity) }}L / Max: {{ number_format($tank->max_capacity) }}L
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <div class="form-text text-primary extra-small" style="font-size: 0.75rem;">
-                                    <i class="bi bi-info-circle me-1"></i>Volume will automatically stock into this tanker in Module 2.
+    {{-- Lift confirmation: the same modal that used to be rendered once for
+         the page's first liftable ATL, now rendered once per liftable row so
+         any record can be marked picked up from its own action. --}}
+    @if (Auth::user()->canMarkAtlLifted()
+        && $atl->status === 'Active'
+        && $atl->lift_status !== \App\Models\PurchaseOrderDelivery::LIFT_LIFTED
+        && $atl->lift_status !== \App\Models\PurchaseOrderDelivery::LIFT_CANCELLED)
+        <div class="modal fade" id="confirmLiftModal{{ $atl->id }}" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content rounded-4 border-0 shadow">
+                    <div class="modal-header border-0 pb-0">
+                        <h5 class="modal-title fw-bold text-dark">
+                            <i class="bi bi-patch-check-fill text-success me-1"></i> Confirm Pick Up / Lift
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <form method="POST" action="{{ route('stock-orders.complete-fuel-trade', $atl->id) }}">
+                        @csrf
+                        <div class="modal-body pt-3">
+                            <div class="p-3 bg-light rounded-3 mb-3">
+                                <div class="d-flex justify-content-between small text-muted mb-1">
+                                    <span>SO {{ $order->formatted_so_number }}</span>
+                                    <span class="badge bg-secondary-subtle text-secondary">{{ $atl->channel_label }}</span>
+                                </div>
+                                <div class="fw-bold fs-5 text-primary mb-1">{{ number_format($atl->qty_to_receive) }} L of {{ $atl->product }}</div>
+                                <div class="small text-muted">
+                                    Client: <span class="fw-semibold text-dark">{{ $order->account }}</span>
                                 </div>
                             </div>
-                        @else
-                            <div class="alert alert-info border-0 rounded-3 small py-2 mb-3">
-                                <i class="bi bi-info-circle me-1"></i><strong>Direct Client Rack Lift:</strong> This order will be marked as fulfilled directly. No wet stock movements required.
-                            </div>
-                        @endif
 
-                        <div class="row g-2 mb-3">
-                            <div class="col-6">
-                                <label class="form-label small fw-semibold">Supplier SO #</label>
-                                <input type="text" name="supplier_so_number" class="form-control form-control-sm" placeholder="e.g. SO-8842" value="{{ $liftableDelivery->supplier_so_number }}">
+                            @if ($atl->isTankerPickup())
+                                <div class="mb-3">
+                                    <label class="form-label small fw-semibold">Target Mobile Tanker Truck <span class="text-danger">*</span></label>
+                                    <select name="storage_tank_id" class="form-select" required>
+                                        <option value="">Select DITC Tanker to receive fuel...</option>
+                                        @foreach ($mobileTankers as $tank)
+                                            <option value="{{ $tank->id }}" {{ $atl->storage_tank_id == $tank->id ? 'selected' : '' }}>
+                                                {{ $tank->name }} ({{ $tank->warehouse->name ?? 'Depot' }}) — Remaining: {{ number_format($tank->remaining_capacity) }}L / Max: {{ number_format($tank->max_capacity) }}L
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    <div class="form-text text-primary extra-small" style="font-size: 0.75rem;">
+                                        <i class="bi bi-info-circle me-1"></i>Volume will automatically stock into this tanker in Module 2.
+                                    </div>
+                                </div>
+                            @else
+                                <div class="alert alert-info border-0 rounded-3 small py-2 mb-3">
+                                    <i class="bi bi-info-circle me-1"></i><strong>Direct Client Rack Lift:</strong> This order will be marked as fulfilled directly. No wet stock movements required.
+                                </div>
+                            @endif
+
+                            <div class="row g-2 mb-3">
+                                <div class="col-6">
+                                    <label class="form-label small fw-semibold">Supplier SO #</label>
+                                    <input type="text" name="supplier_so_number" class="form-control form-control-sm" placeholder="e.g. SO-8842" value="{{ $atl->supplier_so_number }}">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small fw-semibold">Supplier Rack DR #</label>
+                                    <input type="text" name="supplier_dr_number" class="form-control form-control-sm" placeholder="e.g. DR-9901" value="{{ $atl->supplier_dr_number }}">
+                                </div>
                             </div>
-                            <div class="col-6">
-                                <label class="form-label small fw-semibold">Supplier Rack DR #</label>
-                                <input type="text" name="supplier_dr_number" class="form-control form-control-sm" placeholder="e.g. DR-9901" value="{{ $liftableDelivery->supplier_dr_number }}">
+
+                            <div class="mb-2">
+                                <label class="form-label small fw-semibold">
+                                    <i class="bi bi-google text-danger me-1"></i>Google Drive Scanned Document Link
+                                </label>
+                                <input type="url" name="scanned_doc_url" class="form-control form-control-sm" placeholder="https://drive.google.com/..." value="{{ $atl->scanned_doc_url }}">
+                                <div class="form-text text-muted extra-small" style="font-size: 0.75rem;">Shareable link to signed DR and dip inspection tickets.</div>
                             </div>
                         </div>
-
-                        <div class="mb-2">
-                            <label class="form-label small fw-semibold">
-                                <i class="bi bi-google text-danger me-1"></i>Google Drive Scanned Document Link
-                            </label>
-                            <input type="url" name="scanned_doc_url" class="form-control form-control-sm" placeholder="https://drive.google.com/..." value="{{ $liftableDelivery->scanned_doc_url }}">
-                            <div class="form-text text-muted extra-small" style="font-size: 0.75rem;">Shareable link to signed DR and dip inspection tickets.</div>
+                        <div class="modal-footer border-0 pt-0">
+                            <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-success rounded-pill px-4">
+                                <i class="bi bi-check-circle me-1"></i> Confirm Pick Up
+                            </button>
                         </div>
-                    </div>
-                    <div class="modal-footer border-0 pt-0">
-                        <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-success rounded-pill px-4">
-                            <i class="bi bi-check-circle me-1"></i> Confirm Pick Up
-                        </button>
-                    </div>
-                </form>
+                    </form>
+                </div>
             </div>
         </div>
-    </div>
-@endif
+    @endif
+
+    {{-- Reversal. Unlifting unwinds everything the lift wrote - the record,
+         any tanker stock it stocked in, the PO flow state, the order status
+         and Module 1's delivery mirror - so the warning lists what happens
+         instead of implying this is a one-column edit. --}}
+    @if (Auth::user()->canMarkAtlLifted()
+        && $atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_LIFTED)
+        <div class="modal fade" id="unliftModal{{ $atl->id }}" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content rounded-4 border-0 shadow">
+                    <div class="modal-header border-0 pb-0">
+                        <h5 class="modal-title fw-bold text-dark">
+                            <i class="bi bi-arrow-counterclockwise text-warning-emphasis me-1"></i> Mark Unlifted
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <form method="POST" action="{{ route('stock-orders.unlift-atl', $atl->id) }}">
+                        @csrf
+                        <div class="modal-body pt-3">
+                            <div class="p-3 bg-light rounded-3 mb-3">
+                                <div class="fw-bold fs-5 text-primary mb-1">{{ number_format($atl->qty_to_receive) }} L of {{ $atl->product }}</div>
+                                <div class="small text-muted">
+                                    Lifted {{ $atl->lifted_at ? $atl->lifted_at->format('M d, Y') : '' }}
+                                    @if ($atl->lifter)
+                                        by <span class="fw-semibold text-dark">{{ $atl->lifter->name }}</span>
+                                    @endif
+                                </div>
+                            </div>
+                            <div class="alert alert-warning border-0 rounded-3 small py-2 mb-2">
+                                <i class="bi bi-exclamation-triangle me-1"></i>
+                                This reverses the recorded lift, not just the label: the ATL returns to
+                                <strong>Unlifted</strong>, the linked Purchase Order goes back to
+                                <strong>For Delivery</strong> (while no other ATL of it is still lifted), the
+                                Sales Order returns to <strong>Active</strong> when nothing on it is lifted
+                                anymore, any tanker stock the lift recorded is removed, and the delivery
+                                record in Sales Documentation is deleted so its Remaining balance goes back up.
+                            </div>
+                        </div>
+                        <div class="modal-footer border-0 pt-0">
+                            <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-warning rounded-pill px-4">
+                                <i class="bi bi-arrow-counterclockwise me-1"></i> Mark Unlifted
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endif
+@endforeach
 @endsection

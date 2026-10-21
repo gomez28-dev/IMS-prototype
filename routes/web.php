@@ -240,6 +240,7 @@ Route::post('/warehouses/{warehouse}/tanks', [WetStock\StorageTankController::cl
         Route::get('/fuel-trade/{order}/create-po', [WetStock\StockOrderController::class, 'createFromSalesOrder'])->name('create-fuel-trade-po');
         Route::post('/fuel-trade/{order}/store-po', [WetStock\StockOrderController::class, 'storeFuelTradePo'])->name('store-fuel-trade-po');
         Route::post('/deliveries/{delivery}/complete-fuel-trade', [WetStock\StockOrderController::class, 'completeFuelTrade'])->name('complete-fuel-trade');
+        Route::post('/deliveries/{delivery}/unlift', [WetStock\StockOrderController::class, 'unliftAtl'])->name('unlift-atl');
         Route::post('/deliveries/{delivery}/update-docs', [WetStock\StockOrderController::class, 'updateDeliveryDocs'])->name('update-docs');
         Route::get('/{purchaseOrder}/prepare', [WetStock\StockOrderController::class, 'editRequest'])->name('edit-request');
         // A Module 2 request becomes a purchase order when Purchasing prepares
