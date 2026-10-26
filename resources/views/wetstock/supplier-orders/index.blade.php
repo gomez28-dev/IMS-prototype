@@ -13,9 +13,6 @@
             <i class="bi bi-file-earmark-text me-2"></i> Stock Requests
         </a>
         @if (Auth::user()->canEditModule2())
-        <a href="{{ route('wetstock.stock-requests.index', ['create' => 1]) }}" class="btn btn-outline-primary d-flex align-items-center">
-            <i class="bi bi-cart-plus me-2"></i> Request Replenishment
-        </a>
         <a href="{{ route('wetstock.supplier-orders.create') }}" class="btn btn-primary-custom shadow-sm d-flex align-items-center">
             <i class="bi bi-plus-circle me-2"></i> Add Incoming Stock
         </a>
