@@ -9,16 +9,6 @@
             <h2 class="fw-bold text-dark mb-1">Wet Stock Requests</h2>
             <p class="text-muted small mb-0">Incoming wet stock replenishment requests and the depot deliveries raised against them.</p>
         </div>
-        <div class="d-flex gap-2 align-items-center flex-wrap">
-            <a href="{{ route('wetstock.supplier-orders.index') }}" class="btn btn-secondary-custom">
-                <i class="bi bi-box-seam me-1"></i> Incoming Stock Log
-            </a>
-            @if (Auth::user()->canEditModule2())
-                <a href="{{ route('wetstock.stock-requests.create') }}" class="btn btn-primary-custom shadow-sm">
-                    <i class="bi bi-plus-circle me-1"></i> Request Replenishment
-                </a>
-            @endif
-        </div>
     </div>
 
     @if (session('success'))
@@ -106,11 +96,10 @@
     <!-- Replenishment Requests Table -->
     <div class="card card-custom border-0 shadow-sm">
         <div class="card-header bg-white border-0 py-3">
-            {{-- The search sits on the section it filters rather than in the page
-                 header, so it is obvious what it narrows. The controller has always
-                 honoured ?search= here; only its placement is new. --}}
+            {{-- The search sits LEFT of the heading, in the same header row it
+                 filters the list card through - the supervisor's annotation put
+                 them side by side, search first. --}}
             <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2">
-                <h5 class="fw-bold text-dark mb-0"><i class="bi bi-file-earmark-text text-secondary me-2"></i>Submitted Replenishment Requests</h5>
                 <form method="GET" action="{{ route('stock-orders.wet-stock-requests.index') }}"
                       class="d-flex gap-2 align-items-center flex-wrap">
                     @if (request('warehouse_id'))
@@ -129,6 +118,7 @@
                     <a href="{{ route('stock-orders.wet-stock-requests.index') }}"
                        class="btn btn-outline-secondary">Clear</a>
                 </form>
+                <h5 class="fw-bold text-dark mb-0"><i class="bi bi-file-earmark-text text-secondary me-2"></i>Submitted Replenishment Requests</h5>
             </div>
         </div>
         <div class="card-body p-0">
@@ -171,12 +161,10 @@
                                     @if (Auth::user()->canEditStockOrders())
                                         {{-- The only action left on a request row. It leads to
                                              the request's own ATL page, which lists what has been
-                                             issued and adds more, and which chooses the PO to
-                                             draw on. A request does not need a PO of its own
-                                             first, so there is no separate Prepare step here. --}}
+                                             issued and adds more from there. --}}
                                         <a href="{{ route('stock-orders.wet-stock-requests.atls', $req->id) }}"
-                                           class="btn btn-sm btn-primary rounded-pill px-3 py-1 d-block w-100" title="Issue an ATL against this request">
-                                            <i class="bi bi-plus-lg me-1"></i> Create ATL
+                                           class="btn btn-sm btn-primary rounded-pill px-3 py-1 d-block w-100" title="Open this request's ATL records">
+                                            <i class="bi bi-card-list me-1"></i> View ATLs
                                         </a>
                                     @endif
                                 </td>

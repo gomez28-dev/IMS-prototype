@@ -416,12 +416,15 @@ class WetStockRequestAtlMultiPoTest extends TestCase
         $html = $this->atlsHtml($request);
 
         $this->assertStringContainsString('Add ATL', $html);
-        $this->assertStringContainsString(
-            route('stock-orders.wet-stock-requests.atls.create', $request->id),
-            $html
-        );
-        // The queue's Create ATL is the other half of the two-step route in.
-        $this->assertStringContainsString('Create ATL', $this->actingAs($this->admin)
+        // The button is a collapse toggle now: the drawdown form opens right
+        // here on the page instead of a link away. This fixture carries no PO
+        // yet, so the embed sits ready with its "nothing to draw on" warning
+        // rather than a form - the form itself is pinned by the create-atl test.
+        $this->assertStringContainsString('data-bs-target="#createAtlCollapse"', $html);
+        $this->assertStringContainsString('id="createAtlCollapse"', $html);
+        // The queue's row action leads here; it reads View ATLs now that the
+        // step-two create page is only a bookmarked fallback.
+        $this->assertStringContainsString('View ATLs', $this->actingAs($this->admin)
             ->get(route('stock-orders.wet-stock-requests.index'))
             ->getContent());
     }

@@ -208,14 +208,23 @@
 
         {{-- Where the supervisor pointed it: on the list's own heading, exactly
              where Add Delivery sits on M1's. It opens the multi-PO drawdown
-             form, so this is step two of the two-step route in. --}}
+             form right here instead of leaving the page; the standalone Raise
+             an ATL page keeps the same partial for a bookmarked way in. --}}
         @if (Auth::user()->canEditStockOrders())
-            <a href="{{ route('stock-orders.wet-stock-requests.atls.create', $request->id) }}"
-               class="btn btn-primary-custom">
+            <button type="button" class="btn btn-primary-custom" data-bs-toggle="collapse"
+                    data-bs-target="#createAtlCollapse" aria-expanded="false" aria-controls="createAtlCollapse">
                 <i class="bi bi-plus-lg me-1"></i> Add ATL
-            </a>
+            </button>
         @endif
     </div>
+
+    {{-- The Add ATL form, embedded: same partial, same field names, same
+         store route as the standalone page - either way in posts the same. --}}
+    @if (Auth::user()->canEditStockOrders())
+        <div class="collapse mb-3" id="createAtlCollapse">
+            @include('wetstock.wet-stock-requests.partials.create-atl-form')
+        </div>
+    @endif
 
     <div class="card card-custom border-0 shadow-sm">
         <div class="card-body p-0">

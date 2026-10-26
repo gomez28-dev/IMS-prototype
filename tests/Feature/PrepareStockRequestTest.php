@@ -76,7 +76,7 @@ class PrepareStockRequestTest extends TestCase
             ->get(route('stock-orders.wet-stock-requests.index'))
             ->assertOk()
             ->assertSee($request->request_number)
-            ->assertSee('Create ATL', false);
+            ->assertSee('View ATLs', false);
     }
 
     public function test_the_queue_search_matches_the_req_number(): void

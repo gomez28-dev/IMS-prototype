@@ -72,7 +72,9 @@ class WetStockRequestController extends Controller
      *
      * Laid out like the M1 Deliveries page: an info card, product-aware totals,
      * the ATLs themselves, and an Add ATL button. Several ATLs may exist for one
-     * request, each drawing on whichever PO still has volume.
+     * request, each drawing on whichever PO still has volume. The Add ATL
+     * button opens the same drawdown form the standalone page serves, embedded
+     * in a collapsible card, so this action also carries the form's data.
      */
     public function atls(StockRequest $stockRequest): View
     {
@@ -87,6 +89,11 @@ class WetStockRequestController extends Controller
             'request' => $stockRequest,
             'atls' => $atls,
             'volumes' => $stockRequest->atlVolumeTotals(),
+            // The embed's form data - the same inputs createAtl() passes, so
+            // both entrances post an identical payload.
+            'availablePos' => PurchaseOrder::availableForAllocation(),
+            'pending' => $stockRequest->pendingByProduct(),
+            'tanks' => $this->tankOptions($stockRequest),
         ]);
     }
 
@@ -105,16 +112,7 @@ class WetStockRequestController extends Controller
         // hold. A request does not need a PO of its own any more.
         $availablePos = PurchaseOrder::availableForAllocation();
 
-        // Only tanks at the request's own site. Booking a delivery against a tank
-        // at another depot is possible if the list is the whole company's.
-        $tanks = StorageTank::where('is_active', true)
-            ->when(
-                $stockRequest->warehouse_id,
-                fn ($query) => $query->where('warehouse_id', $stockRequest->warehouse_id)
-            )
-            ->with('warehouse')
-            ->orderBy('name')
-            ->get();
+        $tanks = $this->tankOptions($stockRequest);
 
         return view('wetstock.wet-stock-requests.create-atl', [
             'request' => $stockRequest,
@@ -122,6 +120,24 @@ class WetStockRequestController extends Controller
             'pending' => $stockRequest->pendingByProduct(),
             'tanks' => $tanks,
         ]);
+    }
+
+    /**
+     * The tanks the ATL form offers as its optional depot tank: the active
+     * ones at the request's own site. Booking a delivery against a tank at
+     * another depot is possible if the list is the whole company's, so the
+     * query stays scoped to the request's warehouse.
+     */
+    private function tankOptions(StockRequest $stockRequest)
+    {
+        return StorageTank::where('is_active', true)
+            ->when(
+                $stockRequest->warehouse_id,
+                fn ($query) => $query->where('warehouse_id', $stockRequest->warehouse_id)
+            )
+            ->with('warehouse')
+            ->orderBy('name')
+            ->get();
     }
 
     /**

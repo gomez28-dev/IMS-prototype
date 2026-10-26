@@ -14,10 +14,13 @@ use App\Models\Warehouse;
 use Tests\TestCase;
 
 /**
- * The Wet Stock Requests page's action became Create ATL, which opens a
+ * The Wet Stock Requests page's action is View ATLs, which opens the
  * per-request ATL page laid out like the M1 Deliveries page: an info card,
- * product-aware totals, an ATL table, and an Add ATL button. Prepare stays
- * available as its own action, because raising the PO is still its own job.
+ * product-aware totals, an ATL table, and an Add ATL button. The Add ATL
+ * button no longer leaves the page: it opens the multi-PO drawdown form
+ * right there in a collapsible card, while the standalone Raise an ATL page
+ * keeps working for a bookmark or a back-link. Prepare stays available as
+ * its own route, because raising the PO is still its own job.
  */
 class WetStockRequestCreateAtlPageTest extends TestCase
 {
@@ -115,7 +118,7 @@ class WetStockRequestCreateAtlPageTest extends TestCase
 
     // ---- The list page's action --------------------------------------------
 
-    public function test_the_list_page_offers_create_atl(): void
+    public function test_the_list_page_offers_view_atls(): void
     {
         $request = $this->request();
 
@@ -128,7 +131,8 @@ class WetStockRequestCreateAtlPageTest extends TestCase
             route('stock-orders.wet-stock-requests.atls', $request->id),
             $html
         );
-        $this->assertStringContainsString('Create ATL', $html);
+        $this->assertStringContainsString('View ATLs', $html);
+        $this->assertStringNotContainsString('Create ATL', $html);
     }
 
     public function test_the_prepare_route_still_works_even_though_the_button_is_gone(): void
@@ -233,7 +237,34 @@ class WetStockRequestCreateAtlPageTest extends TestCase
         $this->assertStringContainsString('No ATLs issued for this request yet.', $html);
     }
 
-    public function test_the_atl_page_offers_the_add_atl_button(): void
+    public function test_the_add_atl_button_opens_the_form_in_place(): void
+    {
+        $request = $this->request();
+        $po = $this->purchaseOrder();
+
+        $html = $this->actingAs($this->admin)
+            ->get(route('stock-orders.wet-stock-requests.atls', $request->id))
+            ->assertOk()
+            ->getContent();
+
+        // The button on the heading is a collapse toggle, not a link away.
+        $this->assertStringContainsString('data-bs-target="#createAtlCollapse"', $html);
+
+        // And the drawdown form itself is right there on the page - the same
+        // form the standalone Raise an ATL page serves, posting to the same
+        // store route with the same row fields.
+        $this->assertStringContainsString('id="createAtlCollapse"', $html);
+        $this->assertStringContainsString(
+            route('stock-orders.wet-stock-requests.atls.store', $request->id),
+            $html
+        );
+        $this->assertStringContainsString('name="drawdowns[0][purchase_order_id]"', $html);
+
+        // The embed offers the same PO pool the standalone form does.
+        $this->assertStringContainsString($po->po_number, $html);
+    }
+
+    public function test_the_embedded_form_hides_when_it_has_nothing_to_draw_on(): void
     {
         $request = $this->request();
 
@@ -242,10 +273,26 @@ class WetStockRequestCreateAtlPageTest extends TestCase
             ->assertOk()
             ->getContent();
 
+        // No PO holds volume, so the embed says so instead of offering a
+        // form with an empty PO list.
+        $this->assertStringContainsString('No purchase order currently has volume left to draw on.', $html);
+        $this->assertStringNotContainsString('name="drawdowns[0][purchase_order_id]"', $html);
+    }
+
+    public function test_the_standalone_create_atl_page_still_serves_the_form(): void
+    {
+        $request = $this->request();
+        $po = $this->purchaseOrder();
+
+        $html = $this->actingAs($this->admin)
+            ->get(route('stock-orders.wet-stock-requests.atls.create', $request->id))
+            ->assertOk()
+            ->getContent();
+
         $this->assertStringContainsString(
-            route('stock-orders.wet-stock-requests.atls.create', $request->id),
-            $html,
-            'Add ATL must lead somewhere.'
+            route('stock-orders.wet-stock-requests.atls.store', $request->id),
+            $html
         );
+        $this->assertStringContainsString('name="drawdowns[0][purchase_order_id]"', $html);
     }
 }

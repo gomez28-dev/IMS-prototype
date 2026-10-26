@@ -91,27 +91,25 @@ class WetStockRequestsSearchTest extends TestCase
     {
         $html = $this->page();
 
-        // It moved out of the page header and onto the Submitted Replenishment
-        // Requests card it actually narrows, so it is no longer beside the
-        // Incoming Stock Log button.
+        // It sits LEFT of the "Submitted Replenishment Requests" heading, in
+        // the same header row the list card it narrows opens with - not in
+        // the page header, and not dangling after the title.
         $searchAt = strpos($html, 'name="search"');
         $sectionAt = strpos($html, 'Submitted Replenishment Requests');
-        $incomingAt = strpos($html, 'Incoming Stock Log');
 
         $this->assertIsInt($searchAt);
         $this->assertIsInt($sectionAt);
-        $this->assertIsInt($incomingAt);
 
-        $this->assertGreaterThan(
+        $this->assertLessThan(
             $sectionAt,
             $searchAt,
-            'The search box belongs inside the section header it filters.'
+            'The search box sits beside the section heading it filters, before it.'
         );
-        $this->assertGreaterThan(
-            $incomingAt,
-            $searchAt,
-            'It should no longer sit in the page header beside the other buttons.'
-        );
+
+        // The page header became plain: the two navigation buttons left with
+        // the top-right actions block.
+        $this->assertStringNotContainsString('Incoming Stock Log', $html);
+        $this->assertStringNotContainsString('Request Replenishment', $html);
 
         // The prompt the supervisor asked for.
         $this->assertStringContainsString('Search REQ #, site, or remarks...', $html);
