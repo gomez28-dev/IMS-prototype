@@ -133,6 +133,32 @@ class StockOrdersTemplateStructureTest extends TestCase
         $this->assertSame(0, $depth, "{$relativePath} ends with {$depth} <div> still open.");
     }
 
+    // ---- Round 7: blocks removed from templates ----------------------------
+
+    public function test_the_delivery_modal_carries_no_documentation_block(): void
+    {
+        $source = $this->source('resources/views/deliveries/index.blade.php');
+
+        // The whole Google Drive Documentation Hub left the ATL details
+        // modal: the attach button, the attached green banner, the
+        // edit-collapse form, and the update-docs route it posted to.
+        $this->assertStringNotContainsString('Documentation Hub', $source);
+        $this->assertStringNotContainsString('Attach Google Drive Link', $source);
+        $this->assertStringNotContainsString('Verified Scanned Documents', $source);
+        $this->assertStringNotContainsString('Open Google Drive', $source);
+        $this->assertStringNotContainsString('Edit Link', $source);
+        $this->assertStringNotContainsString('editDocCollapse', $source);
+        $this->assertStringNotContainsString('update-docs', $source);
+
+        // The modal's own frame survives: exactly one modal-footer remains
+        // (Close + Download ATL PDF).
+        $this->assertSame(
+            1,
+            substr_count($source, 'modal-footer'),
+            'The ATL details modal should keep its single footer, Close + Download ATL PDF.'
+        );
+    }
+
     // ---- The specific structure each broken page lost ---------------------
 
     public function test_the_po_card_header_closes_before_the_card_body(): void

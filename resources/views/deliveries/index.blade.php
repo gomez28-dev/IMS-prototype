@@ -744,61 +744,6 @@
                     </div>
                     @endif
 
-                    {{-- Documentation Hub (Google Drive) --}}
-                    <div class="col-12">
-                        @if ($ftDelivery->hasScannedDocs())
-                            <div class="p-3 bg-success bg-opacity-10 border border-success border-opacity-25 rounded-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
-                                <div>
-                                    <span class="text-success small fw-bold d-block"><i class="bi bi-google me-1"></i>Verified Scanned Documents Attached</span>
-                                    <span class="small text-muted">Signed refinery DR, loading tickets, and calibration dip sheets.</span>
-                                </div>
-                                <div class="d-flex gap-2">
-                                    <a href="{{ $ftDelivery->scanned_doc_url }}" target="_blank" class="btn btn-sm btn-success rounded-pill px-3 shadow-sm">
-                                        <i class="bi bi-box-arrow-up-right me-1"></i> Open Google Drive
-                                    </a>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3" data-bs-toggle="collapse" data-bs-target="#editDocCollapse">
-                                        <i class="bi bi-pencil me-1"></i> Edit Link
-                                    </button>
-                                </div>
-                            </div>
-                        @else
-                            {{-- No placeholder prose on an unattached ATL: the
-                                 attach action is the whole point of the card. --}}
-                            <div class="p-3 bg-light border rounded-3 d-flex justify-content-end">
-                                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" data-bs-toggle="collapse" data-bs-target="#editDocCollapse">
-                                    <i class="bi bi-plus-lg me-1"></i> Attach Google Drive Link
-                                </button>
-                            </div>
-                        @endif
-
-                        <div class="collapse mt-2" id="editDocCollapse">
-                            <form method="POST" action="{{ route('stock-orders.update-docs', $ftDelivery->id) }}" class="card card-body border rounded-3 p-3 bg-white shadow-sm">
-                                @csrf
-                                <h6 class="fw-bold small text-dark mb-2">Update Refinery Document Serials & Drive Link</h6>
-                                <div class="row g-2 mb-2">
-                                    <div class="col-md-6">
-                                        <label class="form-label extra-small text-muted mb-1" style="font-size: 0.75rem;">Supplier SO / Contract #</label>
-                                        <input type="text" name="supplier_so_number" class="form-control form-control-sm" placeholder="e.g. PETRON-SO-8842" value="{{ $ftDelivery->supplier_so_number }}">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label extra-small text-muted mb-1" style="font-size: 0.75rem;">Supplier Rack DR #</label>
-                                        <input type="text" name="supplier_dr_number" class="form-control form-control-sm" placeholder="e.g. DR-99014" value="{{ $ftDelivery->supplier_dr_number }}">
-                                    </div>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label extra-small text-muted mb-1" style="font-size: 0.75rem;">Google Drive Share Link</label>
-                                    <div class="input-group input-group-sm">
-                                        <span class="input-group-text"><i class="bi bi-google text-danger"></i></span>
-                                        <input type="url" name="scanned_doc_url" class="form-control" placeholder="https://drive.google.com/file/d/..." value="{{ $ftDelivery->scanned_doc_url }}" required>
-                                    </div>
-                                </div>
-                                <div class="d-flex justify-content-end gap-2">
-                                    <button type="button" class="btn btn-sm btn-light border rounded-pill px-3" data-bs-toggle="collapse" data-bs-target="#editDocCollapse">Cancel</button>
-                                    <button type="submit" class="btn btn-sm btn-primary-custom rounded-pill px-3">Save Changes</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
                 </div>
             </div>
             <div class="modal-footer border-top bg-light py-2">

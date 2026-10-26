@@ -17,9 +17,9 @@ use Tests\TestCase;
  *
  * Module 1's Deliveries details modal: the PO allocation lines the ATL is
  * drawn on, one per line instead of one squashed summary; plain labels; an
- * unnumbered ATL shown as Pending, not a made-up 'DITC-ATL'; and the noisy
- * "Scanned Physical Documents" placeholder card gone (the attach/edit flows
- * stay).
+ * unnumbered ATL shown as Pending, not a made-up 'DITC-ATL'; and the whole
+ * Google Drive Documentation Hub gone - attach button, attached banner and
+ * edit form alike (the paperwork lives in the table's own Docs buttons).
  *
  * The printed PDF: one row per PO allocation like the on-screen record, the
  * driver on the first row, S.O. NO. in the FT-prefixed form the rest of the
@@ -172,7 +172,7 @@ class AtlModalAndPdfRedesignTest extends TestCase
         $this->assertStringContainsString('Pending</span>', $html);
     }
 
-    public function test_the_modal_drops_the_scanned_documents_placeholder_but_keeps_the_attach_flow(): void
+    public function test_the_modal_keeps_no_documentation_block_at_all(): void
     {
         $order = $this->order();
         $po = $this->po($order, 'PO-MOD-D-'.rand(1000, 9999), 10000);
@@ -181,12 +181,17 @@ class AtlModalAndPdfRedesignTest extends TestCase
 
         $html = $this->modalHtml($order);
 
+        // The Documentation Hub left the modal entirely: no attach button, no
+        // attached banner, no edit-collapse form, and no doc-update route
+        // rendered into it. The table rows' Docs buttons and the backend
+        // route itself stay - only the modal shows none of it.
         $this->assertStringNotContainsString('Scanned Physical Documents', $html);
-        // The flows survive the cleanup: there is still a way to attach the
-        // scan, and the serials/Drive link edit form still lives in the modal.
-        $this->assertStringContainsString('Attach Google Drive Link', $html);
-        $this->assertStringContainsString('name="supplier_dr_number"', $html);
-        $this->assertStringContainsString('name="scanned_doc_url"', $html);
+        $this->assertStringNotContainsString('Attach Google Drive Link', $html);
+        $this->assertStringNotContainsString('Verified Scanned Documents', $html);
+        $this->assertStringNotContainsString('Open Google Drive', $html);
+        $this->assertStringNotContainsString('Edit Link', $html);
+        $this->assertStringNotContainsString('editDocCollapse', $html);
+        $this->assertStringNotContainsString('update-docs', $html);
     }
 
     // ---- The printed PDF ----------------------------------------------------
