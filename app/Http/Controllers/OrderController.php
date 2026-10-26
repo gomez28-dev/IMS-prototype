@@ -164,7 +164,10 @@ private function resolveOrderType(string $orderType, ?string $buyBackFulfillment
                     'nullable', 'string', 'in:'.Order::BUY_BACK_FULFILLMENT_PICKUP.','.Order::BUY_BACK_FULFILLMENT_DELIVERY,
                 ],
             // Optional for every category, and saved empty when left blank.
-            'date_needed' => ['nullable', 'date'],
+            // The date the fuel is needed was removed from the SO: the M3 ATL
+            // form's Authorized Pick Up Date is the only date the delivery
+            // side reads now, so a stale client still posting date_needed is
+            // simply ignored by validate() dropping it.
             'terms' => ['required', 'string', 'max:64'],
         ], $this->itemRules()), $this->itemMessages(), $this->itemAttributes());
 
@@ -245,7 +248,6 @@ private function resolveOrderType(string $orderType, ?string $buyBackFulfillment
                 'nullable', 'string', 'in:'.Order::BUY_BACK_FULFILLMENT_PICKUP.','.Order::BUY_BACK_FULFILLMENT_DELIVERY,
                 'required_if:order_type,BUY_BACK',
             ],
-            'date_needed' => ['nullable', 'date'],
             'terms' => ['required', 'string', 'max:64'],
             'modification_reason' => ['nullable', 'string', 'max:1000'],
         ], $this->itemRules()), $this->itemMessages(), $this->itemAttributes());
@@ -266,11 +268,11 @@ private function resolveOrderType(string $orderType, ?string $buyBackFulfillment
         // Diff changes against existing model attributes.
         // (qty_ordered / price / amount are derived from the product lines.)
         $changes = [];
-        $comparableFields = ['account', 'date', 'date_needed', 'products', 'so_number', 'po_number', 'location', 'status', 'fulfillment_type', 'order_category', 'terms'];
+        $comparableFields = ['account', 'date', 'products', 'so_number', 'po_number', 'location', 'status', 'fulfillment_type', 'order_category', 'terms'];
 
         foreach ($comparableFields as $field) {
             $oldVal = $order->{$field};
-            if (in_array($field, ['date', 'date_needed'], true) && $oldVal) {
+            if ($field === 'date' && $oldVal) {
                 $oldVal = $oldVal->format('Y-m-d');
             }
             $newVal = $validated[$field] ?? null;

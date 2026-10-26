@@ -318,13 +318,14 @@ class FuelTradeAccountingClearanceGateTest extends TestCase
         $response->assertSee('FT-1011');
         $response->assertSee('FT-1012');
 
-        // The Hold order shows its clearance status but is NOT offered the
-        // Create ATL action; the cleared order is.
+        // The list offers Create ATL nowhere now - the action lives on the
+        // ATL Details page, whose own clearance gate is pinned by
+        // SalesOrderCreateAtlButtonTest. The Hold order still shows its status.
         $response->assertSee('Hold');
         $this->assertSame(
-            1,
+            0,
             substr_count($response->getContent(), 'Create ATL'),
-            'Only the Accounting-cleared order may be offered Create ATL.'
+            'The Sales Orders list offers Create ATL nowhere.'
         );
     }
 

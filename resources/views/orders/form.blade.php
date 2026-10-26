@@ -122,16 +122,6 @@
                         </div>
                     </div>
 
-                    {{-- Optional on every category, and saved empty when blank. --}}
-                    <div class="mb-3">
-                        <label for="date_needed" class="form-label fw-medium text-secondary small">Date Needed</label>
-                        <input type="date" name="date_needed" id="date_needed" class="form-control @error('date_needed') is-invalid @enderror" value="{{ old('date_needed', $order && $order->date_needed ? $order->date_needed->format('Y-m-d') : '') }}">
-                        <div class="form-text extra-small">When the fuel is required on site. Leave blank if not set.</div>
-                        @error('date_needed')
-                            <div class="invalid-feedback">{{ $message }}</div>
-                        @enderror
-                    </div>
-
                     <div class="mb-4">
                         <label for="po_number" class="form-label fw-medium text-secondary small">PO Number</label>
                         <input type="text" name="po_number" id="po_number" class="form-control @error('po_number') is-invalid @enderror" placeholder="e.g. PO-12345 (optional)" value="{{ old('po_number', $order ? $order->po_number : '') }}">

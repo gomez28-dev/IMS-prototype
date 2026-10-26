@@ -238,37 +238,27 @@ class OrderCategoryRoutingTest extends TestCase
         $this->assertTrue($pickup->canPrepareAtl());
     }
 
-    // ---- Date Needed -----------------------------------------------------
+    // ---- Date Needed -------------------------------------------------------
 
-    public function test_date_needed_is_optional_for_every_category(): void
+    public function test_date_needed_posts_are_ignored_and_the_field_left_the_form(): void
     {
-        foreach (['REGULAR', 'FUEL_TRADE', 'CONSUMO', 'BUY_BACK'] as $type) {
-            $overrides = ['order_type' => $type];
-            if ($type === 'BUY_BACK') {
-                $overrides['buy_back_fulfillment'] = 'PICKUP';
-            }
-
-            $order = $this->storeOrder($overrides);
-            $this->assertNull($order->fresh()->date_needed, "{$type} may be saved without a date needed");
-        }
-    }
-
-    public function test_date_needed_is_saved_when_given(): void
-    {
+        // Date Needed was removed from the Sales Order (the delivery date is
+        // the ATL form's Authorized Pick Up Date), so a stale client that
+        // still posts the field must not be able to reappear with it.
         $order = $this->storeOrder([
             'order_type' => 'REGULAR',
             'date_needed' => '2026-11-15',
         ]);
 
-        $this->assertEquals('2026-11-15', $order->fresh()->date_needed->format('Y-m-d'));
+        $this->assertNull($order->fresh()->date_needed);
     }
 
-    public function test_date_needed_is_optional_on_the_form(): void
+    public function test_the_form_no_longer_renders_a_date_needed_input(): void
     {
         $response = $this->actingAs($this->sales)->get(route('order.create'));
 
         $response->assertStatus(200);
-        $response->assertSee('name="date_needed"', false);
+        $response->assertDontSee('name="date_needed"', false);
     }
 
     // ---- Form ------------------------------------------------------------

@@ -163,7 +163,6 @@
                         <thead class="bg-light">
                             <tr>
                                 <th class="ps-3 py-3">SO Number</th>
-                                <th class="py-3">Date Needed</th>
                                 <th class="py-3">Client / Account</th>
                                 <th class="py-3">Qty Ordered / Products</th>
                                 <th class="py-3 text-center">Clearance</th>
@@ -185,16 +184,10 @@
                                         $name = $item->product_name;
                                         $rowVolumes[$name] = ($rowVolumes[$name] ?? 0) + (int) $item->qty;
                                     }
-                                    $rowTotal = array_sum($rowVolumes);
                                 @endphp
                                 <tr>
                                     <td class="ps-3 fw-bold text-dark">
                                         {{ $row->formatted_so_number }}
-                                    </td>
-                                    {{-- The date entered in Module 1 as "date needed",
-                                         not the order date. --}}
-                                    <td class="small">
-                                        {{ $row->date_needed ? $row->date_needed->format('M d, Y') : '—' }}
                                     </td>
                                     <td><strong>{{ $row->account }}</strong></td>
                                     <td>
@@ -210,10 +203,6 @@
                                                     <span class="fw-bold font-monospace ms-2">{{ number_format($qty) }}</span>
                                                 </div>
                                             @endforeach
-                                            <div class="stat-total">
-                                                <span>Total</span>
-                                                <span class="stat-val">{{ number_format($rowTotal) }} L</span>
-                                            </div>
                                         @endif
                                     </td>
                                     <td class="text-center">
@@ -244,12 +233,6 @@
                                     </td>
                                     <td class="pe-3 text-end">
                                         <div class="d-inline-flex gap-1 justify-content-end">
-                                            @if ($row->canBeIssuedAtl() && Auth::user()->canEditStockOrders())
-                                                <a href="{{ route('stock-orders.create-fuel-trade-po', $row->id) }}"
-                                                   class="btn btn-sm btn-primary rounded-pill px-3 py-1">
-                                                    <i class="bi bi-plus-circle me-1"></i> Create ATL
-                                                </a>
-                                            @endif
                                             <a href="{{ route('stock-orders.sales-orders.show', $row->id) }}"
                                                class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1">
                                                 ATL Details
@@ -259,7 +242,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="text-center py-5 text-muted">
+                                    <td colspan="6" class="text-center py-5 text-muted">
                                         <i class="bi bi-inbox fs-1 d-block mb-3 text-secondary"></i>
                                         No Fuel Trade or Buy Back pick-up orders found.
                                     </td>

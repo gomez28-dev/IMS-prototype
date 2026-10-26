@@ -168,61 +168,25 @@ class SalesOrderProductAwarenessTest extends TestCase
         $this->assertStringContainsString('Qty Ordered / Products', $html);
         $this->assertStringContainsString('1,000', $html);
         $this->assertStringContainsString('500', $html);
-        // The per-row total is shown too.
-        $this->assertStringContainsString('1,500 L', $html);
+        // The cumulative Total row under the product lines is gone; the cards
+        // keep their own totals.
+        $this->assertStringNotContainsString('1,500 L', $html);
         // The old name-only badges are gone.
         $this->assertStringNotContainsString('<span class="badge bg-light text-dark border me-1">', $html);
     }
 
-    // ---- Date Needed column -----------------------------------------------
+    // ---- Date Needed column -------------------------------------------------
 
-    public function test_date_needed_is_its_own_column(): void
+    public function test_date_needed_is_gone_from_the_list(): void
     {
         $this->order(['D' => 1000]);
 
         $html = $this->pageHtml();
 
-        $this->assertStringContainsString('Date Needed', $html);
-    }
-
-    public function test_the_column_shows_date_needed_not_the_order_date(): void
-    {
-        // Ordered weeks ago, needed in a few days: the two are far apart so a
-        // mix-up cannot pass.
-        $order = Order::create([
-            'account' => 'Apex Logistics Corp',
-            'location' => 'Valenzuela',
-            'so_number' => (string) rand(100000, 999999),
-            'date' => now()->subDays(90)->startOfDay(),
-            'date_needed' => now()->addDays(21)->startOfDay(),
-            'status' => 'Active',
-            'terms' => 'COD',
-            'order_category' => Order::CATEGORY_CLIENT_ORDER,
-            'fulfillment_type' => Order::FULFILLMENT_FUEL_TRADE,
-            'qty_ordered' => 1000,
-            'created_by' => $this->purchasing->id,
-        ]);
-        OrderItem::create(['order_id' => $order->id, 'product_type' => 'D', 'qty' => 1000, 'price' => 50]);
-
-        $html = $this->pageHtml();
-
-        $this->assertStringContainsString(
-            $order->date_needed->format('M d, Y'),
-            $html,
-            'The column must show the Module 1 date needed'
-        );
-        $this->assertStringNotContainsString(
-            $order->date->format('M d, Y'),
-            $html,
-            'The order date must no longer sit under the SO number'
-        );
-    }
-
-    public function test_a_row_with_no_date_needed_shows_a_placeholder(): void
-    {
-        $this->order(['D' => 1000], ['date_needed' => null]);
-
-        $this->assertStringContainsString('Date Needed', $this->pageHtml());
+        // The column was removed with the SO form's field: the delivery date
+        // is the ATL form's Authorized Pick Up Date, and nothing on the Sales
+        // Orders list quotes a "date needed".
+        $this->assertStringNotContainsString('Date Needed', $html);
     }
 
     /**
