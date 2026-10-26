@@ -198,6 +198,24 @@ class WetStockRequestController extends Controller
             }
         }
 
+        // One load, one rack - the same rule the Fuel Trade form enforces: two
+        // rows of one ATL must not mix suppliers, or one supplier at two
+        // loading locations. The lift happens at a single refinery terminal.
+        $primaryKey = $pool->get($drawdowns->first()['purchase_order_id'])?->allocationKey();
+        $primaryPo = $pool->get($drawdowns->first()['purchase_order_id']);
+
+        foreach ($drawdowns->skip(1) as $dd) {
+            $po = $pool->get($dd['purchase_order_id']);
+
+            if ($po && $primaryKey !== null && $po->allocationKey() !== $primaryKey) {
+                return back()->withInput()->withErrors([
+                    'drawdowns' => "Cross-allocation is not allowed: PO #{$po->po_number} is not the same supplier and "
+                        ."loading location as PO #{$primaryPo->po_number}. One lift draws at one rack - "
+                        .'split this into one ATL per supplier visit.',
+                ]);
+            }
+        }
+
         foreach ($drawnByProduct as $product => $qty) {
             if (! array_key_exists($product, $pending)) {
                 return back()->withInput()->withErrors([

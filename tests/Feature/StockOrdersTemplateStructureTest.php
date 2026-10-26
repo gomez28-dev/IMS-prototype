@@ -28,6 +28,7 @@ class StockOrdersTemplateStructureTest extends TestCase
         return [
             'resources/views/wetstock/stock-orders/create-po.blade.php',
             'resources/views/wetstock/stock-orders/form.blade.php',
+            'resources/views/wetstock/wet-stock-requests/create-atl.blade.php',
             'resources/views/wetstock/purchase-orders/index.blade.php',
             'resources/views/wetstock/sales-orders/index.blade.php',
             'resources/views/wetstock/sales-orders/show.blade.php',
@@ -72,6 +73,7 @@ class StockOrdersTemplateStructureTest extends TestCase
         return [
             'create supplier po' => ['resources/views/wetstock/stock-orders/create-po.blade.php'],
             'issue atl form' => ['resources/views/wetstock/stock-orders/form.blade.php'],
+            'request atl form' => ['resources/views/wetstock/wet-stock-requests/create-atl.blade.php'],
             'purchase orders list' => ['resources/views/wetstock/purchase-orders/index.blade.php'],
             'sales orders list' => ['resources/views/wetstock/sales-orders/index.blade.php'],
             'sales order detail' => ['resources/views/wetstock/sales-orders/show.blade.php'],

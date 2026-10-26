@@ -68,6 +68,7 @@
                                                 @foreach ($availablePos as $po)
                                                     <option value="{{ $po->id }}"
                                                             data-products="{{ json_encode($po->items->pluck('product', 'product')->map(fn ($p) => [$p, $po->getAvailableBalanceForProduct($p)])->values()) }}"
+                                                            data-alloc-key="{{ $po->allocationKey() }}"
                                                             {{ (int) ($row['purchase_order_id'] ?? 0) === $po->id ? 'selected' : '' }}>
                                                         {{ $po->po_number }} — {{ $po->supplier_name }}
                                                     </option>
@@ -310,12 +311,28 @@ document.addEventListener('DOMContentLoaded', function () {
             const template = container.querySelector('.drawdown-row');
             if (!template) return;
 
+            // One lift, one rack: a new row may only reach POs of the same
+            // supplier at the same rack as the first row - the same rule the
+            // save enforces. With no PO chosen yet the full pool stays on
+            // offer; the save refuses a mixed split either way.
+            const keyOption = template.querySelector('[data-po-select]').selectedOptions[0];
+            const rackKey = keyOption ? keyOption.getAttribute('data-alloc-key') : null;
+
             const clone = template.cloneNode(true);
             clone.querySelectorAll('input, select').forEach(function (field) {
                 if (field.tagName === 'INPUT') field.value = '';
                 else field.selectedIndex = 0;
                 field.classList.remove('is-invalid');
             });
+
+            if (rackKey) {
+                const poSelect = clone.querySelector('[data-po-select]');
+                Array.from(poSelect.options).forEach(function (option) {
+                    if (option.value && option.getAttribute('data-alloc-key') !== rackKey) {
+                        option.remove();
+                    }
+                });
+            }
             const hint = clone.querySelector('.availability-hint');
             if (hint) hint.textContent = '';
 

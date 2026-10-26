@@ -336,7 +336,9 @@
                                                                     }
                                                                     $avail = $availByProduct[$defaultReqProduct] ?? 0;
                                                                 @endphp
-                                                                <option value="{{ $p->id }}" data-items="{{ json_encode($availByProduct) }}" data-avail="{{ $avail }}" {{ $loop->first ? 'selected' : '' }}>
+                                                                <option value="{{ $p->id }}" data-items="{{ json_encode($availByProduct) }}" data-avail="{{ $avail }}"
+                                                                        data-alloc-key="{{ $p->allocationKey() }}" data-rack="{{ $p->allocationRack() }}"
+                                                                        {{ $loop->first ? 'selected' : '' }}>
                                                                     {{ $p->po_number }} — {{ $p->supplier_name }}
                                                                 </option>
                                                             @endforeach
@@ -783,6 +785,21 @@ function addDrawdownRow(preferredProduct) {
     tbody.appendChild(tr);
     ddIndex++;
 
+    // One lift, one rack: rows 2+ may only reach POs of the same supplier at
+    // the same rack as the first row - the same rule the save enforces. The
+    // filter runs before the product preselection, so that scan only ever
+    // finds a PO the save would accept.
+    const keyOption = firstSelect.selectedOptions[0];
+    if (keyOption && keyOption.getAttribute('data-alloc-key')) {
+        const rackKey = keyOption.getAttribute('data-alloc-key');
+        const poSelect = tr.querySelector('.po-select');
+        Array.from(poSelect.options).forEach(function (option) {
+            if (option.value && option.getAttribute('data-alloc-key') !== rackKey) {
+                option.remove();
+            }
+        });
+    }
+
     if (preferredProduct) {
         const poSelect = tr.querySelector('.po-select');
         const productSelect = tr.querySelector('.dd-product-select');
@@ -897,6 +914,31 @@ function handlePoSelectChange(select) {
     // quantity step so the availability badge reflects the new pair.
     refreshProductOptions(row);
     handleProductChange(row.querySelector('.dd-product-select'));
+    updateRackLocation();
+}
+
+/**
+ * The Refinery Rack is where the first row's PO draws, so on a pooled load
+ * the field reports that rack and stays read-only rather than asking again.
+ * With no pool (the direct-PO fallback, where a supplier is typed by hand) or
+ * before a PO is chosen it stays manual.
+ */
+function updateRackLocation() {
+    const locationInput = document.getElementById('location');
+    if (!locationInput) return;
+
+    const firstPoSelect = document.querySelector('#drawdownRowsBody .po-select');
+    if (!firstPoSelect) return; // fallback form: manual entry stays
+
+    const option = firstPoSelect.selectedOptions[0];
+    const rack = option && option.value ? (option.getAttribute('data-rack') || '') : '';
+
+    if (rack !== '') {
+        locationInput.value = rack;
+        locationInput.readOnly = true;
+    } else {
+        locationInput.readOnly = false;
+    }
 }
 
 function calculateTotalDrawn() {
@@ -1018,6 +1060,7 @@ function handleTankerSelectChange(select) {
 
 document.addEventListener('DOMContentLoaded', function() {
     calculateTotalDrawn();
+    updateRackLocation();
     const channelSelect = document.getElementById('delivery_channel');
     if (channelSelect) {
         handleDeliveryChannelChange(channelSelect.value);

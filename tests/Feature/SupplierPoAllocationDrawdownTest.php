@@ -140,7 +140,7 @@ class SupplierPoAllocationDrawdownTest extends TestCase
     {
         // PO 1: 4,000L Diesel remaining
         $po1 = PurchaseOrder::create([
-            'po_number' => 'PO-PETRON-01',
+            'po_number' => 'PO-PETRON-B-01',
             'po_type' => 'STANDARD_REPLENISHMENT',
             'supplier_name' => 'Petron Bataan',
             'qty_ordered' => 4000,
@@ -153,11 +153,13 @@ class SupplierPoAllocationDrawdownTest extends TestCase
             'quantity_ordered' => 4000,
         ]);
 
-        // PO 2: 20,000L Diesel remaining
+        // PO 2: 20,000L Diesel remaining - a different PO of the SAME supplier
+        // at the SAME rack, because one lift draws at one rack and a split is
+        // only for when one PO does not hold the volume on its own.
         $po2 = PurchaseOrder::create([
-            'po_number' => 'PO-SHELL-02',
+            'po_number' => 'PO-PETRON-C-02',
             'po_type' => 'STANDARD_REPLENISHMENT',
-            'supplier_name' => 'Shell Tabangao',
+            'supplier_name' => 'Petron Bataan',
             'qty_ordered' => 20000,
             'request_status' => 'CONFIRMED',
             'status' => 'Pending',
@@ -187,7 +189,7 @@ class SupplierPoAllocationDrawdownTest extends TestCase
             'receiving_date' => now()->addDays(2)->format('Y-m-d'),
             'driver_name' => 'Carlos Santos',
             'plate_number' => 'XYZ-9988',
-            'location' => 'Multiple Refineries',
+            'location' => 'Petron Bataan Terminal',
             'atl_type' => 'DITC_ATL',
             'atl_number' => 'ATL-MULTI-01',
             'drawdowns' => [

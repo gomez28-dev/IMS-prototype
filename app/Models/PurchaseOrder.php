@@ -200,7 +200,7 @@ public function isFuelTrade(): bool
             ->createdPos()
             ->where('status', '!=', 'Cancelled')
             ->whereIn('request_status', self::VP_APPROVED_STATUSES)
-            ->with(['items.allocations', 'allocations'])
+            ->with(['items.allocations', 'allocations', 'supplier', 'warehouse'])
             ->get()
             ->filter(function (self $po) {
                 foreach (self::PRODUCTS as $product) {
@@ -212,6 +212,34 @@ public function isFuelTrade(): bool
                 return false;
             })
             ->values();
+    }
+
+    /**
+     * One supplier at one loading point - the key an ATL's PO rows must all
+     * agree on.
+     *
+     * DITC loads a whole tanker at a single refinery rack, so one ATL may not
+     * draw half its volume from one supplier's PO and half from another's, or
+     * from the same supplier at a different terminal. The loading location is
+     * the warehouse the PO was raised for, falling back to the supplier's own
+     * location when the PO has no warehouse; the supplier falls back to the
+     * name column for legacy POs that never linked to the registry.
+     */
+    public function allocationKey(): string
+    {
+        $supplierKey = (string) ($this->supplier_id ?: $this->supplier?->company_name ?: $this->supplier_name);
+        $locationKey = (string) ($this->warehouse_id ?: $this->supplier?->location);
+
+        return $supplierKey.'|'.$locationKey;
+    }
+
+    /**
+     * The loading location an ATL row draws at, for display and for the
+     * Refinery Rack field's auto-fill.
+     */
+    public function allocationRack(): ?string
+    {
+        return $this->warehouse?->name ?: $this->supplier?->location ?: null;
     }
 
     public function isBuyBack(): bool

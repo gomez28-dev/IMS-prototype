@@ -486,6 +486,42 @@ class StockOrderController extends Controller
         return null;
     }
 
+    /**
+     * Refuse a split ATL whose PO rows do not all pair on one supplier at one
+     * loading location.
+     *
+     * A lifted tanker is loaded at a single refinery rack, so cross-allocation
+     * - mixing suppliers, or one supplier across two terminals - is not
+     * something the system may save and later print on a single ATL. Splitting
+     * across POs of that same pairing stays legal: no single PO has to hold
+     * the whole volume on its own.
+     *
+     * @param  \Illuminate\Support\Collection<int, array{purchase_order_id: mixed, product: mixed, quantity: mixed}>  $drawdowns
+     */
+    private function guardSameRackDrawdowns(\Illuminate\Support\Collection $drawdowns): ?RedirectResponse
+    {
+        $pos = PurchaseOrder::with('supplier')
+            ->whereIn('id', $drawdowns->pluck('purchase_order_id'))
+            ->get()
+            ->keyBy('id');
+
+        $primary = $pos->get($drawdowns->first()['purchase_order_id']);
+
+        foreach ($drawdowns->skip(1) as $row) {
+            $po = $pos->get($row['purchase_order_id']);
+
+            if ($po && $primary && $po->allocationKey() !== $primary->allocationKey()) {
+                return back()->withInput()->withErrors([
+                    'drawdowns' => "Cross-allocation is not allowed: PO #{$po->po_number} is not the same supplier and "
+                        ."loading location as PO #{$primary->po_number}. One lift draws at one rack - "
+                        .'split this into one ATL per supplier visit.',
+                ]);
+            }
+        }
+
+        return null;
+    }
+
     public function storeFuelTradePo(Request $request, Order $order): RedirectResponse
     {
         if (!Auth::user()->canEditStockOrders()) {
@@ -586,7 +622,14 @@ class StockOrderController extends Controller
                 return $refusal;
             }
 
-            // 2. Verify each PO has sufficient remaining balance for that product
+            // 2. One load, one rack: a lifted tanker is loaded at a single
+            // refinery terminal, so every row must name the same supplier
+            // AND the same loading location as the first row.
+            if ($refusal = $this->guardSameRackDrawdowns($drawdowns)) {
+                return $refusal;
+            }
+
+            // 3. Verify each PO has sufficient remaining balance for that product
             foreach ($drawdowns as $dd) {
                 $targetPo = PurchaseOrder::find($dd['purchase_order_id']);
                 $avail = $targetPo->getAvailableBalanceForProduct($dd['product']);
@@ -1433,6 +1476,16 @@ public function storeStockRequestPo(Request $request): RedirectResponse
             PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL,
         ], true)) {
             return back()->with('error', 'Only ATLs awaiting approval can be approved.');
+        }
+
+        // Approval is the moment the record becomes official, and the official
+        // PDF prints the ATL number - a DITC-issued ATL may not be approved
+        // while DITC has not yet given it one. The number is recorded on the
+        // ATL itself the moment DITC issues it, and approving lifts then.
+        // Client-provided rows carried their number at creation, NONE-type
+        // rows never carry one.
+        if ($delivery->atl_type === 'DITC_ATL' && trim((string) $delivery->atl_number) === '') {
+            return back()->with('error', 'This DITC-issued ATL has no ATL Number yet - record it on the ATL (Pen) before approving.');
         }
 
         $delivery->update([

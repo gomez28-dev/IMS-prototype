@@ -32,6 +32,13 @@ class WetStockRequestAtlMultiPoTest extends TestCase
 
     protected Warehouse $warehouse;
 
+    /**
+     * One supplier per test. A split ATL's rows must pair on one supplier at
+     * one rack - the cross-allocation rule - so every PO a test raises comes
+     * from the same supplier.
+     */
+    protected Supplier $supplier;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -77,7 +84,7 @@ class WetStockRequestAtlMultiPoTest extends TestCase
      */
     protected function po(string $number, array $products): PurchaseOrder
     {
-        $supplier = Supplier::create([
+        $this->supplier ??= Supplier::create([
             'company_name' => 'Split Refinery '.rand(1000, 9999),
             'location' => 'Limay Terminal',
         ]);
@@ -85,8 +92,8 @@ class WetStockRequestAtlMultiPoTest extends TestCase
         $po = PurchaseOrder::create([
             'po_number' => $number,
             'po_type' => PurchaseOrder::TYPE_STANDARD_REPLENISHMENT,
-            'supplier_id' => $supplier->id,
-            'supplier_name' => $supplier->company_name,
+            'supplier_id' => $this->supplier->id,
+            'supplier_name' => $this->supplier->company_name,
             'po_date' => now()->toDateString(),
             'qty_ordered' => array_sum($products),
             'request_status' => 'CONFIRMED',
