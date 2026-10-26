@@ -639,13 +639,26 @@
                     </div>
                     <div class="col-md-6">
                         <div class="p-3 bg-light rounded-3">
-                            <span class="text-muted small d-block mb-1">Supplier PO Allocation (Kabangga ng ATL)</span>
-                            <span class="fw-bold text-primary fs-6">{{ $ftDelivery->allocations_summary }}</span>
+                            <span class="text-muted small d-block mb-1">Supplier PO Allocation</span>
+                            <span class="fw-bold text-primary fs-6">
+                                {{-- One line per PO: an ATL can draw on several
+                                     purchase orders, and the old single summary
+                                     string merged them into one jammed figure. --}}
+                                @forelse ($ftDelivery->allocations as $allocation)
+                                    <div class="d-flex justify-content-between align-items-start gap-3">
+                                        <span>{{ $allocation->purchaseOrder?->po_number ?: '—' }}</span>
+                                        <span class="text-dark">{{ $allocation->product }}</span>
+                                        <span class="text-dark">{{ number_format($allocation->quantity) }} L</span>
+                                    </div>
+                                @empty
+                                    —
+                                @endforelse
+                            </span>
                         </div>
                     </div>
                     <div class="col-md-6">
                         <div class="p-3 bg-light rounded-3">
-                            <span class="text-muted small d-block mb-1">Refinery / Supplier</span>
+                            <span class="text-muted small d-block mb-1">Supplier</span>
                             <span class="fw-bold text-dark fs-5">{{ $order->linkedPurchaseOrder?->supplier_name ?: '—' }}</span>
                         </div>
                     </div>
@@ -681,7 +694,7 @@
                     <div class="col-md-3">
                         <div class="p-3 bg-light rounded-3">
                             <span class="text-muted small d-block mb-1">ATL #</span>
-                            <span class="fw-bold text-success fs-5">{{ $ftDelivery->atl_number ?: ($ftDelivery->client_atl_number ?: 'DITC-ATL') }}</span>
+                            <span class="fw-bold text-success fs-5">{{ $ftDelivery->atl_number ?: ($ftDelivery->client_atl_number ?: 'Pending') }}</span>
                         </div>
                     </div>
                     <div class="col-md-3">
@@ -717,7 +730,7 @@
                     @if ($ftDelivery->location)
                     <div class="col-md-8">
                         <div class="p-3 bg-light rounded-3">
-                            <span class="text-muted small d-block mb-1">Pickup Depot Location</span>
+                            <span class="text-muted small d-block mb-1">Location</span>
                             <span class="fw-medium text-dark">{{ $ftDelivery->location }}</span>
                         </div>
                     </div>
@@ -749,11 +762,9 @@
                                 </div>
                             </div>
                         @else
-                            <div class="p-3 bg-light border rounded-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
-                                <div>
-                                    <span class="text-muted small fw-semibold d-block"><i class="bi bi-file-earmark-arrow-up me-1"></i>Scanned Physical Documents</span>
-                                    <span class="extra-small text-muted" style="font-size: 0.8rem;">No Google Drive link attached yet for stamped DR and dip sheet.</span>
-                                </div>
+                            {{-- No placeholder prose on an unattached ATL: the
+                                 attach action is the whole point of the card. --}}
+                            <div class="p-3 bg-light border rounded-3 d-flex justify-content-end">
                                 <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" data-bs-toggle="collapse" data-bs-target="#editDocCollapse">
                                     <i class="bi bi-plus-lg me-1"></i> Attach Google Drive Link
                                 </button>

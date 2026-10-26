@@ -29,9 +29,11 @@ class StockOrdersTemplateStructureTest extends TestCase
             'resources/views/wetstock/stock-orders/create-po.blade.php',
             'resources/views/wetstock/stock-orders/form.blade.php',
             'resources/views/wetstock/wet-stock-requests/create-atl.blade.php',
+            'resources/views/wetstock/stock-orders/atl-pdf.blade.php',
             'resources/views/wetstock/purchase-orders/index.blade.php',
             'resources/views/wetstock/sales-orders/index.blade.php',
             'resources/views/wetstock/sales-orders/show.blade.php',
+            'resources/views/deliveries/index.blade.php',
             'resources/views/layouts/app.blade.php',
         ];
     }
@@ -74,9 +76,11 @@ class StockOrdersTemplateStructureTest extends TestCase
             'create supplier po' => ['resources/views/wetstock/stock-orders/create-po.blade.php'],
             'issue atl form' => ['resources/views/wetstock/stock-orders/form.blade.php'],
             'request atl form' => ['resources/views/wetstock/wet-stock-requests/create-atl.blade.php'],
+            'atl pdf' => ['resources/views/wetstock/stock-orders/atl-pdf.blade.php'],
             'purchase orders list' => ['resources/views/wetstock/purchase-orders/index.blade.php'],
             'sales orders list' => ['resources/views/wetstock/sales-orders/index.blade.php'],
             'sales order detail' => ['resources/views/wetstock/sales-orders/show.blade.php'],
+            'deliveries page' => ['resources/views/deliveries/index.blade.php'],
             'app layout' => ['resources/views/layouts/app.blade.php'],
         ];
     }

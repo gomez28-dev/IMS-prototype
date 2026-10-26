@@ -203,50 +203,65 @@
             <td class="meta-label">COMPANY</td>
             <td class="meta-value">{{ $po?->supplier_name ?: ($delivery->stockRequest?->requester?->name ?: '—') }}</td>
             <td class="meta-label">S.O. NO.</td>
-            <td class="meta-value">{{ $delivery->so_number ?: '—' }}</td>
+            <td class="meta-value">{{ $delivery->order?->formatted_so_number ?: ($delivery->so_number ?: ($delivery->stockRequest?->request_number ?: '—')) }}</td>
         </tr>
         <tr>
             <td class="meta-label">DESTINATION / SITE</td>
-            <td class="meta-value" colspan="3">{{ optional($po?->warehouse)->name ?: (optional($delivery->stockRequest?->warehouse)->name ?: ($po?->isFuelTrade() ? 'Direct to Client Pick-Up' : '—')) }}</td>
+            <td class="meta-value" colspan="3">{{ $delivery->location ?: '—' }}</td>
         </tr>
     </table>
 
-    <!-- Product & Delivery Details Table -->
+    <!-- Product & Delivery Details Table: one row per PO allocation, the way
+         the on-screen ATL record lists them. Driver, plate and date are
+         attributes of the lift itself, so they sit on the first row only;
+         the destination above carries the location. -->
     <table class="details-table">
         <thead>
             <tr>
-                <th style="width: 14%;">P.O. NO.</th>
-                <th style="width: 14%;">PRODUCT</th>
-                <th style="width: 12%;">QUANTITY</th>
-                <th style="width: 17%;">DRIVER'S NAME</th>
-                <th style="width: 13%;">PLATE NO.</th>
-                <th style="width: 14%;">PICK UP DATE</th>
-                <th style="width: 16%;">LOCATION</th>
+                <th style="width: 22%;">P.O. NO.</th>
+                <th style="width: 22%;">PRODUCT</th>
+                <th style="width: 16%;">QUANTITY</th>
+                <th style="width: 20%;">DRIVER'S NAME</th>
+                <th style="width: 20%;">PLATE NO.</th>
+                <th style="width: 24%;">PICK UP DATE</th>
             </tr>
         </thead>
         <tbody>
-            <tr>
-                <td style="font-weight: 700;">
-                    @if ($delivery->allocations && $delivery->allocations->isNotEmpty())
-                        {{ $delivery->allocations->map(fn($a) => $a->purchaseOrder?->po_number)->filter()->unique()->implode(', ') ?: ($po->po_number ?: '—') }}
-                        @if ($delivery->allocations->count() > 1)
-                            <div style="font-size: 8px; color: #555; font-weight: normal; margin-top: 2px;">
-                                {{ $delivery->allocations_summary }}
-                            </div>
-                        @endif
+            @forelse ($delivery->allocations as $allocation)
+                <tr>
+                    <td style="font-weight: 700;">
+                        {{ $allocation->purchaseOrder?->po_number ?: ($po?->po_number ?: '—') }}
+                    </td>
+                    <td><strong style="color: #222;">{{ $allocation->product }}</strong></td>
+                    <td style="font-weight: 700; color: #0d6efd;">{{ number_format($allocation->quantity) }} L</td>
+                    @if ($loop->first)
+                        <td class="text-left">{{ $delivery->driver_name ?: '—' }}</td>
+                        <td><strong>{{ $delivery->plate_number ?: '—' }}</strong></td>
+                        <td>
+                            {{ $delivery->receiving_date ? \Carbon\Carbon::parse($delivery->receiving_date)->format('F d, Y') : '—' }}
+                        </td>
                     @else
-                        {{ $po?->po_number ?: ($delivery->stockRequest?->request_number ?: '—') }}
+                        <td></td>
+                        <td></td>
+                        <td></td>
                     @endif
-                </td>
-                <td><strong style="color: #222;">{{ $delivery->product }}</strong></td>
-                <td style="font-weight: 700; color: #0d6efd;">{{ number_format($delivery->qty_to_receive) }} L</td>
-                <td class="text-left">{{ $delivery->driver_name ?: '—' }}</td>
-                <td><strong>{{ $delivery->plate_number ?: '—' }}</strong></td>
-                <td>
-                    {{ $delivery->receiving_date ? \Carbon\Carbon::parse($delivery->receiving_date)->format('F d, Y') : '—' }}
-                </td>
-                <td class="text-left">{{ $delivery->location ?: '—' }}</td>
-            </tr>
+                </tr>
+            @empty
+                {{-- Legacy rows written before allocations existed still
+                     print, from the delivery's own single product line. --}}
+                <tr>
+                    <td style="font-weight: 700;">
+                        {{ $po?->po_number ?: ($delivery->stockRequest?->request_number ?: '—') }}
+                    </td>
+                    <td><strong style="color: #222;">{{ $delivery->product }}</strong></td>
+                    <td style="font-weight: 700; color: #0d6efd;">{{ number_format($delivery->qty_to_receive) }} L</td>
+                    <td class="text-left">{{ $delivery->driver_name ?: '—' }}</td>
+                    <td><strong>{{ $delivery->plate_number ?: '—' }}</strong></td>
+                    <td>
+                        {{ $delivery->receiving_date ? \Carbon\Carbon::parse($delivery->receiving_date)->format('F d, Y') : '—' }}
+                    </td>
+                </tr>
+            @endforelse
         </tbody>
     </table>
 
