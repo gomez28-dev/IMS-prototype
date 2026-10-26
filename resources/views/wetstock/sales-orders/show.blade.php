@@ -14,23 +14,8 @@
                         <li class="breadcrumb-item active" aria-current="page">{{ $order->formatted_so_number }}</li>
                     </ol>
                 </nav>
-                <h3 class="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                <h3 class="fw-bold text-dark mb-0">
                     <span><i class="bi bi-patch-check text-primary me-2"></i>ATL Details &mdash; {{ $order->formatted_so_number }}</span>
-                    @php
-                        // The order's own line may predate the product_type column,
-                        // in which case the product is recovered from the PO it
-                        // raised or an ATL already issued against it.
-                        $orderProduct = $order->resolvedProduct();
-                        $orderProductCode = $order->resolvedProductCode();
-                        $chipStyles = [
-                            'U' => 'background:#dcfce7;color:#166534;border:1px solid #bbf7d0;',
-                            'D' => 'background:#e0e7ff;color:#3730a3;border:1px solid #c7d2fe;',
-                            'P' => 'background:#fee2e2;color:#991b1b;border:1px solid #fecaca;',
-                        ];
-                    @endphp
-                    <span class="badge rounded-pill fw-semibold"
-                          style="{{ $chipStyles[$orderProductCode] ?? 'background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb;' }}"
-                          title="Product for this order">{{ $orderProductCode ? $orderProductCode.' - ' : '' }}{{ $orderProduct }}</span>
                 </h3>
                 <p class="text-muted small mb-0 mt-1">{{ $order->account }}</p>
             </div>
@@ -112,9 +97,9 @@
         {{-- The per-product requirement block that used to sit here is gone.
              The supervisor removed it as redundant, and it was the last place
              the page read a product off the order's own line, which is how
-             legacy orders came to say "Unspecified". The product now resolves
-             through Order::resolvedProduct() and is shown as the chip in the
-             title above. --}}
+             legacy orders came to say "Unspecified". The title chip that
+             displayed that resolved product left with the round-6 table
+             cleanup; the products themselves read off the ATL records. --}}
 
         {{-- ATLs --}}
         <div class="card card-custom border-0 shadow-sm">
@@ -151,9 +136,7 @@
                     <table class="table table-hover align-middle mb-0">
                         <thead class="bg-light">
                             <tr>
-                                <th class="ps-3 py-3">REF #</th>
-                                <th class="py-3">Type</th>
-                                <th class="py-3">ATL #</th>
+                                <th class="ps-3 py-3">ATL #</th>
                                 <th class="py-3">PO #</th>
                                 <th class="py-3">Pick Up Date</th>
                                 <th class="py-3">Product / Qty</th>
@@ -175,14 +158,7 @@
                                     $poNumbers = $poNumbers !== '' ? $poNumbers : ($atl->purchaseOrder->po_number ?? '—');
                                 @endphp
                                 <tr>
-                                    <td class="ps-3 fw-bold text-dark">
-                                        {{-- REF# says what the ATL serves: SO-FT or SO-BB. --}}
-                                        {{ $atl->refNumber() }}
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-light text-dark border">{{ $atl->typeLabel() }}</span>
-                                    </td>
-                                    <td class="small">
+                                    <td class="ps-3 small">
                                         {{ $atl->atl_number ?: ($atl->client_atl_number ?: 'Pending') }}
                                         @if ($atl->client_atl_number && $atl->atl_number)
                                             <div class="small text-muted">Client: {{ $atl->client_atl_number }}</div>
@@ -191,24 +167,71 @@
                                     <td class="small">{{ $poNumbers }}</td>
                                     <td class="small">{{ $atl->receiving_date ? $atl->receiving_date->format('M d, Y') : '—' }}</td>
                                     <td class="small">
+                                        @php
+                                            // The same U / D / P shorthand the chips use: a
+                                            // product name the shorthand knows becomes its
+                                            // code, anything else stays readable as-is.
+                                            $productCodes = \App\Models\Order::PRODUCT_TYPES;
+                                        @endphp
                                         @if ($breakdown === [])
-                                            <span class="text-muted">{{ $atl->product ?: '—' }} &mdash; {{ number_format($atl->qty_to_receive) }} L</span>
+                                            <span class="text-muted">{{ array_search($atl->product, $productCodes, true) ?: ($atl->product ?: '—') }} - {{ number_format($atl->qty_to_receive) }}</span>
                                         @else
                                             @foreach ($breakdown as $product => $qty)
-                                                <div><strong>{{ $product }}</strong> &mdash; {{ number_format($qty) }} L</div>
+                                                <div><strong>{{ array_search($product, $productCodes, true) ?: $product }}</strong> - {{ number_format($qty) }}</div>
                                             @endforeach
                                         @endif
                                     </td>
                                     <td>
-                                        @if ($atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_LIFTED)
-                                            <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1">Lifted</span>
-                                        @elseif ($atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_CANCELLED)
-                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2 py-1">Cancelled</span>
+                                        @if (Auth::user()->canMarkAtlLifted())
+                                            @php
+                                                // The transitions the record can honestly make
+                                                // from here - the states it cannot are offered
+                                                // disabled rather than hidden, so the reader can
+                                                // still see what is possible further down the line.
+                                                $liftable = $atl->status === 'Active'
+                                                    && $atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_UNLIFTED
+                                                    && ! $atl->received_at;
+                                                $unliftable = $atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_LIFTED;
+                                                $cancellable = $atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_UNLIFTED
+                                                    && ! $atl->received_at;
+                                                // A tanker pick-up with no truck recorded cannot
+                                                // lift from the bare control: Lifted opens the
+                                                // confirm modal instead, so the auto stock-in
+                                                // gets its tanker answer.
+                                                $needsTankerModal = $liftable
+                                                    && $atl->isTankerPickup()
+                                                    && ! $atl->storage_tank_id;
+                                            @endphp
+                                            @if ($atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_CANCELLED)
+                                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2 py-1" title="A cancelled ATL stays cancelled">Cancelled</span>
+                                            @else
+                                                <form method="POST" action="{{ route('stock-orders.lift-status', $atl->id) }}" class="lift-status-form">
+                                                    @csrf
+                                                    <select name="lift_status"
+                                                            class="form-select form-select-sm lift-status-select"
+                                                            data-atl-id="{{ $atl->id }}"
+                                                            data-current="{{ $atl->lift_status }}"
+                                                            @if ($needsTankerModal) data-requires-modal="1" @endif
+                                                            aria-label="Lift status of this ATL">
+                                                        <option value="{{ \App\Models\PurchaseOrderDelivery::LIFT_UNLIFTED }}"
+                                                                @if ($atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_UNLIFTED) selected
+                                                                @elseif (! $unliftable) disabled @endif>Unlifted</option>
+                                                        <option value="{{ \App\Models\PurchaseOrderDelivery::LIFT_LIFTED }}"
+                                                                @if ($atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_LIFTED) selected
+                                                                @elseif (! $liftable) disabled @endif>Lifted</option>
+                                                        <option value="{{ \App\Models\PurchaseOrderDelivery::LIFT_CANCELLED }}"
+                                                                @if (! $cancellable) disabled @endif>Cancelled</option>
+                                                    </select>
+                                                </form>
+                                            @endif
                                         @else
-                                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2 py-1">Unlifted</span>
-                                        @endif
-                                        @if ($atl->driver_name)
-                                            <div class="extra-small text-muted mt-1">{{ $atl->driver_name }} @if ($atl->plate_number)({{ $atl->plate_number }})@endif</div>
+                                            @if ($atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_LIFTED)
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1">Lifted</span>
+                                            @elseif ($atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_CANCELLED)
+                                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2 py-1">Cancelled</span>
+                                            @else
+                                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2 py-1">Unlifted</span>
+                                            @endif
                                         @endif
                                     </td>
                                     <td class="text-center">
@@ -225,11 +248,9 @@
                                         @endif
                                     </td>
                                     <td class="pe-3 text-end">
-                                        {{-- Three actions now: View opens the ATL pop-up,
-                                             Pen opens the ATL form, and Lift/Unlift acts on
-                                             the record itself - one per row, so a second ATL
-                                             can be lifted without the page-level button only
-                                             ever reaching the first. --}}
+                                        {{-- Two actions: View opens the ATL pop-up, Pen opens
+                                             the ATL form. The lift state lives in the Status
+                                             column's control, not here. --}}
                                         <div class="d-inline-flex gap-1 justify-content-end">
                                             <button type="button" class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary"
                                                     data-bs-toggle="modal" data-bs-target="#atlDetailModal{{ $atl->id }}"
@@ -252,27 +273,6 @@
                                                         <i class="bi bi-pencil me-1"></i> Pen
                                                     </a>
                                                 @endif
-                                            @endif
-                                            {{-- The lift that used to hang on the header: same
-                                                 eligibility (dispatched and not yet marked, old
-                                                 rows counting as unlifted), but attached to the
-                                                 record it acts on. --}}
-                                            @if (Auth::user()->canMarkAtlLifted()
-                                                && $atl->status === 'Active'
-                                                && $atl->lift_status !== \App\Models\PurchaseOrderDelivery::LIFT_LIFTED
-                                                && $atl->lift_status !== \App\Models\PurchaseOrderDelivery::LIFT_CANCELLED)
-                                                <button type="button" class="btn btn-sm btn-success rounded-pill px-2 py-1"
-                                                        data-bs-toggle="modal" data-bs-target="#confirmLiftModal{{ $atl->id }}"
-                                                        title="Mark Picked Up">
-                                                    <i class="bi bi-check-circle me-1"></i> Mark Picked Up
-                                                </button>
-                                            @elseif (Auth::user()->canMarkAtlLifted()
-                                                && $atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_LIFTED)
-                                                <button type="button" class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-warning-emphasis"
-                                                        data-bs-toggle="modal" data-bs-target="#unliftModal{{ $atl->id }}"
-                                                        title="Reverse the recorded lift">
-                                                    <i class="bi bi-arrow-counterclockwise me-1"></i> Mark Unlifted
-                                                </button>
                                             @endif
                                         </div>
                                     </td>
@@ -393,13 +393,15 @@
         </div>
     </div>
 
-    {{-- Lift confirmation: the same modal that used to be rendered once for
-         the page's first liftable ATL, now rendered once per liftable row so
-         any record can be marked picked up from its own action. --}}
+    {{-- Lift confirmation: the records table's control lifts most rows
+         directly. This modal stays for the one case that cannot lift blind -
+         a tanker pick-up with no truck recorded - because the auto stock-in
+         needs the tanker answer the control cannot supply. --}}
     @if (Auth::user()->canMarkAtlLifted()
         && $atl->status === 'Active'
-        && $atl->lift_status !== \App\Models\PurchaseOrderDelivery::LIFT_LIFTED
-        && $atl->lift_status !== \App\Models\PurchaseOrderDelivery::LIFT_CANCELLED)
+        && $atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_UNLIFTED
+        && $atl->isTankerPickup()
+        && ! $atl->storage_tank_id)
         <div class="modal fade" id="confirmLiftModal{{ $atl->id }}" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content rounded-4 border-0 shadow">
@@ -475,53 +477,34 @@
         </div>
     @endif
 
-    {{-- Reversal. Unlifting unwinds everything the lift wrote - the record,
-         any tanker stock it stocked in, the PO flow state, the order status
-         and Module 1's delivery mirror - so the warning lists what happens
-         instead of implying this is a one-column edit. --}}
-    @if (Auth::user()->canMarkAtlLifted()
-        && $atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_LIFTED)
-        <div class="modal fade" id="unliftModal{{ $atl->id }}" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content rounded-4 border-0 shadow">
-                    <div class="modal-header border-0 pb-0">
-                        <h5 class="modal-title fw-bold text-dark">
-                            <i class="bi bi-arrow-counterclockwise text-warning-emphasis me-1"></i> Mark Unlifted
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <form method="POST" action="{{ route('stock-orders.unlift-atl', $atl->id) }}">
-                        @csrf
-                        <div class="modal-body pt-3">
-                            <div class="p-3 bg-light rounded-3 mb-3">
-                                <div class="fw-bold fs-5 text-primary mb-1">{{ number_format($atl->qty_to_receive) }} L of {{ $atl->product }}</div>
-                                <div class="small text-muted">
-                                    Lifted {{ $atl->lifted_at ? $atl->lifted_at->format('M d, Y') : '' }}
-                                    @if ($atl->lifter)
-                                        by <span class="fw-semibold text-dark">{{ $atl->lifter->name }}</span>
-                                    @endif
-                                </div>
-                            </div>
-                            <div class="alert alert-warning border-0 rounded-3 small py-2 mb-2">
-                                <i class="bi bi-exclamation-triangle me-1"></i>
-                                This reverses the recorded lift, not just the label: the ATL returns to
-                                <strong>Unlifted</strong>, the linked Purchase Order goes back to
-                                <strong>For Delivery</strong> (while no other ATL of it is still lifted), the
-                                Sales Order returns to <strong>Active</strong> when nothing on it is lifted
-                                anymore, any tanker stock the lift recorded is removed, and the delivery
-                                record in Sales Documentation is deleted so its Remaining balance goes back up.
-                            </div>
-                        </div>
-                        <div class="modal-footer border-0 pt-0">
-                            <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" class="btn btn-warning rounded-pill px-4">
-                                <i class="bi bi-arrow-counterclockwise me-1"></i> Mark Unlifted
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    @endif
+ {{-- The reversal lost its modal with the round-6 control: choosing
+         Unlifted posts directly from the lift-status select, running the
+         same shared reversal. --}}
 @endforeach
 @endsection
+
+<script>
+    // The lift-status control: a change of state is a POST, except for the
+    // Lifted choice on a tanker pick-up with no truck recorded, which opens
+    // the confirm modal instead so the tanker is asked for first.
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.lift-status-select').forEach(function (select) {
+            select.addEventListener('change', function () {
+                if (select.value === select.getAttribute('data-current')) {
+                    return;
+                }
+
+                if (select.value === 'LIFTED' && select.dataset.requiresModal !== undefined) {
+                    select.value = select.getAttribute('data-current');
+                    var modal = document.getElementById('confirmLiftModal' + select.getAttribute('data-atl-id'));
+                    if (modal) {
+                        bootstrap.Modal.getOrCreateInstance(modal).show();
+                    }
+                    return;
+                }
+
+                select.closest('form').submit();
+            });
+        });
+    });
+</script>

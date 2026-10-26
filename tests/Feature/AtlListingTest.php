@@ -128,9 +128,16 @@ class AtlListingTest extends TestCase
         $response->assertSee($order->so_number);
         $response->assertSee('ATL-DETAIL-1');
         $response->assertSee('PO-DETAIL');
-        $response->assertSee('Juan Dela Cruz');
-        $response->assertSee('NBD-1234');
         $response->assertSee('Unlifted');
+
+        // The driver and plate live in the pop-up now, not inside a status
+        // cell on the row.
+        $content = $response->getContent();
+        $modalStart = strpos($content, 'atlDetailModal'.$atl->id);
+        $this->assertNotFalse($modalStart, 'The ATL pop-up should be present');
+        $popUp = substr($content, $modalStart);
+        $this->assertStringContainsString('Juan Dela Cruz', $popUp);
+        $this->assertStringContainsString('NBD-1234', $popUp);
     }
 
     public function test_atl_details_reports_totals_per_product(): void

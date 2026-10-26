@@ -865,18 +865,38 @@ class StockOrderController extends Controller
             'storage_tank_id' => ['nullable', 'exists:storage_tanks,id'],
         ]);
 
+        return $this->performAtlLift(
+            $delivery,
+            $validated,
+            isset($validated['storage_tank_id']) ? (int) $validated['storage_tank_id'] : null
+        );
+    }
+
+    /**
+     * The lift pipeline the two lift entrances share.
+     *
+     * complete-fuel-trade arrives from the confirm modal with the supplier
+     * document serials and, for a tanker pick-up, the tanker to auto-stock
+     * into; the records table's lift-status control arrives without either
+     * for records that already carry their truck. Both landing here is what
+     * keeps the modal's answer and the control's answer from drifting apart.
+     *
+     * @param  array<string, mixed>  $docFields
+     */
+    private function performAtlLift(PurchaseOrderDelivery $delivery, array $docFields, ?int $tankId): RedirectResponse
+    {
         $updateData = [];
-        if (!empty($validated['supplier_dr_number'])) {
-            $updateData['supplier_dr_number'] = $validated['supplier_dr_number'];
+        if (!empty($docFields['supplier_dr_number'])) {
+            $updateData['supplier_dr_number'] = $docFields['supplier_dr_number'];
         }
-        if (!empty($validated['supplier_so_number'])) {
-            $updateData['supplier_so_number'] = $validated['supplier_so_number'];
+        if (!empty($docFields['supplier_so_number'])) {
+            $updateData['supplier_so_number'] = $docFields['supplier_so_number'];
         }
-        if (!empty($validated['scanned_doc_url'])) {
-            $updateData['scanned_doc_url'] = $validated['scanned_doc_url'];
+        if (!empty($docFields['scanned_doc_url'])) {
+            $updateData['scanned_doc_url'] = $docFields['scanned_doc_url'];
         }
 
-        $tankId = $validated['storage_tank_id'] ?? $delivery->storage_tank_id;
+        $tankId = $tankId ?: ($delivery->storage_tank_id ? (int) $delivery->storage_tank_id : null);
 
         // Fuel Trade and Buy Back pick-ups are lifted straight to the client at
         // the supplier, so they never stock into a tank. Tank auto-stocking
@@ -974,6 +994,18 @@ class StockOrderController extends Controller
             abort(403, 'Unauthorized to reverse an ATL lift.');
         }
 
+        return $this->performAtlUnlift($delivery);
+    }
+
+    /**
+     * The reversal pipeline the two unlift entrances share.
+     *
+     * The unlift route and the records table's lift-status control both land
+     * here - the seam exists so the control's Unlifted choice and the legacy
+     * route cannot reverse differently.
+     */
+    private function performAtlUnlift(PurchaseOrderDelivery $delivery): RedirectResponse
+    {
         if ($delivery->lift_status !== PurchaseOrderDelivery::LIFT_LIFTED) {
             return back()->with('error', 'Only a lifted ATL can be marked Unlifted.');
         }
@@ -1050,6 +1082,86 @@ class StockOrderController extends Controller
         return back()->with('success', 'ATL '
             .($delivery->atl_number ?: ($delivery->client_atl_number ?: '#'.$delivery->id))
             .' is marked Unlifted. The lift records and the Module 1 mirror have been reversed.');
+    }
+
+    /**
+     * The lift-status control on the ATL records table.
+     *
+     * One select per row replaces the round-5 Mark Picked Up / Mark Unlifted
+     * buttons: Lifted runs the same pipeline the confirm modal's route runs,
+     * Unlifted runs the same reversal the unlift route runs, and Cancelled
+     * retires a record the supplier will never load - its draw releases back
+     * to the order the same way a rejected ATL releases its volume.
+     *
+     * A tanker pick-up that has not been assigned a truck never lifts from
+     * here: the control marks its Lifted choice with data-requires-modal and
+     * the confirm modal (still posting to complete-fuel-trade) asks for the
+     * tanker first.
+     */
+    public function updateLiftStatus(Request $request, PurchaseOrderDelivery $delivery): RedirectResponse
+    {
+        // Same allowlist as the two routes this one fronts for.
+        if (!Auth::user()->canMarkAtlLifted()) {
+            abort(403, 'Unauthorized to change an ATL lift status.');
+        }
+
+        $validated = $request->validate([
+            'lift_status' => ['required', 'string', 'in:'
+                .PurchaseOrderDelivery::LIFT_UNLIFTED.','
+                .PurchaseOrderDelivery::LIFT_LIFTED.','
+                .PurchaseOrderDelivery::LIFT_CANCELLED],
+        ]);
+
+        return match ($validated['lift_status']) {
+            PurchaseOrderDelivery::LIFT_LIFTED => $delivery->lift_status === PurchaseOrderDelivery::LIFT_LIFTED
+                ? back()->with('error', 'This ATL is already marked Lifted.')
+                : $this->performAtlLift($delivery, [], $delivery->storage_tank_id ? (int) $delivery->storage_tank_id : null),
+            PurchaseOrderDelivery::LIFT_UNLIFTED => $this->performAtlUnlift($delivery),
+            default => $this->performAtlCancel($delivery),
+        };
+    }
+
+    /**
+     * Retire an unlifted ATL - the record is not going to happen.
+     *
+     * The draw it made releases back to the order because the row stops
+     * being an Active draw (the same release a rejected ATL gets on
+     * Order::drawnByProduct). The PO is left in flight, free for another ATL
+     * to be raised against. A lifted record must be reversed first, because
+     * its lift already moved real stock; a received one carries ledgers, so
+     * cancelling it is refused outright.
+     */
+    private function performAtlCancel(PurchaseOrderDelivery $delivery): RedirectResponse
+    {
+        $label = $delivery->atl_number ?: ($delivery->client_atl_number ?: '#'.$delivery->id);
+        $order = $delivery->order ?: $delivery->purchaseOrder?->linkedOrder;
+
+        if ($delivery->lift_status === PurchaseOrderDelivery::LIFT_LIFTED) {
+            return back()->with('error', "ATL {$label} is lifted - mark it Unlifted before cancelling it.");
+        }
+
+        if ($delivery->received_at) {
+            return back()->with('error', 'This ATL has been received into stock, so it cannot be cancelled.');
+        }
+
+        if ($delivery->lift_status === PurchaseOrderDelivery::LIFT_CANCELLED) {
+            return back()->with('error', "ATL {$label} is already cancelled.");
+        }
+
+        $delivery->update([
+            'lift_status' => PurchaseOrderDelivery::LIFT_CANCELLED,
+            'status' => 'Cancelled',
+        ]);
+
+        AuditLog::create([
+            'admin_id' => Auth::id(),
+            'action' => 'updated',
+            'description' => 'Cancelled ATL '.$label
+                .($order ? ' for SO '.$order->formatted_so_number : '')
+                .': its draw was released back to the Sales Order.',
+        ]);
+
+        return back()->with('success', "ATL {$label} is marked Cancelled. The volume it drew is back on the Sales Order's remaining balance.");
     }
 
     public function updateDeliveryDocs(Request $request, PurchaseOrderDelivery $delivery): RedirectResponse

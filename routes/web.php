@@ -241,6 +241,10 @@ Route::post('/warehouses/{warehouse}/tanks', [WetStock\StorageTankController::cl
         Route::post('/fuel-trade/{order}/store-po', [WetStock\StockOrderController::class, 'storeFuelTradePo'])->name('store-fuel-trade-po');
         Route::post('/deliveries/{delivery}/complete-fuel-trade', [WetStock\StockOrderController::class, 'completeFuelTrade'])->name('complete-fuel-trade');
         Route::post('/deliveries/{delivery}/unlift', [WetStock\StockOrderController::class, 'unliftAtl'])->name('unlift-atl');
+        // The lift-status control on the ATL records: one select per row whose
+        // Lifted / Unlifted / Cancelled choices run the same pipelines as the
+        // two routes above.
+        Route::post('/deliveries/{delivery}/lift-status', [WetStock\StockOrderController::class, 'updateLiftStatus'])->name('lift-status');
         Route::post('/deliveries/{delivery}/update-docs', [WetStock\StockOrderController::class, 'updateDeliveryDocs'])->name('update-docs');
         Route::get('/{purchaseOrder}/prepare', [WetStock\StockOrderController::class, 'editRequest'])->name('edit-request');
         // A Module 2 request becomes a purchase order when Purchasing prepares

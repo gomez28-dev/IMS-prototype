@@ -236,7 +236,7 @@ class SalesOrderProductResolutionTest extends TestCase
         $this->assertStringNotContainsString('Unspecified', $html);
     }
 
-    public function test_the_page_still_says_unspecified_when_there_is_nothing_to_go_on(): void
+    public function test_the_page_claims_no_product_when_there_is_nothing_to_go_on(): void
     {
         $order = $this->order(null);
 
@@ -245,6 +245,12 @@ class SalesOrderProductResolutionTest extends TestCase
             ->assertOk()
             ->getContent();
 
-        $this->assertStringContainsString('Unspecified', $html);
+        // The title chip used to resolve the product ("Unspecified" for a
+        // legacy untyped order); the round-6 table cleanup removed it. The
+        // summary cards carry fixed product rows, so nothing on the page
+        // claims a product the order never typed.
+        $this->assertStringNotContainsString('Unspecified', $html);
+        // The volume story is unchanged: the order still reports its size.
+        $this->assertStringContainsString('80,000', $html);
     }
 }

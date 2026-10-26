@@ -11,8 +11,10 @@ use App\Models\Supplier;
 use Tests\TestCase;
 
 /**
- * "Mark Picked Up" moved from the Purchase Orders list to the Sales Orders
- * detail page, because the Purchase Orders list now shows created POs only.
+ * The tanker-pickup lift keeps its confirm modal on the Sales Orders detail
+ * page: a Doyen pick-up without an assigned truck cannot lift from the bare
+ * lift-status control, because the auto stock-in needs the tanker answer
+ * first. The control's Lifted choice opens the modal instead.
  */
 class MarkPickedUpLocationTest extends TestCase
 {
@@ -85,7 +87,7 @@ class MarkPickedUpLocationTest extends TestCase
         return $order->fresh();
     }
 
-    public function test_the_sales_order_page_offers_mark_picked_up(): void
+    public function test_the_sales_order_page_offers_the_tanker_confirm_modal(): void
     {
         $order = $this->fuelTradeOrder();
 
@@ -93,12 +95,15 @@ class MarkPickedUpLocationTest extends TestCase
             ->get(route('stock-orders.sales-orders.show', $order->id));
 
         $response->assertStatus(200);
-        $response->assertSee('Mark Picked Up');
         $response->assertSee('confirmLiftModal', false);
         $response->assertSee('Confirm Pick Up / Lift');
+        $response->assertSee('data-requires-modal', false);
+
+        // The round-5 per-row buttons are gone; the control replaced them.
+        $response->assertDontSee('Mark Picked Up');
     }
 
-    public function test_the_lift_form_posts_to_the_lift_route(): void
+    public function test_the_tanker_modal_still_posts_to_the_full_lift_route(): void
     {
         $order = $this->fuelTradeOrder();
         $delivery = PurchaseOrderDelivery::where('order_id', $order->id)->firstOrFail();
@@ -109,7 +114,7 @@ class MarkPickedUpLocationTest extends TestCase
         $response->assertSee(route('stock-orders.complete-fuel-trade', $delivery->id), false);
     }
 
-    public function test_an_already_lifted_atl_offers_no_further_lift(): void
+    public function test_an_already_lifted_atl_offers_no_confirm_modal(): void
     {
         $order = $this->fuelTradeOrder();
         PurchaseOrderDelivery::where('order_id', $order->id)
@@ -120,9 +125,12 @@ class MarkPickedUpLocationTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertDontSee('Mark Picked Up');
+        // Scoped to real markup: the page's inline script mentions the modal
+        // id it opens for the liftable rows.
+        $response->assertDontSee('id="confirmLiftModal', false);
     }
 
-    public function test_the_lift_stays_with_roles_allowed_to_mark_an_atl_lifted(): void
+    public function test_the_control_stays_with_roles_allowed_to_mark_an_atl_lifted(): void
     {
         $order = $this->fuelTradeOrder();
 
@@ -135,7 +143,9 @@ class MarkPickedUpLocationTest extends TestCase
 
         // The route itself is still gated, whatever the page shows.
         $this->actingAs($sales)
-            ->post(route('stock-orders.complete-fuel-trade', PurchaseOrderDelivery::where('order_id', $order->id)->value('id')))
+            ->post(route('stock-orders.lift-status', PurchaseOrderDelivery::where('order_id', $order->id)->value('id')), [
+                'lift_status' => PurchaseOrderDelivery::LIFT_LIFTED,
+            ])
             ->assertForbidden();
 
         // And the Sales role has no Module 3 access at all.

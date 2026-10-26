@@ -18,13 +18,12 @@ use App\Models\Warehouse;
 /**
  * Lift and unlift, per ATL record, on the Sales Order details page.
  *
- * The lift already existed - one button at the top of the page, bound to the
- * FIRST active unlifted ATL - but a second ATL could not be lifted from that
- * page, and once a lift was recorded there was no way to reverse it at all.
- * Now every active unlifted row carries its own lift action, every lifted row
- * carries Mark Unlifted, and unlifting reverses everything the lift wrote:
- * the ATL row, the tanker stock-in, the PO flow state, the order status, and
- * the Module 1 delivery mirror that M1's Delivered/Remaining figures read.
+ * Each row now carries a lift-status control - the round-5 per-row Mark
+ * Picked Up / Mark Unlifted buttons retired - posting to the shared
+ * lift-status endpoint: Lifted runs the lift pipeline, Unlifted reverses
+ * everything the lift wrote (the ATL row, the tanker stock-in, the PO flow
+ * state, the order status, and the Module 1 delivery mirror that M1's
+ * Delivered/Remaining figures read), and Cancelled releases the draw.
  */
 class AtlLiftToggleTest extends TestCase
 {
@@ -130,43 +129,48 @@ class AtlLiftToggleTest extends TestCase
 
     // ---- Every record carries its own action --------------------------------
 
-    public function test_every_active_unlifted_row_carries_its_own_lift_modal(): void
+    public function test_every_active_unlifted_row_carries_its_own_lift_status_control(): void
     {
         [$order, $po, $rows] = $this->fuelTradeOrder(2);
 
         $html = $this->show($order)->assertOk()->getContent();
 
-        // Two ATLs waiting to be lifted, and each one gets its own modal
-        // rather than the page offering just the first. Each render carries
-        // the string twice (button target + modal id), so count modal
-        // definitions only.
-        $this->assertSame(2, substr_count($html, 'id="confirmLiftModal'), 'Each liftable row needs its own modal.');
+        // Two ATLs waiting to be lifted, and each one gets its own control
+        // posting to the shared lift-status endpoint.
+        $this->assertSame(2, substr_count($html, 'lift-status-form'), 'Each liftable row needs its own control.');
 
         foreach ($rows as $row) {
             $this->assertStringContainsString(
-                route('stock-orders.complete-fuel-trade', $row->id),
+                route('stock-orders.lift-status', $row->id),
                 $html,
-                'Row '.$row->id.' must post to its own lift action.'
+                'Row '.$row->id.' must post to its own lift-status action.'
             );
         }
+
+        // These are direct client rack pick-ups: no tanker to choose, so the
+        // confirm modal is not part of the plain control path.
+        $this->assertSame(0, substr_count($html, 'id="confirmLiftModal'));
     }
 
-    public function test_a_lifted_row_offers_an_unlift_action(): void
+    public function test_a_lifted_row_still_reaches_the_reversal(): void
     {
         [$order, $po, $rows] = $this->fuelTradeOrder(1);
         $rows[0]->update(['lift_status' => PurchaseOrderDelivery::LIFT_LIFTED]);
 
         $html = $this->show($order)->assertOk()->getContent();
 
-        $this->assertStringContainsString('Mark Unlifted', $html);
-        $this->assertStringContainsString('unliftModal', $html);
+        // The row's control reports the lifted state and still posts to the
+        // shared endpoint, whose Unlifted choice runs the reversal.
+        $this->assertStringContainsString('data-current="LIFTED"', $html);
         $this->assertStringContainsString(
-            route('stock-orders.unlift-atl', $rows[0]->id),
+            route('stock-orders.lift-status', $rows[0]->id),
             $html,
-            'The reversal posts to the unlift route.'
+            'The reversal posts to the lift-status route.'
         );
 
-        // And a lifted row must no longer offer lifting itself.
+        // The old button and its modal are gone.
+        $this->assertStringNotContainsString('Mark Unlifted', $html);
+        $this->assertStringNotContainsString('unliftModal', $html);
         $this->assertStringNotContainsString(
             route('stock-orders.complete-fuel-trade', $rows[0]->id),
             $html
@@ -181,7 +185,9 @@ class AtlLiftToggleTest extends TestCase
         $delivery = $rows[0];
 
         $this->actingAs($this->purchasing)
-            ->post(route('stock-orders.complete-fuel-trade', $delivery->id))
+            ->post(route('stock-orders.lift-status', $delivery->id), [
+                'lift_status' => PurchaseOrderDelivery::LIFT_LIFTED,
+            ])
             ->assertSessionHas('success');
 
         $delivery->refresh();
@@ -190,7 +196,9 @@ class AtlLiftToggleTest extends TestCase
         $this->assertEquals(5000, $order->fresh()->total_qty_out);
 
         $this->actingAs($this->purchasing)
-            ->post(route('stock-orders.unlift-atl', $delivery->id))
+            ->post(route('stock-orders.lift-status', $delivery->id), [
+                'lift_status' => PurchaseOrderDelivery::LIFT_UNLIFTED,
+            ])
             ->assertSessionHas('success');
 
         $delivery->refresh();
@@ -225,13 +233,19 @@ class AtlLiftToggleTest extends TestCase
         [$order, $po, $rows] = $this->fuelTradeOrder(2);
 
         $this->actingAs($this->purchasing)
-            ->post(route('stock-orders.complete-fuel-trade', $rows[0]->id));
+            ->post(route('stock-orders.lift-status', $rows[0]->id), [
+                'lift_status' => PurchaseOrderDelivery::LIFT_LIFTED,
+            ]);
         $this->actingAs($this->purchasing)
-            ->post(route('stock-orders.complete-fuel-trade', $rows[1]->id));
+            ->post(route('stock-orders.lift-status', $rows[1]->id), [
+                'lift_status' => PurchaseOrderDelivery::LIFT_LIFTED,
+            ]);
 
         // Reversing one of two lifted ATLs must not un-fulfil the order.
         $this->actingAs($this->purchasing)
-            ->post(route('stock-orders.unlift-atl', $rows[0]->id))
+            ->post(route('stock-orders.lift-status', $rows[0]->id), [
+                'lift_status' => PurchaseOrderDelivery::LIFT_UNLIFTED,
+            ])
             ->assertSessionHas('success');
 
         $this->assertSame('Fulfilled', $order->fresh()->status);
@@ -244,12 +258,18 @@ class AtlLiftToggleTest extends TestCase
         [$order, $po, $rows] = $this->fuelTradeOrder(2);
 
         $this->actingAs($this->purchasing)
-            ->post(route('stock-orders.complete-fuel-trade', $rows[0]->id));
+            ->post(route('stock-orders.lift-status', $rows[0]->id), [
+                'lift_status' => PurchaseOrderDelivery::LIFT_LIFTED,
+            ]);
         $this->actingAs($this->purchasing)
-            ->post(route('stock-orders.complete-fuel-trade', $rows[1]->id));
+            ->post(route('stock-orders.lift-status', $rows[1]->id), [
+                'lift_status' => PurchaseOrderDelivery::LIFT_LIFTED,
+            ]);
 
         $this->actingAs($this->purchasing)
-            ->post(route('stock-orders.unlift-atl', $rows[0]->id))
+            ->post(route('stock-orders.lift-status', $rows[0]->id), [
+                'lift_status' => PurchaseOrderDelivery::LIFT_UNLIFTED,
+            ])
             ->assertSessionHas('success');
 
         $po->refresh();
@@ -288,12 +308,16 @@ class AtlLiftToggleTest extends TestCase
         ]);
 
         $this->actingAs($this->purchasing)
-            ->post(route('stock-orders.complete-fuel-trade', $delivery->id))
+            ->post(route('stock-orders.lift-status', $delivery->id), [
+                'lift_status' => PurchaseOrderDelivery::LIFT_LIFTED,
+            ])
             ->assertSessionHas('success');
         $this->assertSame(1, StockIn::where('purchase_order_delivery_id', $delivery->id)->count());
 
         $this->actingAs($this->purchasing)
-            ->post(route('stock-orders.unlift-atl', $delivery->id))
+            ->post(route('stock-orders.lift-status', $delivery->id), [
+                'lift_status' => PurchaseOrderDelivery::LIFT_UNLIFTED,
+            ])
             ->assertSessionHas('success');
 
         $this->assertSame(
@@ -316,7 +340,9 @@ class AtlLiftToggleTest extends TestCase
         ]);
 
         $this->actingAs($sales)
-            ->post(route('stock-orders.unlift-atl', $rows[0]->id))
+            ->post(route('stock-orders.lift-status', $rows[0]->id), [
+                'lift_status' => PurchaseOrderDelivery::LIFT_UNLIFTED,
+            ])
             ->assertForbidden();
     }
 
@@ -325,7 +351,9 @@ class AtlLiftToggleTest extends TestCase
         [$order, $po, $rows] = $this->fuelTradeOrder(1);
 
         $this->actingAs($this->purchasing)
-            ->post(route('stock-orders.unlift-atl', $rows[0]->id))
+            ->post(route('stock-orders.lift-status', $rows[0]->id), [
+                'lift_status' => PurchaseOrderDelivery::LIFT_UNLIFTED,
+            ])
             ->assertSessionHas('error');
     }
 }
