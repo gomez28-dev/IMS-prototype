@@ -29,20 +29,6 @@
         </div>
     </div>
 
-    @if (session('success'))
-        <div class="alert alert-success alert-dismissible fade show rounded-3" role="alert">
-            <i class="bi bi-check-circle-fill me-2"></i> {{ session('success') }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    @endif
-
-    @if (session('danger'))
-        <div class="alert alert-danger alert-dismissible fade show rounded-3" role="alert">
-            <i class="bi bi-exclamation-triangle-fill me-2"></i> {{ session('danger') }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    @endif
-
     {{-- Validation failures are raised by the request pop-up, but they are
          reported here rather than only inside it. A send that could not be
          saved used to land on this page with the pop-up shut and no visible
@@ -338,32 +324,13 @@
                                 <td class="small text-muted">{{ $req->remarks ?: '—' }}</td>
                             <td class="pe-3 text-end">
                                     <div class="d-inline-flex gap-1 justify-content-end flex-wrap">
-                                        {{-- Picking up and receiving are different things, so
-                                             they are separate actions and separate columns. --}}
-                                        @if (! $req->hasBeenPickedUpByPurchasing())
-                                            <form method="POST" action="{{ route('wetstock.stock-requests.picked-up', $req->id) }}">
-                                                @csrf
-                                                <button type="submit" class="btn btn-sm btn-outline-success rounded-pill px-2 py-1" title="Mark picked up by Purchasing">
-                                                    <i class="bi bi-check2-circle me-1"></i> Pick Up
-                                                </button>
-                                            </form>
-                                        @endif
-
-                                        @if (Auth::user()->canReceiveStockIntoDepot() && $req->lines->isNotEmpty())
-                                            <button type="button" class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary"
-                                                    data-bs-toggle="modal" data-bs-target="#receiveQuantitiesModal{{ $req->id }}"
-                                                    title="Record quantities received">
-                                                <i class="bi bi-box-arrow-in-down me-1"></i> Received
-                                            </button>
-                                        @endif
-
-                                        {{-- VIEW opens the read-only pop-up, PEN the same
-                                             form pre-filled for editing. --}}
-                                        <button type="button" class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary"
-                                                data-bs-toggle="modal" data-bs-target="#requestViewModal{{ $req->id }}"
-                                                title="View request">
+                                        {{-- View opens the request's ATL dashboard. ATLs and
+                                             per-ATL receipt status are managed there. --}}
+                                        <a href="{{ route('stock-orders.wet-stock-requests.atls', $req->id) }}"
+                                           class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary"
+                                           title="View request ATLs">
                                             <i class="bi bi-eye me-1"></i> View
-                                        </button>
+                                        </a>
 
                                         @if (Auth::user()->canEditModule2())
                                             <button type="button" class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary"
@@ -518,149 +485,6 @@
         </form>
     </div>
 </div>
-
-{{-- Read-only view of a request. --}}
-@foreach ($stockRequests as $req)
-    <div class="modal fade" id="requestViewModal{{ $req->id }}" tabindex="-1" aria-labelledby="requestViewModalLabel{{ $req->id }}" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
-            <div class="modal-content rounded-4 border-0 shadow">
-                <div class="modal-header border-0 pb-0">
-                    <h5 class="modal-title fw-bold text-dark" id="requestViewModalLabel{{ $req->id }}">
-                        <i class="bi bi-file-earmark-text text-primary me-1"></i> Request {{ $req->request_number }}
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body pt-3">
-                    <div class="row g-3 mb-3">
-                        <div class="col-md-3">
-                            <div class="text-muted extra-small fw-semibold text-uppercase">Type</div>
-                            <div class="fw-bold">{{ $req->type_label }}</div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="text-muted extra-small fw-semibold text-uppercase">Site</div>
-                            <div class="fw-semibold">{{ $req->warehouse->name ?? '—' }}</div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="text-muted extra-small fw-semibold text-uppercase">Date Needed</div>
-                            <div class="fw-semibold">{{ $req->date_needed ? $req->date_needed->format('M d, Y') : '—' }}</div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="text-muted extra-small fw-semibold text-uppercase">Status</div>
-                            <div class="fw-semibold">{{ $req->status }}</div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="text-muted extra-small fw-semibold text-uppercase">Requested By</div>
-                            <div class="fw-semibold">{{ $req->requester->name ?? 'Depot' }}</div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="text-muted extra-small fw-semibold text-uppercase">Purchasing</div>
-                            <div class="fw-semibold">
-                                @if ($req->hasBeenPickedUpByPurchasing())
-                                    {{ $req->purchasingReceiver?->name ?? 'Purchasing' }}
-                                    <span class="text-muted extra-small">({{ $req->purchasing_received_at?->format('M d, Y') }})</span>
-                                @else
-                                    <span class="badge bg-warning-subtle text-warning-emphasis border rounded-pill px-2 py-1">Awaiting</span>
-                                @endif
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="text-muted extra-small fw-semibold text-uppercase">Raised</div>
-                            <div class="fw-semibold">{{ $req->request_date?->format('M d, Y') }}</div>
-                        </div>
-                        @if ($req->remarks)
-                            <div class="col-12">
-                                <div class="text-muted extra-small fw-semibold text-uppercase mb-1">Additional Remarks</div>
-                                <div class="small">{{ $req->remarks }}</div>
-                            </div>
-                        @endif
-                    </div>
-
-                    <table class="table table-sm align-middle mb-0">
-                        <thead>
-                            <tr>
-                                <th>Product</th>
-                                <th class="text-end">Qty. Requested</th>
-                                <th class="text-end">Qty. Received</th>
-                                <th class="text-end">Qty. Pending</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach ($req->lines as $line)
-                                <tr>
-                                    <td class="fw-semibold">{{ $line->product }}</td>
-                                    <td class="text-end font-monospace">{{ number_format($line->qty_requested) }}</td>
-                                    <td class="text-end font-monospace">{{ number_format($line->qty_received) }}</td>
-                                    <td class="text-end font-monospace {{ $line->qty_pending > 0 ? 'text-warning-emphasis fw-semibold' : 'text-success' }}">
-                                        {{ number_format($line->qty_pending) }}
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-                <div class="modal-footer border-0 pt-0">
-                    <a href="{{ route('wetstock.stock-requests.index') }}" class="btn btn-outline-secondary rounded-pill px-4">
-                        <i class="bi bi-arrow-left me-1"></i> Back to Requests
-                    </a>
-                    <button type="button" class="btn btn-primary-custom rounded-pill px-4" data-bs-dismiss="modal">Close</button>
-                </div>
-            </div>
-        </div>
-    </div>
-@endforeach
-
-{{-- Record what actually arrived on a request, per product line. --}}
-@foreach ($stockRequests as $req)
-    @if (Auth::user()->canReceiveStockIntoDepot() && $req->lines->isNotEmpty())
-        <div class="modal fade" id="receiveQuantitiesModal{{ $req->id }}" tabindex="-1" aria-labelledby="receiveQuantitiesModalLabel{{ $req->id }}" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content rounded-4 border-0 shadow">
-                    <div class="modal-header border-0 pb-0">
-                        <h5 class="modal-title fw-bold text-dark" id="receiveQuantitiesModalLabel{{ $req->id }}">
-                            <i class="bi bi-box-arrow-in-down text-success me-1"></i> Record Received &mdash; {{ $req->request_number }}
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <form method="POST" action="{{ route('wetstock.stock-requests.received', $req->id) }}">
-                        @csrf
-                        <div class="modal-body pt-3">
-                            <table class="table table-sm align-middle mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Product</th>
-                                        <th class="text-end">Requested</th>
-                                        <th class="text-end" style="width: 130px;">Received</th>
-                                        <th class="text-end">Pending</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach ($req->lines as $line)
-                                        <tr>
-                                            <td class="fw-semibold">{{ $line->product }}</td>
-                                            <td class="text-end font-monospace">{{ number_format($line->qty_requested) }}</td>
-                                            <td>
-                                                <input type="number" name="quantities[{{ $line->id }}]" min="0" step="1"
-                                                       class="form-control form-control-sm text-end"
-                                                       value="{{ $line->qty_received }}">
-                                            </td>
-                                            <td class="text-end font-monospace">{{ number_format($line->qty_pending) }}</td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                        <div class="modal-footer border-0 pt-0">
-                            <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" class="btn btn-success rounded-pill px-4">
-                                <i class="bi bi-check2-circle me-1"></i> Save Received
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    @endif
-@endforeach
 
 {{-- Modals container outside table (prevents layout shift and flickering) --}}
 @foreach ($incomingDeliveries->whereIn('status', ['Pending', 'Active']) as $del)

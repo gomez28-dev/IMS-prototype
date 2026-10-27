@@ -236,7 +236,7 @@ class DeliveryController extends Controller
      */
     public function index(Order $order, Request $request): View
     {
-        $order->load(['linkedPurchaseOrder.deliveries.preparer', 'linkedPurchaseOrder.deliveries.approver']);
+        $order->load(['linkedPurchaseOrder.deliveries.preparer', 'linkedPurchaseOrder.deliveries.approver', 'linkedPurchaseOrder.deliveries.allocations']);
         $deliveries = $order->deliveries()->with('items')->orderBy('delivery_date', 'asc')->get();
 
         $filterKeys = ['from', 'to', 'month', 'year', 'type', 'account'];

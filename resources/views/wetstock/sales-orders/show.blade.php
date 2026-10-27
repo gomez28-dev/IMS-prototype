@@ -188,12 +188,14 @@
                                                 // from here - the states it cannot are offered
                                                 // disabled rather than hidden, so the reader can
                                                 // still see what is possible further down the line.
-                                                $liftable = $atl->status === 'Active'
-                                                    && $atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_UNLIFTED
-                                                    && ! $atl->received_at;
-                                                $unliftable = $atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_LIFTED;
-                                                $cancellable = $atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_UNLIFTED
-                                                    && ! $atl->received_at;
+                                                 $liftable = $atl->isApproved()
+                                                     && in_array($atl->status, ['Pending', 'Active', 'Cancelled'], true)
+                                                     && $atl->lift_status !== \App\Models\PurchaseOrderDelivery::LIFT_LIFTED
+                                                     && ! $atl->received_at;
+                                                 $unliftable = $atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_LIFTED
+                                                     && ! $atl->received_at;
+                                                 $cancellable = $atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_UNLIFTED
+                                                     && ! $atl->received_at;
                                                 // A tanker pick-up with no truck recorded cannot
                                                 // lift from the bare control: Lifted opens the
                                                 // confirm modal instead, so the auto stock-in
@@ -202,28 +204,25 @@
                                                     && $atl->isTankerPickup()
                                                     && ! $atl->storage_tank_id;
                                             @endphp
-                                            @if ($atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_CANCELLED)
-                                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2 py-1" title="A cancelled ATL stays cancelled">Cancelled</span>
-                                            @else
-                                                <form method="POST" action="{{ route('stock-orders.lift-status', $atl->id) }}" class="lift-status-form">
-                                                    @csrf
-                                                    <select name="lift_status"
-                                                            class="form-select form-select-sm lift-status-select"
-                                                            data-atl-id="{{ $atl->id }}"
-                                                            data-current="{{ $atl->lift_status }}"
-                                                            @if ($needsTankerModal) data-requires-modal="1" @endif
-                                                            aria-label="Lift status of this ATL">
-                                                        <option value="{{ \App\Models\PurchaseOrderDelivery::LIFT_UNLIFTED }}"
-                                                                @if ($atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_UNLIFTED) selected
-                                                                @elseif (! $unliftable) disabled @endif>Unlifted</option>
-                                                        <option value="{{ \App\Models\PurchaseOrderDelivery::LIFT_LIFTED }}"
-                                                                @if ($atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_LIFTED) selected
-                                                                @elseif (! $liftable) disabled @endif>Lifted</option>
-                                                        <option value="{{ \App\Models\PurchaseOrderDelivery::LIFT_CANCELLED }}"
-                                                                @if (! $cancellable) disabled @endif>Cancelled</option>
-                                                    </select>
-                                                </form>
-                                            @endif
+                                             <form method="POST" action="{{ route('stock-orders.lift-status', $atl->id) }}" class="lift-status-form">
+                                                 @csrf
+                                                 <select name="lift_status"
+                                                         class="form-select form-select-sm lift-status-select"
+                                                         data-atl-id="{{ $atl->id }}"
+                                                         data-current="{{ $atl->lift_status }}"
+                                                         @if ($needsTankerModal) data-requires-modal="1" @endif
+                                                         aria-label="Lift status of this ATL">
+                                                     <option value="{{ \App\Models\PurchaseOrderDelivery::LIFT_UNLIFTED }}"
+                                                             @if ($atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_UNLIFTED) selected
+                                                             @elseif (! $unliftable && $atl->lift_status !== \App\Models\PurchaseOrderDelivery::LIFT_CANCELLED) disabled @endif>Unlifted</option>
+                                                     <option value="{{ \App\Models\PurchaseOrderDelivery::LIFT_LIFTED }}"
+                                                             @if ($atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_LIFTED) selected
+                                                             @elseif (! $liftable) disabled @endif>Lifted</option>
+                                                     <option value="{{ \App\Models\PurchaseOrderDelivery::LIFT_CANCELLED }}"
+                                                             @if ($atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_CANCELLED) selected
+                                                             @elseif (! $cancellable) disabled @endif>Cancelled</option>
+                                                 </select>
+                                             </form>
                                         @else
                                             @if ($atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_LIFTED)
                                                 <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1">Lifted</span>

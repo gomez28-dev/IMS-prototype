@@ -234,29 +234,21 @@ class StockRequestPopUpTest extends TestCase
 
     // ---- View -------------------------------------------------------------
 
-    public function test_the_view_pop_up_reports_each_product(): void
+    public function test_the_view_action_opens_the_request_atl_dashboard(): void
     {
-        $request = $this->request([
-            ['product' => 'Diesel', 'qty' => 10000],
-            ['product' => 'Unleaded', 'qty' => 5000],
-        ]);
-        $request->lines->firstWhere('product', 'Unleaded')->update(['qty_received' => 2000]);
+        $request = $this->request();
 
         $html = $this->actingAs($this->opsManager)
             ->get(route('wetstock.stock-requests.index'))
             ->assertOk()
             ->getContent();
 
-        $this->assertStringContainsString('requestViewModal'.$request->id, $html);
-
-        $modal = substr($html, strpos($html, 'requestViewModal'.$request->id));
-
-        $this->assertStringContainsString($request->request_number, $modal);
-        $this->assertStringContainsString('Diesel', $modal);
-        $this->assertStringContainsString('Unleaded', $modal);
-        // 5,000 requested less 2,000 received.
-        $this->assertStringContainsString('3,000', $modal);
-        // Picking up is reported separately from fuel arriving.
-        $this->assertStringContainsString('Awaiting', $modal);
+        $this->assertStringContainsString(
+            route('stock-orders.wet-stock-requests.atls', $request->id),
+            $html
+        );
+        $this->assertStringNotContainsString('requestViewModal'.$request->id, $html);
+        $this->assertStringNotContainsString('> Pick Up<', $html);
+        $this->assertStringNotContainsString('> Received<', $html);
     }
 }

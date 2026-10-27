@@ -350,14 +350,24 @@
                     @if ($order->isFuelTrade())
                         @if ($order->linkedPurchaseOrder && $order->linkedPurchaseOrder->deliveries->isNotEmpty())
                             @foreach ($order->linkedPurchaseOrder->deliveries as $delivery)
-                            <tr>
-                                <td><span class="id-pill">{{ $order->linkedPurchaseOrder->po_number }}</span></td>
-                                <td class="text-dark">{{ $delivery->atl_number ?: ($delivery->client_atl_number ?: 'Pending') }}</td>
-                                <td>{{ $delivery->receiving_date ? $delivery->receiving_date->format('Y-m-d') : '—' }}</td>
-                                <td>{{ number_format($delivery->qty_to_receive) }}</td>
-                                <td>
-                                    @if ($delivery->status === 'Completed')
-                                        <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1">FULFILLED / LIFTED</span>
+                                    <tr class="{{ $delivery->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_CANCELLED || $delivery->status === 'Cancelled' ? 'delivery-cancelled' : '' }}">
+                                        <td><span class="id-pill">{{ $order->linkedPurchaseOrder->po_number }}</span></td>
+                                        <td class="text-dark">{{ $delivery->atl_number ?: ($delivery->client_atl_number ?: 'Pending') }}</td>
+                                        <td>{{ $delivery->receiving_date ? $delivery->receiving_date->format('Y-m-d') : '—' }}</td>
+                                        <td>
+                                            <div class="pl-block">
+                                                @forelse ($delivery->productBreakdown() ?: [$delivery->product => (int) $delivery->qty_to_receive] as $product => $qty)
+                                                    <div class="pl-row">{{ array_search($product, \App\Models\Order::PRODUCT_TYPES, true) ?: $product }} - {{ number_format($qty) }}</div>
+                                                @empty
+                                                    <div class="pl-row">{{ number_format($delivery->qty_to_receive) }}</div>
+                                                @endforelse
+                                            </div>
+                                        </td>
+                                        <td>
+                                            @if ($delivery->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_CANCELLED || $delivery->status === 'Cancelled')
+                                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2 py-1">CANCELLED</span>
+                                            @elseif ($delivery->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_LIFTED || $delivery->status === 'Completed')
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1">FULFILLED / LIFTED</span>
                                     @elseif ($delivery->status === 'Active')
                                         <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle rounded-pill px-2 py-1">FOR PICK UP</span>
                                     @else
@@ -487,7 +497,7 @@
             @if ($order->isFuelTrade())
                 @if ($order->linkedPurchaseOrder && $order->linkedPurchaseOrder->deliveries->isNotEmpty())
                     @foreach ($order->linkedPurchaseOrder->deliveries as $delivery)
-                    <div class="card border-0 bg-light mb-3 rounded-4 shadow-sm">
+                    <div class="card border-0 bg-light mb-3 rounded-4 shadow-sm {{ $delivery->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_CANCELLED || $delivery->status === 'Cancelled' ? 'delivery-cancelled' : '' }}">
                         <div class="card-body p-4">
                             <div class="d-flex justify-content-between align-items-start mb-2">
                                 <h5 class="fw-bold text-dark mb-0">{{ $order->linkedPurchaseOrder->po_number }}</h5>
@@ -498,12 +508,17 @@
                                 <div class="col-6">
                                     <span class="fw-medium">Pick Up Date:</span> {{ $delivery->receiving_date ? $delivery->receiving_date->format('Y-m-d') : '—' }}
                                 </div>
-                                <div class="col-6 text-end">
-                                    <span class="fw-medium">Qty:</span> {{ number_format($delivery->qty_to_receive) }}
-                                </div>
+                                 <div class="col-6 text-end">
+                                     <span class="fw-medium">Qty Out:</span>
+                                     @foreach ($delivery->productBreakdown() ?: [$delivery->product => (int) $delivery->qty_to_receive] as $product => $qty)
+                                         <span class="d-block">{{ array_search($product, \App\Models\Order::PRODUCT_TYPES, true) ?: $product }} - {{ number_format($qty) }}</span>
+                                     @endforeach
+                                 </div>
                             </div>
                             <div class="mb-3">
-                                @if ($delivery->status === 'Completed')
+                                @if ($delivery->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_CANCELLED || $delivery->status === 'Cancelled')
+                                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-3 py-1">CANCELLED</span>
+                                @elseif ($delivery->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_LIFTED || $delivery->status === 'Completed')
                                     <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1">FULFILLED / LIFTED</span>
                                 @elseif ($delivery->status === 'Active')
                                     <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle rounded-pill px-3 py-1">FOR PICK UP</span>

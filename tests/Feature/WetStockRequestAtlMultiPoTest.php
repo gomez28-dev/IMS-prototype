@@ -371,7 +371,7 @@ class WetStockRequestAtlMultiPoTest extends TestCase
         $this->assertStringContainsString('.id-pill', $html);
         $this->assertStringContainsString('.action-icon', $html);
 
-        foreach (['DR#', 'ATL#', 'PO#', 'Qty Out', 'Status', 'Type', 'Action'] as $column) {
+        foreach (['DR#', 'ATL#', 'PO#', 'Qty Out', 'Approval', 'Lift Status', 'Received', 'Type', 'Action'] as $column) {
             $this->assertStringContainsString('>'.$column.'<', $html);
         }
 
@@ -462,7 +462,8 @@ class WetStockRequestAtlMultiPoTest extends TestCase
         $html = $this->atlsHtml($request);
 
         $this->assertStringContainsString(route('stock-orders.atl-pdf', $atl->id), $html);
-        $this->assertStringContainsString('Mark Lifted', $html);
+        $this->assertStringContainsString('name="lift_status"', $html);
+        $this->assertStringContainsString('value="LIFTED"', $html);
         $this->assertStringContainsString('APPROVED', $html);
     }
 

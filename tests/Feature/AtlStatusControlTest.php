@@ -340,6 +340,81 @@ class AtlStatusControlTest extends TestCase
         $this->assertSame(PurchaseOrderDelivery::LIFT_LIFTED, $delivery->fresh()->lift_status);
     }
 
+    public function test_a_cancelled_atl_can_be_restored_and_draws_again(): void
+    {
+        [$order, $po, $delivery] = $this->atlOrder();
+
+        $this->actingAs($this->purchasing)
+            ->post(route('stock-orders.lift-status', $delivery->id), [
+                'lift_status' => PurchaseOrderDelivery::LIFT_CANCELLED,
+            ])
+            ->assertSessionHas('success');
+
+        $this->assertSame([], $order->fresh()->drawnByProduct());
+
+        $this->actingAs($this->purchasing)
+            ->post(route('stock-orders.lift-status', $delivery->id), [
+                'lift_status' => PurchaseOrderDelivery::LIFT_UNLIFTED,
+            ])
+            ->assertSessionHas('success');
+
+        $delivery->refresh();
+        $this->assertSame(PurchaseOrderDelivery::LIFT_UNLIFTED, $delivery->lift_status);
+        $this->assertSame('Active', $delivery->status);
+        $this->assertSame(['Diesel' => 5000], $order->fresh()->drawnByProduct());
+        $this->assertSame('FOR_DELIVERY', $po->fresh()->request_status);
+    }
+
+    public function test_a_cancelled_atl_can_be_lifted_again(): void
+    {
+        [$order, $po, $delivery] = $this->atlOrder();
+
+        $this->actingAs($this->purchasing)
+            ->post(route('stock-orders.lift-status', $delivery->id), [
+                'lift_status' => PurchaseOrderDelivery::LIFT_CANCELLED,
+            ]);
+
+        $this->actingAs($this->purchasing)
+            ->post(route('stock-orders.lift-status', $delivery->id), [
+                'lift_status' => PurchaseOrderDelivery::LIFT_LIFTED,
+            ])
+            ->assertSessionHas('success');
+
+        $this->assertSame(PurchaseOrderDelivery::LIFT_LIFTED, $delivery->fresh()->lift_status);
+        $this->assertSame('Completed', $delivery->fresh()->status);
+        $this->assertSame(5000, $order->fresh()->total_qty_out);
+    }
+
+    public function test_received_status_is_editable_by_operations_not_purchasing(): void
+    {
+        [$order, $po, $delivery] = $this->atlOrder();
+        $delivery->update([
+            'lift_status' => PurchaseOrderDelivery::LIFT_LIFTED,
+            'status' => 'Completed',
+        ]);
+
+        $operations = Admin::create([
+            'username' => 'ops_'.uniqid(),
+            'password' => bcrypt('secret'),
+            'name' => 'Warehouse Manager',
+            'role' => 'ops_mgr',
+        ]);
+
+        $this->actingAs($operations)
+            ->post(route('stock-orders.received-status', $delivery->id), [
+                'received_status' => 'RECEIVED',
+            ])
+            ->assertSessionHas('success');
+
+        $this->assertNotNull($delivery->fresh()->received_at);
+
+        $this->actingAs($this->purchasing)
+            ->post(route('stock-orders.received-status', $delivery->id), [
+                'received_status' => 'NOT_RECEIVED',
+            ])
+            ->assertForbidden();
+    }
+
     public function test_lifting_an_already_lifted_atl_is_refused(): void
     {
         $tank = StorageTank::create([

@@ -237,7 +237,9 @@
                             <th>PO#</th>
                             <th>{{ $isPickup ? 'Pick Up Date' : 'Delivery Date' }}</th>
                             <th>Qty Out</th>
-                            <th>Status</th>
+                            <th>Approval</th>
+                            <th>Lift Status</th>
+                            <th>Received</th>
                             <th>Type</th>
                             <th>Action</th>
                         </tr>
@@ -258,10 +260,14 @@
 
                                 $codes = ['Diesel' => 'D', 'Unleaded' => 'U', 'Premium' => 'P'];
                                 $approved = $atl->isApproved();
-                                $lifted = $atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_LIFTED;
-                                // Lifting is offered only once the VP has signed it off,
-                                // and only while there is something left to lift.
-                                $canLift = $approved && ! $lifted && Auth::user()->canMarkAtlLifted();
+                                 $lifted = $atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_LIFTED;
+                                 $canEditLift = Auth::user()->canMarkAtlLifted();
+                                 $canEditReceived = Auth::user()->canReceiveStockIntoDepot();
+                                 $canUnlift = $lifted && ! $atl->received_at;
+                                 $canLift = $approved
+                                     && in_array($atl->status, ['Pending', 'Active', 'Cancelled'], true)
+                                     && ! $lifted
+                                     && ! $atl->received_at;
                             @endphp
                             <tr>
                                 <td><span class="id-pill">{{ $atl->dr_number ?: '—' }}</span></td>
@@ -278,23 +284,55 @@
                                     </span>
                                 </td>
                                 <td>
-                                    {{-- Approval and lift side by side: one says whether the
-                                         document is signed, the other whether the fuel has
-                                         moved. --}}
-                                    <div class="d-flex flex-column gap-1 align-items-center">
-                                        <span class="badge rounded-pill px-2 py-1 {{ $approved
-                                            ? 'bg-success-subtle text-success border'
-                                            : ($atl->approval_status === \App\Models\PurchaseOrderDelivery::APPROVAL_REJECTED
-                                                ? 'bg-danger-subtle text-danger border'
-                                                : 'bg-warning-subtle text-warning-emphasis border') }}">
-                                            {{ $approved ? 'APPROVED' : strtoupper(str_replace('_', ' ', $atl->approval_status ?? 'DRAFT')) }}
-                                        </span>
-                                        <span class="badge rounded-pill px-2 py-1 {{ $lifted
-                                            ? 'bg-success-subtle text-success border'
-                                            : 'bg-light text-dark border' }}">
-                                            {{ $lifted ? 'LIFTED' : strtoupper(str_replace('_', ' ', $atl->lift_status ?? 'UNLIFTED')) }}
-                                        </span>
-                                    </div>
+                                    <span class="badge rounded-pill px-2 py-1 {{ $approved
+                                        ? 'bg-success-subtle text-success border'
+                                        : ($atl->approval_status === \App\Models\PurchaseOrderDelivery::APPROVAL_REJECTED
+                                            ? 'bg-danger-subtle text-danger border'
+                                            : 'bg-warning-subtle text-warning-emphasis border') }}">
+                                        {{ $approved ? 'APPROVED' : strtoupper(str_replace('_', ' ', $atl->approval_status ?? 'DRAFT')) }}
+                                    </span>
+                                </td>
+                                <td>
+                                    @if ($canEditLift)
+                                        <form method="POST" action="{{ route('stock-orders.lift-status', $atl->id) }}" class="lift-status-form">
+                                            @csrf
+                                            <select name="lift_status" class="form-select form-select-sm lift-status-select"
+                                                    data-current="{{ $atl->lift_status }}"
+                                                    aria-label="Lift status of ATL {{ $atl->atl_number ?: $atl->id }}">
+                                                <option value="{{ \App\Models\PurchaseOrderDelivery::LIFT_UNLIFTED }}"
+                                                        @selected($atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_UNLIFTED)
+                                                        @disabled(! $canUnlift && $atl->lift_status !== \App\Models\PurchaseOrderDelivery::LIFT_UNLIFTED && $atl->lift_status !== \App\Models\PurchaseOrderDelivery::LIFT_CANCELLED)>Unlifted</option>
+                                                <option value="{{ \App\Models\PurchaseOrderDelivery::LIFT_LIFTED }}"
+                                                        @selected($lifted)
+                                                        @disabled(! $canLift && ! $lifted)>Lifted</option>
+                                                <option value="{{ \App\Models\PurchaseOrderDelivery::LIFT_CANCELLED }}"
+                                                        @selected($atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_CANCELLED)
+                                                        @disabled($atl->lift_status !== \App\Models\PurchaseOrderDelivery::LIFT_UNLIFTED && $atl->lift_status !== \App\Models\PurchaseOrderDelivery::LIFT_CANCELLED)>Cancelled</option>
+                                            </select>
+                                        </form>
+                                    @elseif ($lifted)
+                                        <span class="badge bg-success-subtle text-success border rounded-pill">Lifted</span>
+                                    @elseif ($atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_CANCELLED)
+                                        <span class="badge bg-danger-subtle text-danger border rounded-pill">Cancelled</span>
+                                    @else
+                                        <span class="badge bg-light text-dark border rounded-pill">Unlifted</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    @if ($canEditReceived)
+                                        <form method="POST" action="{{ route('stock-orders.received-status', $atl->id) }}" class="received-status-form">
+                                            @csrf
+                                            <select name="received_status" class="form-select form-select-sm received-status-select"
+                                                    aria-label="Received status of ATL {{ $atl->atl_number ?: $atl->id }}">
+                                                <option value="NOT_RECEIVED" @selected(! $atl->received_at)>Not yet received</option>
+                                                <option value="RECEIVED" @selected((bool) $atl->received_at)>Received</option>
+                                            </select>
+                                        </form>
+                                    @elseif ($atl->received_at)
+                                        <span class="badge bg-success-subtle text-success border rounded-pill">Received</span>
+                                    @else
+                                        <span class="badge bg-light text-dark border rounded-pill">Not yet received</span>
+                                    @endif
                                 </td>
                                 <td class="text-dark">{{ $atl->typeLabel() }}</td>
                                 <td>
@@ -308,24 +346,15 @@
                                                 <i class="bi bi-file-earmark-pdf"></i>
                                             </a>
                                         @endif
-                                        @if ($canLift)
-                                            <button type="button"
-                                                    class="btn btn-sm btn-outline-success action-icon"
-                                                    data-bs-toggle="modal"
-                                                    data-bs-target="#confirmLiftModal{{ $atl->id }}"
-                                                    title="Mark Lifted">
-                                                <i class="bi bi-check-circle"></i>
-                                            </button>
-                                        @endif
-                                        @unless ($approved || $canLift)
-                                            <span class="small text-muted">—</span>
-                                        @endunless
+                                         @unless ($approved)
+                                             <span class="small text-muted">—</span>
+                                         @endunless
                                     </div>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="text-center text-muted">
+                                <td colspan="10" class="text-center text-muted">
                                     <i class="bi bi-file-earmark-x fs-1 d-block mb-3 text-warning"></i>
                                     No ATLs issued for this request yet.
                                 </td>
@@ -337,58 +366,14 @@
         </div>
     </div>
 
-    {{-- One confirm dialog per liftable ATL, as the Sales Orders page does. --}}
-    @foreach ($atls as $atl)
-        @if ($atl->isApproved() && $atl->lift_status !== \App\Models\PurchaseOrderDelivery::LIFT_LIFTED)
-            <div class="modal fade" id="confirmLiftModal{{ $atl->id }}" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog modal-dialog-centered">
-                    <div class="modal-content rounded-4 border-0 shadow">
-                        <div class="modal-header border-0 pb-0">
-                            <h5 class="modal-title fw-bold text-dark">
-                                <i class="bi bi-patch-check-fill text-success me-1"></i> Confirm Lift
-                            </h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        <form method="POST" action="{{ route('stock-orders.complete-fuel-trade', $atl->id) }}">
-                            @csrf
-                            <div class="modal-body pt-3">
-                                <div class="p-3 bg-light rounded-3 mb-3">
-                                    <div class="d-flex justify-content-between small text-muted mb-1">
-                                        <span>REQ# {{ $request->request_number }}</span>
-                                        <span class="badge bg-secondary-subtle text-secondary">{{ $atl->channel_label }}</span>
-                                    </div>
-                                    <div class="fw-bold fs-5 text-primary mb-1">
-                                        {{ number_format($atl->qty_to_receive) }} L of {{ $atl->product }}
-                                    </div>
-                                    <div class="small text-muted">
-                                        ATL: <span class="fw-semibold text-dark">{{ $atl->atl_number ?? '—' }}</span>
-                                    </div>
-                                </div>
-
-                                <div class="row g-2 mb-3">
-                                    <div class="col-6">
-                                        <label class="form-label small fw-semibold">Supplier DR #</label>
-                                        <input type="text" name="supplier_dr_number" class="form-control form-control-sm"
-                                               value="{{ $atl->dr_number }}">
-                                    </div>
-                                    <div class="col-6">
-                                        <label class="form-label small fw-semibold">Supplier SO #</label>
-                                        <input type="text" name="supplier_so_number" class="form-control form-control-sm"
-                                               value="{{ $atl->supplier_so_number }}">
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="modal-footer border-0 pt-0">
-                                <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
-                                <button type="submit" class="btn btn-success rounded-pill px-4">
-                                    <i class="bi bi-check-circle me-1"></i> Confirm Lifted
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        @endif
-    @endforeach
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.lift-status-select, .received-status-select').forEach(function (select) {
+                select.addEventListener('change', function () {
+                    select.closest('form').submit();
+                });
+            });
+        });
+    </script>
 </div>
 @endsection

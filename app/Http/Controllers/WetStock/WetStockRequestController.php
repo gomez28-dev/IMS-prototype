@@ -81,7 +81,7 @@ class WetStockRequestController extends Controller
         $stockRequest->load(['lines', 'warehouse', 'requester']);
 
         $atls = $stockRequest->deliveries()
-            ->with(['purchaseOrder', 'allocations.purchaseOrder', 'lifter'])
+            ->with(['purchaseOrder', 'allocations.purchaseOrder', 'lifter', 'receiver'])
             ->orderByDesc('id')
             ->get();
 
@@ -95,6 +95,57 @@ class WetStockRequestController extends Controller
             'pending' => $stockRequest->pendingByProduct(),
             'tanks' => $this->tankOptions($stockRequest),
         ]);
+    }
+
+    /**
+     * Record whether one request ATL has arrived at the depot.
+     *
+     * This is deliberately separate from the Stock In flow: the request ATL
+     * dashboard needs a per-ATL confirmation, while physical tank receiving
+     * may also create a StockIn ledger entry through receiveDelivery().
+     */
+    public function updateReceivedStatus(Request $request, PurchaseOrderDelivery $delivery): RedirectResponse
+    {
+        if (! Auth::user()->canReceiveStockIntoDepot()) {
+            abort(403, 'Unauthorized to change an ATL received status.');
+        }
+
+        $validated = $request->validate([
+            'received_status' => ['required', 'string', 'in:RECEIVED,NOT_RECEIVED'],
+        ]);
+
+        if ($validated['received_status'] === 'RECEIVED') {
+            if ($delivery->lift_status !== PurchaseOrderDelivery::LIFT_LIFTED
+                && $delivery->status !== 'Completed') {
+                return back()->with('error', 'An ATL must be lifted before it can be marked Received.');
+            }
+
+            $delivery->update([
+                'received_at' => $delivery->received_at ?: now(),
+                'received_by' => $delivery->received_by ?: Auth::id(),
+            ]);
+
+            $message = 'ATL '.($delivery->atl_number ?: '#'.$delivery->id).' is marked Received.';
+        } else {
+            if ($delivery->stockIns()->exists()) {
+                return back()->with('error', 'This ATL has stock recorded in a tank, so its received status cannot be reversed here.');
+            }
+
+            $delivery->update([
+                'received_at' => null,
+                'received_by' => null,
+            ]);
+
+            $message = 'ATL '.($delivery->atl_number ?: '#'.$delivery->id).' is marked Not yet received.';
+        }
+
+        AuditLog::create([
+            'admin_id' => Auth::id(),
+            'action' => 'updated',
+            'description' => $message,
+        ]);
+
+        return back()->with('success', $message);
     }
 
     /**

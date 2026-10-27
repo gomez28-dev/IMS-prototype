@@ -241,6 +241,7 @@ Route::post('/warehouses/{warehouse}/tanks', [WetStock\StorageTankController::cl
         Route::post('/fuel-trade/{order}/store-po', [WetStock\StockOrderController::class, 'storeFuelTradePo'])->name('store-fuel-trade-po');
         Route::post('/deliveries/{delivery}/complete-fuel-trade', [WetStock\StockOrderController::class, 'completeFuelTrade'])->name('complete-fuel-trade');
         Route::post('/deliveries/{delivery}/unlift', [WetStock\StockOrderController::class, 'unliftAtl'])->name('unlift-atl');
+        Route::post('/deliveries/{delivery}/received-status', [WetStock\WetStockRequestController::class, 'updateReceivedStatus'])->name('received-status');
         // The lift-status control on the ATL records: one select per row whose
         // Lifted / Unlifted / Cancelled choices run the same pipelines as the
         // two routes above.

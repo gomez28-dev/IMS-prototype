@@ -885,6 +885,31 @@ class StockOrderController extends Controller
      */
     private function performAtlLift(PurchaseOrderDelivery $delivery, array $docFields, ?int $tankId): RedirectResponse
     {
+        // Older Fuel Trade rows predate approval_status. Keep the existing
+        // direct complete-fuel-trade endpoint compatible with those records;
+        // explicit non-approved states still cannot be lifted.
+        if (filled($delivery->approval_status) && ! $delivery->isApproved()) {
+            return back()->with('error', 'Only an approved ATL can be marked Lifted.');
+        }
+
+        if ($delivery->received_at) {
+            return back()->with('error', 'This ATL has already been received and cannot be lifted again.');
+        }
+
+        if (! in_array($delivery->status, ['Pending', 'Active', 'Cancelled'], true)) {
+            return back()->with('error', 'Only a pending, active, or cancelled ATL can be marked Lifted.');
+        }
+
+        // A cancelled ATL is reversible. Restore its live state before running
+        // the normal lift pipeline, so its allocation is counted again.
+        if ($delivery->status === 'Cancelled') {
+            $delivery->update([
+                'status' => 'Active',
+                'lift_status' => PurchaseOrderDelivery::LIFT_UNLIFTED,
+            ]);
+            $delivery->refresh();
+        }
+
         $updateData = [];
         if (!empty($docFields['supplier_dr_number'])) {
             $updateData['supplier_dr_number'] = $docFields['supplier_dr_number'];
@@ -1018,10 +1043,6 @@ class StockOrderController extends Controller
 
         $order = $delivery->order ?: $delivery->purchaseOrder?->linkedOrder;
 
-        if (!$order) {
-            return back()->with('error', 'This ATL serves no Sales Order, so there is no lift to reverse here.');
-        }
-
         // An ATL that was lifted and then unwound is back in flight: approved
         // ones resume at Active, anything still awaiting approval resumes at
         // Pending. lifted_at/by were the record of the lift, so they go blank.
@@ -1059,24 +1080,26 @@ class StockOrderController extends Controller
         // The order only stops being Fulfilled when nothing on it is lifted
         // anymore - reversing one of two lifted ATLs must not un-fulfil the
         // half the client genuinely picked up.
-        if (!$order->hasLiftedAtl()) {
+        if ($order && ! $order->hasLiftedAtl()) {
             $order->update(['status' => 'Active']);
         }
 
         // Module 1 counts delivered from its own delivery rows, so the mirror
         // row the lift wrote is what makes its Remaining balance fall back.
-        $mirror = $this->module1DeliveryFor($delivery, $order);
-        $mirror?->delete();
+        if ($order) {
+            $mirror = $this->module1DeliveryFor($delivery, $order);
+            $mirror?->delete();
+        }
 
         AuditLog::create([
             'admin_id' => Auth::id(),
             'action' => 'updated',
             'description' => 'Reversed the lift of ATL '
                 .($delivery->atl_number ?: ($delivery->client_atl_number ?: '#'.$delivery->id))
-                ." for SO {$order->formatted_so_number}: ATL back to Unlifted"
+                .($order ? " for SO {$order->formatted_so_number}" : '')
+                .': ATL back to Unlifted'
                 .($po ? '; PO '.$po->po_number.' back to '.($po->fresh()->request_status) : '')
-                .'; Sales Order now '.($order->fresh()->status)
-                .'; Module 1 mirror removed.',
+                .($order ? '; Sales Order now '.($order->fresh()->status).'; Module 1 mirror removed.' : '.'),
         ]);
 
         return back()->with('success', 'ATL '
@@ -1116,9 +1139,36 @@ class StockOrderController extends Controller
             PurchaseOrderDelivery::LIFT_LIFTED => $delivery->lift_status === PurchaseOrderDelivery::LIFT_LIFTED
                 ? back()->with('error', 'This ATL is already marked Lifted.')
                 : $this->performAtlLift($delivery, [], $delivery->storage_tank_id ? (int) $delivery->storage_tank_id : null),
-            PurchaseOrderDelivery::LIFT_UNLIFTED => $this->performAtlUnlift($delivery),
+            PurchaseOrderDelivery::LIFT_UNLIFTED => $delivery->lift_status === PurchaseOrderDelivery::LIFT_CANCELLED
+                ? $this->restoreCancelledAtl($delivery)
+                : $this->performAtlUnlift($delivery),
             default => $this->performAtlCancel($delivery),
         };
+    }
+
+    /**
+     * Restore a cancelled, not-yet-lifted ATL to its live pre-cancellation state.
+     */
+    private function restoreCancelledAtl(PurchaseOrderDelivery $delivery): RedirectResponse
+    {
+        if ($delivery->received_at) {
+            return back()->with('error', 'This ATL has been received and cannot be restored.');
+        }
+
+        $delivery->update([
+            'status' => $delivery->isApproved() ? 'Active' : 'Pending',
+            'lift_status' => PurchaseOrderDelivery::LIFT_UNLIFTED,
+        ]);
+
+        $label = $delivery->atl_number ?: ($delivery->client_atl_number ?: '#'.$delivery->id);
+
+        AuditLog::create([
+            'admin_id' => Auth::id(),
+            'action' => 'updated',
+            'description' => "Restored cancelled ATL {$label}: its volume counts against the Sales Order again.",
+        ]);
+
+        return back()->with('success', "ATL {$label} is restored to Unlifted. Its volume counts against the remaining balance again.");
     }
 
     /**
