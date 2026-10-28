@@ -166,16 +166,16 @@
         <div class="card card-custom border-0 shadow-sm">
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
+                    <table class="table table-center table-hover align-middle mb-0">
                         <thead class="bg-light">
                             <tr>
                                 <th class="ps-3 py-3">PO #</th>
                                 <th class="py-3">Supplier</th>
-                                <th class="py-3 text-end">Qty.</th>
-                                <th class="py-3 text-end">Price</th>
-                                <th class="py-3 text-end">Amount</th>
-                                <th class="py-3 text-center">Status</th>
-                                <th class="pe-3 py-3 text-end">Action</th>
+                                <th class="py-3">Qty.</th>
+                                <th class="py-3">Price</th>
+                                <th class="py-3">Amount</th>
+                                <th class="py-3">Status</th>
+                                <th class="py-3 table-actions">Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -201,30 +201,32 @@
                                              in the system - which made these three columns read as a
                                              different table from the rest. Amount follows the Dashboard's
                                              text-nowrap cell. --}}
-                                    <td class="text-center">
+                                    <td>
                                         @if ($po->items->isNotEmpty())
                                             <div class="pl-block">
                                                 @foreach ($po->items as $it)
                                                     <div class="pl-row" title="{{ $it->product }}">
-                                                        <span class="pl-key">{!! $chip(\Illuminate\Support\Str::substr($it->product, 0, 1), $it->product) !!}</span> {{ number_format($it->quantity_ordered) }}
+                                                        <span class="pl-key">{!! $chip(\Illuminate\Support\Str::substr($it->product, 0, 1), $it->product) !!}</span>
+                                                        <span class="pl-num">{{ number_format($it->quantity_ordered) }}</span>
                                                     </div>
                                                 @endforeach
                                             </div>
                                         @else
-                                            <div class="pl-row">{{ number_format($po->qty_ordered) }}</div>
+                                            <div class="pl-row"><span class="pl-num">{{ number_format($po->qty_ordered) }}</span></div>
                                         @endif
                                     </td>
-                                    <td class="text-center">
+                                    <td>
                                         @if ($po->items->isNotEmpty())
                                             <div class="pl-block">
                                                 @foreach ($po->items as $it)
                                                     <div class="pl-row" title="{{ $it->product }}">
-                                                        <span class="pl-key">{!! $chip(\Illuminate\Support\Str::substr($it->product, 0, 1), $it->product) !!}</span> {{ number_format((float) $it->unit_price, 2) }}
+                                                        <span class="pl-key">{!! $chip(\Illuminate\Support\Str::substr($it->product, 0, 1), $it->product) !!}</span>
+                                                        <span class="pl-num">{{ number_format((float) $it->unit_price, 2) }}</span>
                                                     </div>
                                                 @endforeach
                                             </div>
                                         @else
-                                            <div class="pl-row text-muted">&mdash;</div>
+                                            <div class="pl-row text-muted"><span class="pl-num">&mdash;</span></div>
                                         @endif
                                     </td>
                                     <td class="text-nowrap">
@@ -236,7 +238,7 @@
                                         @endphp
                                         <div class="fw-bold">{{ number_format($amount, 2) }}</div>
                                     </td>
-                                    <td class="text-center">
+                                    <td>
                                         {{-- One label, not two. This cell previously stacked a
                                              numbered request_status badge over computed_status,
                                              which read as two answers to the same question - "3.
@@ -253,7 +255,7 @@
                                             {{ $po->computed_status }}
                                         </span>
                                     </td>
-                                    <td class="pe-3 text-end">
+                                    <td class="table-actions">
                                         {{-- Exactly two actions besides View, and which two
                                              depends on where the PO is in its life: Print is
                                              released only once the VP has approved, and an
@@ -261,19 +263,19 @@
                                              offers Print XOR Edit. The routes enforce the same
                                              thing, so this is a convenience rather than the
                                              gate. --}}
-                                        <div class="d-inline-flex gap-1 align-items-center flex-wrap justify-content-end">
+                                        <div class="d-inline-flex gap-1 align-items-center justify-content-center">
                                             @if ($po->isVpApproved())
                                                 <a href="{{ route('stock-orders.po-pdf', $po->id) }}"
-                                                   class="btn btn-sm btn-outline-danger rounded-pill px-2 py-1" title="Print Purchase Order">
+                                                   class="btn btn-sm btn-action btn-outline-danger rounded-pill px-2 py-1" title="Print Purchase Order">
                                                     <i class="bi bi-printer me-1"></i> Print
                                                 </a>
                                             @elseif (Auth::user()->canEditStockOrders())
-                                                <a href="{{ route('stock-orders.edit-supplier-po', $po->id) }}" class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary" title="Edit purchase order">
+                                                <a href="{{ route('stock-orders.edit-supplier-po', $po->id) }}" class="btn btn-sm btn-action btn-light border rounded-pill px-2 py-1 text-secondary" title="Edit purchase order">
                                                     <i class="bi bi-pencil me-1"></i> Edit
                                                 </a>
                                             @endif
 
-                                            <a href="{{ route('stock-orders.purchase-orders.show', $po->id) }}" class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary" title="Open purchase order">
+                                            <a href="{{ route('stock-orders.purchase-orders.show', $po->id) }}" class="btn btn-sm btn-action btn-light border rounded-pill px-2 py-1 text-secondary" title="Open purchase order">
                                                 <i class="bi bi-eye me-1"></i> View
                                             </a>
                                         </div>

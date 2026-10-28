@@ -160,19 +160,8 @@
     .acct-name { max-width: 170px; }
     .terms-cell { max-width: 100px; }
 
-    /* Per-product lines: "U - 3,000" / "U - 78.00" (block is centered, lines stay aligned) */
-    .pl-block {
-        display: inline-block;
-        text-align: left;
-        white-space: nowrap;
-    }
-    .pl-row { line-height: 1.7; }
-    .pl-key {
-        display: inline-block;
-        min-width: 1rem;
-        text-align: center;
-        font-weight: 400;
-    }
+    /* Per-product lines (.pl-block / .pl-row / .pl-key / .pl-num) are shared:
+       see public/css/ims-ui.css. */
     .exp-item { text-align: center; }
 
     /* Expanded details strip */
@@ -409,10 +398,11 @@
                                 <div class="pl-block">
                                     @forelse ($order->items as $item)
                                         <div class="pl-row" title="{{ $item->product_name }}">
-                                            <span class="pl-key">{!! $chip($item->product_type, $item->product_name) !!}</span> {{ number_format($item->qty) }}
+                                            <span class="pl-key">{!! $chip($item->product_type, $item->product_name) !!}</span>
+                                            <span class="pl-num">{{ number_format($item->qty) }}</span>
                                         </div>
                                     @empty
-                                        <div class="pl-row">{{ number_format($order->effective_qty_ordered) }}</div>
+                                        <div class="pl-row"><span class="pl-num">{{ number_format($order->effective_qty_ordered) }}</span></div>
                                     @endforelse
                                 </div>
                             </td>
@@ -422,10 +412,11 @@
                                 <div class="pl-block">
                                     @forelse ($order->items as $item)
                                         <div class="pl-row" title="{{ $item->product_name }}">
-                                            <span class="pl-key">{!! $chip($item->product_type, $item->product_name) !!}</span> {{ (float) $item->price > 0 ? number_format((float) $item->price, 2) : '—' }}
+                                            <span class="pl-key">{!! $chip($item->product_type, $item->product_name) !!}</span>
+                                            <span class="pl-num">{{ (float) $item->price > 0 ? number_format((float) $item->price, 2) : '—' }}</span>
                                         </div>
                                     @empty
-                                        <div class="pl-row">{{ (float) $order->price > 0 ? number_format((float) $order->price, 2) : '—' }}</div>
+                                        <div class="pl-row"><span class="pl-num">{{ (float) $order->price > 0 ? number_format((float) $order->price, 2) : '—' }}</span></div>
                                     @endforelse
                                 </div>
                             </td>

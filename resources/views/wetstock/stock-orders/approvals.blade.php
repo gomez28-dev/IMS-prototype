@@ -47,25 +47,25 @@
         <div class="card card-custom border-0 shadow-sm">
             <div class="card-body p-4">
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
+                    <table class="table table-center table-hover align-middle mb-0">
                         <thead class="bg-light">
                             <tr>
-                                <th class="ps-3 py-3">ATL Number</th>
+                                <th class="py-3">ATL Number</th>
                                 <th class="py-3">Sales Order</th>
                                 <th class="py-3">PO #</th>
                                 <th class="py-3">Pick Up Date</th>
-                                <th class="py-3 text-end">Volume</th>
+                                <th class="py-3">Volume</th>
                                 <th class="py-3">Prepared By</th>
                                 <th class="py-3">Driver / Plate</th>
-                                <th class="pe-3 py-3 text-end">Action</th>
+                                <th class="py-3 table-actions">Action</th>
                             </tr>
                         </thead>
                         <tbody>
                             @forelse ($pendingAtls as $atl)
                                 <tr>
-                                    <td class="ps-3 fw-bold text-dark">
+                                    <td class="fw-bold text-dark">
                                         {{ $atl->atl_number ?: '—' }}
-                                        <div class="small text-muted">Issued {{ $atl->issued_at?->format('M d, Y') }}</div>
+                                        <div class="small text-muted">{{ $atl->issued_at ? 'Issued '.$atl->issued_at->format('M d, Y') : 'Not yet issued' }}</div>
                                     </td>
                                     <td>
                                         @if ($atl->order)
@@ -93,7 +93,7 @@
                                         {{ $atlPoNumbers->isNotEmpty() ? $atlPoNumbers->join(', ') : ($atl->purchaseOrder->po_number ?? '—') }}
                                     </td>
                                     <td class="small">{{ $atl->receiving_date ? $atl->receiving_date->format('M d, Y') : '—' }}</td>
-                                    <td class="text-end fw-bold font-monospace">{{ number_format($atl->qty_to_receive) }} L</td>
+                                    <td class="fw-bold">{{ number_format($atl->qty_to_receive) }} L</td>
                                     <td class="small">{{ $atl->preparer->name ?? 'Purchasing' }}</td>
                                     <td class="small">
                                         {{ $atl->driver_name ?: '—' }}
@@ -101,21 +101,21 @@
                                             <div class="text-muted">{{ $atl->plate_number }}</div>
                                         @endif
                                     </td>
-                                    <td class="pe-3 text-end">
+                                    <td class="table-actions">
                                         @if (Auth::user()->canApproveStockOrders())
-                                            <div class="d-inline-flex gap-1 justify-content-end">
+                                            <div class="d-inline-flex gap-1 justify-content-center">
                                                 <form method="POST" action="{{ route('stock-orders.atl-reject', $atl->id) }}" class="d-inline"
                                                       onsubmit="return confirm('Reject this ATL and return it to Purchasing?');">
                                                     @csrf
                                                     <input type="hidden" name="rejection_reason" value="">
-                                                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3 py-1">
+                                                    <button type="submit" class="btn btn-sm btn-action btn-outline-danger rounded-pill px-3 py-1">
                                                         <i class="bi bi-x-lg me-1"></i> Reject
                                                     </button>
                                                 </form>
                                                 <form method="POST" action="{{ route('stock-orders.atl-approve', $atl->id) }}" class="d-inline"
                                                       onsubmit="return confirm('Approve this ATL?');">
                                                     @csrf
-                                                    <button type="submit" class="btn btn-sm btn-success rounded-pill px-3 py-1">
+                                                    <button type="submit" class="btn btn-sm btn-action btn-success rounded-pill px-3 py-1">
                                                         <i class="bi bi-check-lg me-1"></i> Approve
                                                     </button>
                                                 </form>
@@ -152,17 +152,17 @@
         <div class="card card-custom border-0 shadow-sm">
             <div class="card-body p-4">
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
+                    <table class="table table-center table-hover align-middle mb-0">
                         <thead class="bg-light">
                             <tr>
-                                <th class="ps-3 py-3">PO Number</th>
+                                <th class="py-3">PO Number</th>
                                 <th class="py-3">Type</th>
                                 <th class="py-3">Supplier / Source</th>
                                 <th class="py-3">Site / Channel</th>
-                                <th class="py-3 text-end">Volume</th>
+                                <th class="py-3">Volume</th>
                                 <th class="py-3">Prepared By</th>
                                 <th class="py-3">Delivery / ATL Breakdown</th>
-                                <th class="pe-3 py-3 text-end">Action</th>
+                                <th class="py-3 table-actions">Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -186,7 +186,7 @@
                                             Direct to Client
                                         @endif
                                     </td>
-                                    <td class="text-end fw-bold font-monospace">{{ number_format($order->qty_ordered) }} L</td>
+                                    <td class="fw-bold">{{ number_format($order->qty_ordered) }} L</td>
                                     <td class="small">{{ $order->requester->name ?? 'Purchasing' }}</td>
                                     <td class="small">
                                         @foreach ($order->deliveries as $del)
@@ -196,19 +196,19 @@
                                             </div>
                                         @endforeach
                                     </td>
-                                    <td class="pe-3 text-end">
+                                    <td class="table-actions">
                                         @if (Auth::user()->canApproveStockOrders())
-                                            <div class="d-inline-flex gap-1 align-items-center justify-content-end flex-wrap">
+                                            <div class="d-inline-flex gap-1 align-items-center justify-content-center">
                                                 <form method="POST" action="{{ route('stock-orders.approve', $order->id) }}" class="d-inline" onsubmit="return confirm('Confirm approval for Stock Order #{{ $order->po_number }}?');">
                                                     @csrf
-                                                    <button type="submit" class="btn btn-sm btn-success rounded-pill px-3 shadow-sm">
+                                                    <button type="submit" class="btn btn-sm btn-action btn-success rounded-pill px-3 shadow-sm">
                                                         <i class="bi bi-check-lg me-1"></i> Approve PO
                                                     </button>
                                                 </form>
                                                 <form method="POST" action="{{ route('stock-orders.reject', $order->id) }}" class="d-inline" onsubmit="return confirm('Reject Stock Order #{{ $order->po_number }} and return it to purchasing for rework?');">
                                                     @csrf
                                                     <input type="hidden" name="rejection_reason" value="">
-                                                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3 shadow-sm">
+                                                    <button type="submit" class="btn btn-sm btn-action btn-outline-danger rounded-pill px-3 shadow-sm">
                                                         <i class="bi bi-x-lg me-1"></i> Reject
                                                     </button>
                                                 </form>

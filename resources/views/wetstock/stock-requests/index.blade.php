@@ -257,9 +257,9 @@
                             <th>REQ #</th>
                             <th>Site</th>
                             <th>Type</th>
-                            <th class="text-end">Qty. Requested</th>
-                            <th class="text-end">Qty. Received</th>
-                            <th class="text-end">Qty. Pending</th>
+                            <th class="text-center">Qty. Requested</th>
+                            <th class="text-center">Qty. Received</th>
+                            <th class="text-center">Qty. Pending</th>
                             <th>Purchasing</th>
                             <th>Date Needed</th>
                             <th>Status</th>
@@ -277,31 +277,46 @@
                                 {{-- Volumes break out per product, because a request can
                                      cover more than one and Pending is per product:
                                      Requested minus Received. --}}
-                                <td class="text-end fw-bold font-monospace">
+                                <td class="text-center">
                                     @if ($req->lines->isEmpty())
                                         <span class="text-muted">&mdash;</span>
                                     @else
-                                        @foreach ($req->lines as $line)
-                                            <div>{!! $chip(\Illuminate\Support\Str::substr((string) $line->product, 0, 1), $line->product) !!} <span class="ms-2">{{ number_format($line->qty_requested) }}</span></div>
-                                        @endforeach
+                                        <div class="pl-block">
+                                            @foreach ($req->lines as $line)
+                                                <div class="pl-row" title="{{ $line->product }}">
+                                                    <span class="pl-key">{!! $chip(\Illuminate\Support\Str::substr((string) $line->product, 0, 1), $line->product) !!}</span>
+                                                    <span class="pl-num">{{ number_format($line->qty_requested) }}</span>
+                                                </div>
+                                            @endforeach
+                                        </div>
                                     @endif
                                 </td>
-                                <td class="text-end font-monospace">
+                                <td class="text-center">
                                     @if ($req->lines->isEmpty())
                                         <span class="text-muted">&mdash;</span>
                                     @else
-                                        @foreach ($req->lines as $line)
-                                            <div>{!! $chip(\Illuminate\Support\Str::substr((string) $line->product, 0, 1), $line->product) !!} <span class="ms-2">{{ number_format($line->qty_received) }}</span></div>
-                                        @endforeach
+                                        <div class="pl-block">
+                                            @foreach ($req->lines as $line)
+                                                <div class="pl-row" title="{{ $line->product }}">
+                                                    <span class="pl-key">{!! $chip(\Illuminate\Support\Str::substr((string) $line->product, 0, 1), $line->product) !!}</span>
+                                                    <span class="pl-num">{{ number_format($line->qty_received) }}</span>
+                                                </div>
+                                            @endforeach
+                                        </div>
                                     @endif
                                 </td>
-                                <td class="text-end font-monospace">
+                                <td class="text-center">
                                     @if ($req->lines->isEmpty())
                                         <span class="text-muted">&mdash;</span>
                                     @else
-                                        @foreach ($req->lines as $line)
-                                            <div class="{{ $line->qty_pending > 0 ? 'text-warning-emphasis fw-semibold' : 'text-success' }}">{!! $chip(\Illuminate\Support\Str::substr((string) $line->product, 0, 1), $line->product) !!} <span class="ms-2">{{ number_format($line->qty_pending) }}</span></div>
-                                        @endforeach
+                                        <div class="pl-block">
+                                            @foreach ($req->lines as $line)
+                                                <div class="pl-row" title="{{ $line->product }}">
+                                                    <span class="pl-key">{!! $chip(\Illuminate\Support\Str::substr((string) $line->product, 0, 1), $line->product) !!}</span>
+                                                    <span class="pl-num">{{ number_format($line->qty_pending) }}</span>
+                                                </div>
+                                            @endforeach
+                                        </div>
                                     @endif
                                 </td>
                                 {{-- Purchasing picking the request up is reported on its

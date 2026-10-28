@@ -165,9 +165,33 @@ body .wetstock-transfers-table tbody td {
     font-size: var(--fs-table);
 }
 
+/* One column of figures, centred headers, and a last column that does not
+   float away from the rest of the row. The spare width of a full-width table
+   otherwise lands in front of the Action buttons. */
+.table-center th,
+.table-center td {
+    text-align: center;
+    vertical-align: middle;
+}
+
+.table-center th {
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+.table-center th.table-actions,
+.table-center td.table-actions {
+    width: 1%;
+    white-space: nowrap;
+}
+
 /* Per-product lines: "D 3,000" — chip first, then the figure. The rules were
    previously copy-pasted into dashboard/deliveries and missing entirely from
-   the Module 3 purchase-order list. */
+   the Module 3 purchase-order list.
+
+   Fixed columns are what keeps them lined up: the chip sits in the first
+   track and the figure is right-aligned in the second, so a four-digit number
+   no longer shoves its chip sideways. */
 .pl-block {
     display: inline-block;
     text-align: left;
@@ -175,17 +199,27 @@ body .wetstock-transfers-table tbody td {
 }
 
 .pl-row {
-    line-height: 1.7;
+    display: grid;
+    grid-template-columns: 1.5rem 5.5rem;
+    column-gap: 0.5rem;
+    align-items: center;
+    line-height: 1.8;
 }
 
 .pl-key {
-    display: inline-block;
-    min-width: 1rem;
     text-align: center;
 }
 
+/* `grid-column` also gives chip-less rows (legacy POs, empty lines) the same
+   right-aligned figure column. */
+.pl-num {
+    grid-column: 2;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
 .pl-row .prod-chip {
-    margin-right: 0.35rem;
+    margin-right: 0;
 }
 
 /* --------------------------------------------------------------------------
@@ -340,6 +374,11 @@ body .action-icon:hover {
     background: var(--surface);
     border-color: #CBD5E1;
     color: var(--ink-strong);
+}
+
+/* Row actions share one width, so Print / Edit / View stop shifting the row. */
+.btn-action {
+    min-width: 5.5rem;
 }
 
 /* --------------------------------------------------------------------------

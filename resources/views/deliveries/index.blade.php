@@ -61,19 +61,8 @@
         border-radius: 0.5rem !important;
     }
 
-    /* Per-product lines: "U - 3,000" (block is centered, lines stay aligned) */
-    .pl-block {
-        display: inline-block;
-        text-align: left;
-        white-space: nowrap;
-    }
-    .pl-row { line-height: 1.7; }
-    .pl-key {
-        display: inline-block;
-        min-width: 1rem;
-        text-align: center;
-        font-weight: 400;
-    }
+    /* Per-product lines (.pl-block / .pl-row / .pl-key / .pl-num) are shared:
+       see public/css/ims-ui.css. */
 
     /* Buttons: same size as the Orders Dashboard */
     .compact-bar .btn {
@@ -357,9 +346,9 @@
                                         <td>
                                             <div class="pl-block">
                                                 @forelse ($delivery->productBreakdown() ?: [$delivery->product => (int) $delivery->qty_to_receive] as $product => $qty)
-                                                    <div class="pl-row"><x-product-chip :code="array_search($product, \App\Models\Order::PRODUCT_TYPES, true) ?: $product" :title="$product" /> {{ number_format($qty) }}</div>
+                                                    <div class="pl-row"><x-product-chip :code="array_search($product, \App\Models\Order::PRODUCT_TYPES, true) ?: $product" :title="$product" /><span class="pl-num">{{ number_format($qty) }}</span></div>
                                                 @empty
-                                                    <div class="pl-row">{{ number_format($delivery->qty_to_receive) }}</div>
+                                                    <div class="pl-row"><span class="pl-num">{{ number_format($delivery->qty_to_receive) }}</span></div>
                                                 @endforelse
                                             </div>
                                         </td>
@@ -431,10 +420,11 @@
                                     <div class="pl-block">
                                         @forelse ($delivery->items as $line)
                                             <div class="pl-row" title="{{ $line->product_name }}">
-                                                <span class="pl-key"><x-product-chip :code="$line->product_type" :title="$line->product_name" /></span> {{ number_format($line->qty_out) }}
+                                                <span class="pl-key"><x-product-chip :code="$line->product_type" :title="$line->product_name" /></span>
+                                                <span class="pl-num">{{ number_format($line->qty_out) }}</span>
                                             </div>
                                         @empty
-                                            <div class="pl-row">{{ number_format($delivery->qty_out) }}</div>
+                                            <div class="pl-row"><span class="pl-num">{{ number_format($delivery->qty_out) }}</span></div>
                                         @endforelse
                                     </div>
                                 </td>

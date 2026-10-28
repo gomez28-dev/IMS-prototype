@@ -151,7 +151,8 @@
                                         <div class="pl-block">
                                             @foreach ($req->lines as $line)
                                                 <div class="pl-row" title="{{ $line->product }}">
-                                                    <span class="pl-key">{!! $chip(\Illuminate\Support\Str::substr((string) $line->product, 0, 1), $line->product) !!}</span> {{ number_format($line->qty_requested) }}
+                                                    <span class="pl-key">{!! $chip(\Illuminate\Support\Str::substr((string) $line->product, 0, 1), $line->product) !!}</span>
+                                                    <span class="pl-num">{{ number_format($line->qty_requested) }}</span>
                                                 </div>
                                             @endforeach
                                         </div>
