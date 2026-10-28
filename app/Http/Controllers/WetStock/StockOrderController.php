@@ -1927,7 +1927,9 @@ public function storeStockRequestPo(Request $request): RedirectResponse
             'preparedBy' => $preparedBy,
             'approvedBy' => $approvedBy,
             'logoBase64' => $logoBase64,
-        ]);        $pdf->setPaper('letter', 'portrait');
+        ]);
+
+        $this->useBrandStationery($pdf, 'portrait');
 
         $sanitized = preg_replace('/[^A-Za-z0-9_\-]/', '_', $purchaseOrder->po_number ?: ('PO-' . $purchaseOrder->id));
 
@@ -1968,12 +1970,48 @@ public function storeStockRequestPo(Request $request): RedirectResponse
             ? 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath))
             : null;
 
+        // The ATL follows the company's printed form, which is landscape.
         $pdf = Pdf::loadView('wetstock.stock-orders.atl-pdf', compact('delivery', 'po', 'logoBase64'));
-        $pdf->setPaper('letter', 'portrait');
+
+        $this->useBrandStationery($pdf, 'landscape');
 
         $sanitizedName = preg_replace('/[^A-Za-z0-9_\-]/', '_', $delivery->atl_number ?: ($delivery->reference_no ?: ('DEL-' . $delivery->id)));
         $filename = 'ATL_' . $sanitizedName . '.pdf';
 
         return $pdf->download($filename);
+    }
+
+    /**
+     * The paper both printed documents are set on: Montserrat, portrait for
+     * the purchase order and landscape for the authority to load.
+     *
+     * dompdf only reads a font it can find inside its chroot, and it keeps the
+     * copy it embeds plus the metrics it derives in the font cache. Both are
+     * pointed at the project so the font files shipped in public/fonts are
+     * usable and the cache lives in writable storage rather than in vendor.
+     */
+    private function useBrandStationery(\Barryvdh\DomPDF\PDF $pdf, string $orientation): void
+    {
+        $pdf->setOption('chroot', base_path());
+        $pdf->setOption('fontDir', storage_path('fonts'));
+        $pdf->setOption('fontCache', storage_path('fonts'));
+
+        $faces = [
+            ['400', 'normal', 'Montserrat-400.ttf'],
+            ['400', 'italic', 'Montserrat-400-italic.ttf'],
+            ['700', 'normal', 'Montserrat-700.ttf'],
+            ['800', 'normal', 'Montserrat-800.ttf'],
+        ];
+
+        foreach ($faces as [$weight, $style, $file]) {
+            $path = str_replace('\\', '/', public_path('fonts/montserrat/' . $file));
+
+            $pdf->getFontMetrics()->registerFont(
+                ['family' => 'Montserrat', 'style' => $style, 'weight' => $weight],
+                'file://' . $path
+            );
+        }
+
+        $pdf->setPaper('letter', $orientation);
     }
 }

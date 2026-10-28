@@ -213,19 +213,19 @@ class AtlModalAndPdfRedesignTest extends TestCase
         $this->assertStringNotContainsString('allocations_summary', $source);
     }
 
-    public function test_the_pdf_carries_the_driver_and_date_on_the_first_row_and_no_location_column(): void
+    public function test_the_pdf_prints_the_lift_details_once_under_the_product_lines(): void
     {
         $source = $this->pdfSource();
 
-        // The location column (and its duplicated value) left for the
-        // DESTINATION / SITE row above, which now reads the delivery's own
-        // location.
-        $this->assertStringNotContainsString('>LOCATION<', $source);
-        $this->assertStringContainsString('DESTINATION / SITE', $source);
+        // The printed form carries the lift's own particulars in one labelled
+        // block below the product lines, so driver, plate, date and location
+        // never repeat down the allocation table. The old DESTINATION / SITE
+        // row in the metadata grid went with them: location has its own row.
+        foreach (["Driver's Name", 'Plate No.', 'Pick Up Date', 'Location'] as $label) {
+            $this->assertSame(1, substr_count($source, $label), $label . ' prints once.');
+        }
 
-        // Driver, plate and date render once - on the first allocation row -
-        // rather than repeating down the table.
-        $this->assertStringContainsString('$loop->first', $source);
+        $this->assertStringNotContainsString('DESTINATION / SITE', $source);
     }
 
     public function test_the_pdf_prints_the_so_number_in_its_formatted_form(): void

@@ -87,24 +87,26 @@ class WetStockRequestsSearchTest extends TestCase
         $this->assertMatchesRegularExpression('/btn-primary-custom[^"]*"?>\s*Search/', $html);
     }
 
-    public function test_the_search_box_sits_on_the_section_it_filters(): void
+    public function test_the_search_box_sits_in_the_header_of_the_list_it_filters(): void
     {
         $html = $this->page();
 
-        // It sits LEFT of the "Submitted Replenishment Requests" heading, in
-        // the same header row the list card it narrows opens with - not in
-        // the page header, and not dangling after the title.
+        // It opens the card the list lives in - above the table it narrows,
+        // not in the page header and not dangling after the title.
         $searchAt = strpos($html, 'name="search"');
-        $sectionAt = strpos($html, 'Submitted Replenishment Requests');
+        $cardAt = strpos($html, '<div class="card card-custom border-0 shadow-sm">');
+        $tableAt = strpos($html, '<table class="table table-custom mb-0">');
 
         $this->assertIsInt($searchAt);
-        $this->assertIsInt($sectionAt);
+        $this->assertIsInt($cardAt);
+        $this->assertIsInt($tableAt);
 
-        $this->assertLessThan(
-            $sectionAt,
-            $searchAt,
-            'The search box sits beside the section heading it filters, before it.'
-        );
+        $this->assertGreaterThan($cardAt, $searchAt, 'The search sits inside the list card.');
+        $this->assertLessThan($tableAt, $searchAt, 'The search sits above the table it narrows.');
+
+        // The section heading the search used to sit beside was removed and
+        // the search moved into its row, at the left edge of the header.
+        $this->assertStringNotContainsString('Submitted Replenishment Requests', $html);
 
         // The page header became plain: the two navigation buttons left with
         // the top-right actions block.

@@ -5,291 +5,254 @@
     <title>Purchase Order - {{ $po->po_number }}</title>
     <style>
         @page {
-            margin: 26px 30px 30px 30px;
+            margin: 28px 34px 44px 34px;
             size: letter portrait;
         }
         body {
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            font-size: 11px;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 9pt;
             line-height: 1.35;
-            color: #222;
+            color: #111;
             margin: 0;
             padding: 0;
         }
-
-        /* Header */
-        .header-table {
+        table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 12px;
         }
-        .logo-cell {
-            width: 38%;
-            vertical-align: middle;
+        .header-table td {
+            padding: 0;
+            vertical-align: top;
         }
         .logo-img {
-            max-width: 190px;
+            width: 150px;
             height: auto;
         }
-        .company-cell {
-            width: 62%;
-            text-align: right;
-            vertical-align: middle;
-        }
         .company-name {
-            font-size: 15px;
-            font-weight: 800;
-            letter-spacing: 0.5px;
-            color: #111;
-            margin: 0;
+            margin: 5px 0 0 0;
+            font-size: 7.5pt;
+            font-weight: 700;
+            letter-spacing: 0.3px;
         }
         .company-line {
-            font-size: 9px;
+            margin: 1px 0 0 0;
+            font-size: 7pt;
             color: #444;
-            margin: 1px 0 0;
         }
-
-        /* Orange document banner */
-        .doc-banner {
-            width: 100%;
-            background-color: #f7941d;
-            color: #fff;
-            font-size: 14px;
+        .doc-title {
+            margin: 0;
+            font-size: 20pt;
             font-weight: 800;
-            letter-spacing: 2px;
-            text-align: center;
+            letter-spacing: 1.2px;
+            text-align: right;
             text-transform: uppercase;
-            padding: 6px 0;
-            margin-bottom: 14px;
-        }
-
-        /* Company / reference block */
-        .head-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 12px;
-        }
-        .head-table td {
-            padding: 3px 6px;
-            vertical-align: top;
-            font-size: 11px;
-        }
-        .head-label {
-            width: 78px;
-            font-weight: 700;
-            color: #333;
-        }
-        .head-value {
-            width: 42%;
-            font-weight: 600;
             color: #111;
         }
-        .ref-value {
-            color: #d9480f;
-            font-weight: 700;
+        .rule {
+            border-top: 1.4px solid #000;
+            margin: 10px 0 14px 0;
         }
-
-        /* Line items */
-        .items-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 0;
+        /* Every framed block on the form: black hairlines, rice-paper labels. */
+        .boxed td,
+        .boxed th {
+            border: 1px solid #000;
         }
-        .items-table th {
-            background-color: #f7941d;
-            color: #fff;
-            border: 1px solid #d9822b;
-            padding: 7px 6px;
-            font-size: 10px;
+        .label {
+            padding: 5px 8px;
+            background-color: #fee8e5;
+            font-size: 7.5pt;
             font-weight: 700;
+            letter-spacing: 0.5px;
             text-transform: uppercase;
-            text-align: center;
-        }
-        .items-table td {
-            border: 1px solid #ccc;
-            padding: 8px 6px;
-            font-size: 11px;
-            text-align: center;
             vertical-align: middle;
         }
-        .items-table td.num {
+        .value {
+            padding: 5px 8px;
+            font-size: 9pt;
+            vertical-align: middle;
+        }
+        .grid {
+            margin-bottom: 13px;
+        }
+        .grid .label {
+            width: 15%;
+        }
+        .grid .value {
+            width: 35%;
+        }
+        .items {
+            margin-bottom: 0;
+        }
+        .items th {
+            padding: 6px 8px;
+            background-color: #fee8e5;
+            font-size: 7.5pt;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            text-align: center;
+        }
+        .items td {
+            height: 22px;
+            padding: 6px 8px;
+            vertical-align: middle;
+        }
+        .items td.center {
+            text-align: center;
+        }
+        .items td.num {
             text-align: right;
         }
-        .items-table td.particulars {
+        .items td.particulars {
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            font-weight: 600;
-        }
-
-        /* Totals block */
-        .totals-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: -1px;
-        }
-        .totals-table td {
-            border: 1px solid #ccc;
-            padding: 5px 8px;
-            font-size: 11px;
-        }
-        .totals-table td.label {
-            width: 68%;
+            letter-spacing: 0.4px;
             font-weight: 700;
-            text-transform: uppercase;
-            font-size: 10px;
-            letter-spacing: 0.5px;
         }
-        .totals-table td.value {
+        .totals .label {
+            width: 68%;
+        }
+        .totals .value {
             width: 32%;
             text-align: right;
-            font-weight: 600;
+            font-weight: 700;
         }
-        .totals-table tr.net td {
-            background-color: #fafafa;
+        .totals tr.net .value {
             font-weight: 800;
         }
-
-        /* Remarks and acceptance */
-        .foot-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 12px;
+        .foot {
+            margin-top: 13px;
         }
-        .foot-table td {
-            border: 1px solid #ccc;
-            padding: 8px 10px;
-            vertical-align: top;
-            height: 70px;
+        .foot .label {
+            width: 22%;
         }
-        .foot-label {
-            font-weight: 700;
-            text-transform: uppercase;
-            font-size: 10px;
-            letter-spacing: 0.5px;
-            color: #333;
+        .foot td.value {
+            height: 34px;
         }
-
-        /* Signatures */
-        .signatures-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 26px;
+        .sig-caption {
+            font-size: 8pt;
+            font-style: italic;
+            color: #444;
         }
-        .signatures-table td {
+        .signatures {
+            margin-top: 22px;
+        }
+        .signatures td {
             width: 50%;
-            padding: 0 22px;
-            text-align: center;
-            vertical-align: bottom;
+            padding: 0 8px;
+            vertical-align: top;
         }
-        .sig-role {
-            font-size: 11px;
+        .sig-label {
+            font-size: 7.5pt;
             font-weight: 700;
-            text-align: left;
-            margin-bottom: 40px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
         }
-        .sig-line {
-            border-top: 1.2px solid #222;
-            padding-top: 5px;
+        .sig-space {
+            height: 30px;
         }
         .sig-name {
-            font-size: 11px;
+            font-size: 10.5pt;
             font-weight: 800;
+            letter-spacing: 0.4px;
+            text-align: center;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
         }
-        .sig-title {
-            font-size: 9px;
-            color: #555;
-            margin-top: 1px;
+        .sig-note {
+            margin-top: 2px;
+            font-size: 8.5pt;
+            font-style: italic;
+            text-align: center;
+            color: #333;
         }
-
         .footer {
             position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
+            padding-top: 5px;
+            border-top: 1.2px solid #000;
             text-align: center;
-            font-size: 9px;
-            color: #888;
-            border-top: 1px solid #eee;
-            padding-top: 6px;
+            font-size: 8pt;
+            color: #444;
         }
     </style>
 </head>
 <body>
 
-    {{-- Header: logo and company identity --}}
+    {{-- Masthead: wordmark and issuer identity left, the document's name set
+         hard against the right margin, as on the printed ATL form. --}}
     <table class="header-table">
         <tr>
-            <td class="logo-cell">
-                @if(!empty($logoBase64))
+            <td style="width: 55%;">
+                @if (!empty($logoBase64))
                     <img src="{{ $logoBase64 }}" class="logo-img" alt="Doyen Petroleum">
                 @else
-                    <div style="font-size: 18px; font-weight: 900; color: #c92a2a; letter-spacing: 1px;">DOYEN PETROLEUM</div>
+                    <div style="font-size: 18px; font-weight: 800; letter-spacing: 1px;">DOYEN PETROLEUM</div>
                 @endif
+                <div class="company-name">DOYEN INTERNATIONAL TRADING CORP.</div>
+                <div class="company-line">2108 Lamesa St, Brgy. Ugong Distr. 2, Valenzuela City</div>
+                <div class="company-line">Email Add: doyen.petroelum@yahoo.com</div>
             </td>
-            <td class="company-cell">
-                <p class="company-name">DOYEN INTERNATIONAL TRADING CORP.</p>
-                <p class="company-line">2108 Lamesa St, Brgy. Ugong Distr. 2, Valenzuela City</p>
-                <p class="company-line">Email Add: doyen.petroelum@yahoo.com</p>
+            <td style="width: 45%;">
+                <h1 class="doc-title">Purchase Order</h1>
             </td>
         </tr>
     </table>
 
-    <div class="doc-banner">Purchase Order</div>
+    <div class="rule"></div>
 
-    {{-- Company and reference details --}}
-    <table class="head-table">
+    {{-- Who the order is addressed to, and its reference details. --}}
+    <table class="boxed grid">
         <tr>
-            <td class="head-label">Company</td>
-            <td class="head-value">{{ $supplierName }}</td>
-            <td class="head-label">Reference No.</td>
-            <td class="head-value ref-value">{{ $po->po_number ?: '—' }}</td>
+            <td class="label">Company</td>
+            <td class="value">{{ $supplierName }}</td>
+            <td class="label">Reference No.</td>
+            <td class="value" style="font-weight: 700;">{{ $po->po_number ?: '—' }}</td>
         </tr>
         <tr>
-            <td class="head-label">Address</td>
-            <td class="head-value">{{ $supplierAddress ?: '—' }}</td>
-            <td class="head-label">Date</td>
-            <td class="head-value">{{ $poDate ?: '—' }}</td>
+            <td class="label">Address</td>
+            <td class="value">{{ $supplierAddress ?: '—' }}</td>
+            <td class="label">Date</td>
+            <td class="value">{{ $poDate ?: '—' }}</td>
         </tr>
         <tr>
-            <td class="head-label">Attention</td>
-            <td class="head-value">{{ $attention ?: '—' }}</td>
-            <td class="head-label">Terms</td>
-            <td class="head-value">{{ $po->terms ?: '—' }}</td>
+            <td class="label">Attention</td>
+            <td class="value">{{ $attention ?: '—' }}</td>
+            <td class="label">Terms</td>
+            <td class="value">{{ $po->terms ?: '—' }}</td>
         </tr>
     </table>
 
-    {{-- Line items --}}
-    <table class="items-table">
+    {{-- Line items, one order line per row. --}}
+    <table class="boxed items">
         <thead>
             <tr>
-                <th style="width: 16%;">Quantity</th>
-                <th style="width: 10%;">Unit</th>
-                <th style="width: 34%;">Particulars</th>
-                <th style="width: 20%;">Unit Price</th>
-                <th style="width: 20%;">Amount</th>
+                <th style="width: 15%;">Quantity</th>
+                <th style="width: 9%;">Unit</th>
+                <th style="width: 38%;">Particulars</th>
+                <th style="width: 19%;">Unit Price</th>
+                <th style="width: 19%;">Amount</th>
             </tr>
         </thead>
         <tbody>
             @forelse ($lines as $line)
                 <tr>
                     <td class="num">{{ number_format($line['qty'], 0) }}</td>
-                    <td>{{ $line['unit'] ?: 'LTRS' }}</td>
+                    <td class="center">{{ $line['unit'] ?: 'LTRS' }}</td>
                     <td class="particulars">{{ $line['particulars'] }}</td>
                     <td class="num">{{ number_format($line['price'], 2) }}</td>
                     <td class="num">{{ number_format($line['amount'], 2) }}</td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="5">No product lines recorded.</td>
+                    <td colspan="5" class="center">No product lines recorded.</td>
                 </tr>
             @endforelse
         </tbody>
     </table>
 
     {{-- Totals. VAT rows are entered by hand, matching the printed form. --}}
-    <table class="totals-table">
+    <table class="boxed totals">
         <tr>
             <td class="label">Total Amount</td>
             <td class="value">{{ number_format($totals['total_amount'], 2) }}</td>
@@ -312,44 +275,39 @@
         </tr>
     </table>
 
-    {{-- Remarks and supplier acceptance --}}
-    <table class="foot-table">
+    {{-- Remarks, and the supplier's acceptance of the order. --}}
+    <table class="boxed foot">
         <tr>
-            <td style="width: 62%;">
-                <div class="foot-label">Remarks:</div>
-                <div style="margin-top: 6px; color: #c92a2a; font-style: italic; font-weight: 600;">
-                    {{ $po->remarks ?: '' }}
-                </div>
-            </td>
-            <td style="width: 38%;">
-                <div class="foot-label">Order Accepted by:</div>
-                <div style="margin-top: 6px; font-size: 10px; color: #555;">Signature over printed name/Date</div>
+            <td class="label">Remarks</td>
+            <td class="value">{{ $po->remarks ?: '—' }}</td>
+        </tr>
+        <tr>
+            <td class="label">Order Accepted By</td>
+            <td class="value">
+                <span class="sig-caption">signature over printed name / date</span>
             </td>
         </tr>
     </table>
 
     {{-- Prepared and approved. Printed names only; no signature images. --}}
-    <table class="signatures-table">
+    <table class="signatures">
         <tr>
             <td>
-                <div class="sig-role">Prepared by:</div>
-                <div class="sig-line">
-                    <div class="sig-name">{{ $preparedBy ?: '—' }}</div>
-                    <div class="sig-title">Signature over printed name</div>
-                </div>
+                <div class="sig-label">Prepared by:</div>
+                <div class="sig-space"></div>
+                <div class="sig-name">{{ $preparedBy ?: '—' }}</div>
+                <div class="sig-note">signature over printed name</div>
             </td>
             <td>
-                <div class="sig-role">Approved by:</div>
-                <div class="sig-line">
-                    <div class="sig-name">{{ $approvedBy ?: '—' }}</div>
-                    <div class="sig-title">Signature over printed name</div>
-                </div>
+                <div class="sig-label">Approved by:</div>
+                <div class="sig-space"></div>
+                <div class="sig-name">{{ $approvedBy ?: '—' }}</div>
+                <div class="sig-note">signature over printed name</div>
             </td>
         </tr>
     </table>
 
-    <div class="footer">
-        Purchase Order {{ $po->po_number }} &mdash; Doyen International Trading Corp.
-    </div>
+    <div class="footer">www.doyengroupofcompanies.com</div>
+
 </body>
 </html>

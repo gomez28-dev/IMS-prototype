@@ -96,16 +96,19 @@
     <!-- Replenishment Requests Table -->
     <div class="card card-custom border-0 shadow-sm">
         <div class="card-header bg-white border-0 py-3">
-            {{-- The search sits LEFT of the heading, in the same header row it
-                 filters the list card through - the supervisor's annotation put
-                 them side by side, search first. --}}
-            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2">
+            {{-- The section heading was removed and the search took its row:
+                 the left edge of the card header, directly above the table it
+                 filters. --}}
+            <div class="d-flex justify-content-start">
                 <form method="GET" action="{{ route('stock-orders.wet-stock-requests.index') }}"
                       class="d-flex gap-2 align-items-center flex-wrap">
                     @if (request('warehouse_id'))
                         <input type="hidden" name="warehouse_id" value="{{ request('warehouse_id') }}">
                     @endif
-                    <div class="input-group">
+                    {{-- The same fixed width the Purchase Orders list gives its
+                         search, so the pair reads as one control instead of
+                         stretching across the header. --}}
+                    <div class="input-group flex-shrink-0" style="width: 320px;">
                         <span class="input-group-text bg-white border-end-0">
                             <i class="bi bi-search text-muted"></i>
                         </span>
@@ -118,7 +121,6 @@
                     <a href="{{ route('stock-orders.wet-stock-requests.index') }}"
                        class="btn btn-outline-secondary">Clear</a>
                 </form>
-                <h5 class="fw-bold text-dark mb-0"><i class="bi bi-file-earmark-text text-secondary me-2"></i>Submitted Replenishment Requests</h5>
             </div>
         </div>
         <div class="card-body p-0">

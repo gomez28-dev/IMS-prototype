@@ -135,7 +135,9 @@ class WetStockRequestsIndexCleanupTest extends TestCase
 
         $html = $this->page();
 
-        $this->assertStringContainsString('Submitted Replenishment Requests', $html);
+        // The section heading was removed; the search that took its place is
+        // all the card header carries now.
+        $this->assertStringNotContainsString('Submitted Replenishment Requests', $html);
         // One table: the requests. The other two headings are gone.
         $this->assertSame(
             1,
