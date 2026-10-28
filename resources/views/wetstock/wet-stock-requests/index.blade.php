@@ -130,7 +130,7 @@
                             <th>ATL / DR #</th>
                             <th>Site</th>
                             <th>Type</th>
-                            <th class="text-end">Volume</th>
+                            <th class="text-center">Volume</th>
                             <th>Date Needed</th>
                             <th>Status</th>
                             <th>Requested By</th>
@@ -146,10 +146,18 @@
                                 <td class="small">Pending</td>
                                 <td>{{ $req->warehouse->name ?? 'All Depots' }}</td>
                                 <td><span class="badge bg-light text-dark border">{{ $req->type_label }}</span></td>
-                                <td class="text-end fw-bold font-monospace">
-                                    @foreach ($req->lines as $line)
-                                        <div>{{ \Illuminate\Support\Str::substr((string) $line->product, 0, 1) }} &mdash; {{ number_format($line->qty_requested) }}</div>
-                                    @endforeach
+                                <td class="fw-bold">
+                                    @if ($req->lines->isNotEmpty())
+                                        <div class="pl-block">
+                                            @foreach ($req->lines as $line)
+                                                <div class="pl-row" title="{{ $line->product }}">
+                                                    <span class="pl-key">{!! $chip(\Illuminate\Support\Str::substr((string) $line->product, 0, 1), $line->product) !!}</span> {{ number_format($line->qty_requested) }}
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @else
+                                        <span class="text-muted">&mdash;</span>
+                                    @endif
                                 </td>
                                 <td class="small">{{ $req->date_needed ? $req->date_needed->format('M d, Y') : '—' }}</td>
                                 <td>

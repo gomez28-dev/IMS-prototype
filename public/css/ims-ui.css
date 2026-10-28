@@ -19,6 +19,7 @@
 
 :root {
     --brand: #FF4500;
+    --brand-rgb: 255, 69, 0;
     --brand-hover: #CC3700;
     --brand-soft: #FFF1EA;
     --brand-ring: rgba(255, 69, 0, 0.28);
@@ -268,8 +269,11 @@ body .wetstock-transfers-table tbody td {
     --bs-btn-disabled-border-color: var(--brand);
 }
 
+/* Keep Bootstrap's opacity utility working: `bg-primary bg-opacity-10` is how
+   the login shield, and several icon tiles, get their tinted backing. A flat
+   `background-color: var(--brand)` swallowed that and turned them solid. */
 .bg-primary {
-    background-color: var(--brand) !important;
+    background-color: rgba(var(--brand-rgb), var(--bs-bg-opacity, 1)) !important;
 }
 
 .bg-primary-subtle {
