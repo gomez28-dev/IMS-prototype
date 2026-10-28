@@ -1,0 +1,423 @@
+/* ==========================================================================
+   IMS UI — shared portal stylesheet
+   --------------------------------------------------------------------------
+   Single source of truth for the visual language shared by Module 1 (Sales
+   Documentation), Module 2 (Wet Stock) and Module 3 (Stock Orders).
+
+   Loaded from resources/views/layouts/app.blade.php AFTER Bootstrap, BEFORE
+   the layout's own shell styles and the per-page <style> blocks. No build
+   step: plain CSS so Hostinger shared hosting needs nothing beyond a push.
+
+   Rules of the house:
+   - Montserrat is the only family. `.font-monospace` is remapped, not removed,
+     so old markup keeps working without touching 20 views.
+   - Numbers use tabular figures, not a second font family.
+   - Orange (#FF4500) is the primary action colour; amber (#F2A900) is the
+     secondary accent and the Diesel chip.
+   - Product chips use one palette: U green, D amber, P red.
+   ========================================================================== */
+
+:root {
+    --brand: #FF4500;
+    --brand-hover: #CC3700;
+    --brand-soft: #FFF1EA;
+    --brand-ring: rgba(255, 69, 0, 0.28);
+
+    --accent: #F2A900;
+    --accent-soft: #FEF3C7;
+
+    --ink: #334155;
+    --ink-strong: #0F172A;
+    --muted: #64748B;
+    --line: #E2E8F0;
+    --surface: #F1F5F9;
+    --thead: #F8FAFC;
+
+    --radius-container: 16px;
+    --radius-control: 10px;
+    --radius-pill: 999px;
+
+    --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px -18px rgba(15, 23, 42, 0.25);
+
+    --fs-page: 1.5rem;
+    --fs-section: 1.05rem;
+    --fs-body: 0.875rem;
+    --fs-table: 0.82rem;
+    --fs-th: 0.72rem;
+    --fs-label: 0.78rem;
+    --fs-meta: 0.72rem;
+    --fs-btn: 0.82rem;
+    --fs-badge: 0.7rem;
+
+    --prod-u: #166534;
+    --prod-u-bg: #DCFCE7;
+    --prod-u-line: #BBF7D0;
+    --prod-d: #92400E;
+    --prod-d-bg: #FEF3C7;
+    --prod-d-line: #FDE68A;
+    --prod-p: #991B1B;
+    --prod-p-bg: #FEE2E2;
+    --prod-p-line: #FECACA;
+    --prod-none: #6B7280;
+    --prod-none-bg: #F3F4F6;
+    --prod-none-line: #E5E7EB;
+
+    --font-ui: 'Montserrat', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+/* --------------------------------------------------------------------------
+   1. Typography
+   -------------------------------------------------------------------------- */
+
+html,
+body,
+button,
+input,
+optgroup,
+select,
+textarea,
+.btn,
+.badge,
+.table,
+.form-control,
+.form-select,
+.dropdown-menu,
+.modal,
+.popover,
+.tooltip {
+    font-family: var(--font-ui);
+}
+
+h1, h2, h3, h4, h5, h6 {
+    color: var(--ink-strong);
+    letter-spacing: -0.01em;
+}
+
+/* Numbers never get a second family. `font-monospace` survives in 20 views
+   and is remapped here so the portal reads as one typeface everywhere. */
+.font-monospace {
+    font-family: var(--font-ui) !important;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0;
+}
+
+/* Tabular figures keep columns of quantities aligned without monospace. */
+table td,
+table th,
+.pl-block,
+.pl-row,
+.stat-big,
+.stat-val,
+.font-monospace {
+    font-variant-numeric: tabular-nums;
+}
+
+/* Used in ~10 views but never defined before; make it mean something. */
+.extra-small {
+    font-size: var(--fs-meta) !important;
+    line-height: 1.45;
+}
+
+.page-title {
+    font-size: var(--fs-page);
+    font-weight: 700;
+    color: var(--ink-strong);
+    margin: 0;
+}
+
+.section-title {
+    font-size: var(--fs-section);
+    font-weight: 600;
+    color: var(--ink-strong);
+}
+
+/* --------------------------------------------------------------------------
+   2. Tables — one header and body scale for every module
+   -------------------------------------------------------------------------- */
+
+/* `body` prefix so a page-local `.table-custom td { font-size: ... }` cannot
+   quietly reintroduce a second scale. */
+body .table-custom thead th {
+    background-color: var(--thead);
+    color: var(--muted);
+    font-size: var(--fs-th);
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+body .table-custom tbody td {
+    font-size: var(--fs-table);
+}
+
+body .wetstock-deliveries-table thead th,
+body .wetstock-transfers-table thead th {
+    color: var(--muted);
+    font-size: var(--fs-th);
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+body .wetstock-deliveries-table tbody td,
+body .wetstock-transfers-table tbody td {
+    font-size: var(--fs-table);
+}
+
+/* Per-product lines: "D 3,000" — chip first, then the figure. The rules were
+   previously copy-pasted into dashboard/deliveries and missing entirely from
+   the Module 3 purchase-order list. */
+.pl-block {
+    display: inline-block;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.pl-row {
+    line-height: 1.7;
+}
+
+.pl-key {
+    display: inline-block;
+    min-width: 1rem;
+    text-align: center;
+}
+
+.pl-row .prod-chip {
+    margin-right: 0.35rem;
+}
+
+/* --------------------------------------------------------------------------
+   3. Product chips — U Unleaded (green), D Diesel (amber), P Premium (red)
+   -------------------------------------------------------------------------- */
+
+.prod-chip {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0.2rem 0.4rem;
+    border-radius: 0.35rem;
+    border: 1px solid transparent;
+    margin: 0 1px;
+    vertical-align: middle;
+}
+
+.prod-chip--u {
+    background: var(--prod-u-bg);
+    color: var(--prod-u);
+    border-color: var(--prod-u-line);
+}
+
+.prod-chip--d {
+    background: var(--prod-d-bg);
+    color: var(--prod-d);
+    border-color: var(--prod-d-line);
+}
+
+.prod-chip--p {
+    background: var(--prod-p-bg);
+    color: var(--prod-p);
+    border-color: var(--prod-p-line);
+}
+
+.prod-chip--none {
+    background: var(--prod-none-bg);
+    color: var(--prod-none);
+    border-color: var(--prod-none-line);
+}
+
+/* --------------------------------------------------------------------------
+   4. Buttons, badges and links — Bootstrap's blue becomes the brand orange
+   -------------------------------------------------------------------------- */
+
+/* Bootstrap 5.3's `.btn-primary` reads `--bs-btn-bg` directly, so overriding
+   `--bs-primary` alone leaves 86 buttons blue. These are the real hooks. */
+.btn {
+    font-weight: 500;
+    font-size: var(--fs-btn);
+    border-radius: var(--radius-control);
+    transition: background-color 0.18s ease, border-color 0.18s ease,
+        box-shadow 0.18s ease, color 0.18s ease;
+}
+
+.btn-primary {
+    --bs-btn-color: #fff;
+    --bs-btn-bg: var(--brand);
+    --bs-btn-border-color: var(--brand);
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: var(--brand-hover);
+    --bs-btn-hover-border-color: var(--brand-hover);
+    --bs-btn-focus-shadow-rgb: 255, 69, 0;
+    --bs-btn-active-color: #fff;
+    --bs-btn-active-bg: var(--brand-hover);
+    --bs-btn-active-border-color: var(--brand-hover);
+    --bs-btn-disabled-color: #fff;
+    --bs-btn-disabled-bg: var(--brand);
+    --bs-btn-disabled-border-color: var(--brand);
+}
+
+.btn-outline-primary {
+    --bs-btn-color: var(--brand);
+    --bs-btn-border-color: var(--brand);
+    --bs-btn-hover-bg: var(--brand);
+    --bs-btn-hover-border-color: var(--brand);
+    --bs-btn-active-bg: var(--brand);
+    --bs-btn-active-border-color: var(--brand);
+    --bs-btn-disabled-color: var(--brand);
+    --bs-btn-disabled-border-color: var(--brand);
+}
+
+.bg-primary {
+    background-color: var(--brand) !important;
+}
+
+.bg-primary-subtle {
+    background-color: var(--brand-soft) !important;
+}
+
+.border-primary-subtle {
+    border-color: #FFD7C7 !important;
+}
+
+.text-primary {
+    color: var(--brand) !important;
+}
+
+.text-primary-emphasis {
+    color: #C2410C !important;
+}
+
+.link-primary {
+    color: var(--brand) !important;
+}
+
+.badge {
+    font-size: var(--fs-badge);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+
+/* --------------------------------------------------------------------------
+   5. Stat cards, icons and action buttons
+   -------------------------------------------------------------------------- */
+
+/* Seven copies of this rule use 46px, two use 2.25rem. Body prefix wins over
+   the page-local copies without editing nine files. */
+body .stat-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    flex: none;
+}
+
+body .action-icon {
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-control);
+    background: #fff;
+    color: var(--ink);
+    font-size: 0.95rem;
+    line-height: 1;
+    transition: background-color 0.18s ease, border-color 0.18s ease,
+        color 0.18s ease;
+}
+
+body .action-icon:hover {
+    background: var(--surface);
+    border-color: #CBD5E1;
+    color: var(--ink-strong);
+}
+
+/* --------------------------------------------------------------------------
+   6. Forms
+   -------------------------------------------------------------------------- */
+
+.form-label {
+    font-size: var(--fs-label);
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 0.35rem;
+}
+
+.form-text {
+    font-size: var(--fs-meta);
+    color: var(--muted);
+}
+
+.form-control,
+.form-select {
+    border-radius: var(--radius-control);
+    border-color: var(--line);
+    font-size: var(--fs-body);
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 0.2rem var(--brand-ring);
+}
+
+/* --------------------------------------------------------------------------
+   7. Floating cards and modals — one shell
+   -------------------------------------------------------------------------- */
+
+.modal-content {
+    border: 0;
+    border-radius: var(--radius-container);
+    box-shadow: 0 24px 60px -20px rgba(15, 23, 42, 0.35);
+}
+
+.modal-header,
+.modal-footer {
+    padding: 1rem 1.25rem;
+}
+
+.modal-header {
+    border-bottom: 1px solid var(--line);
+}
+
+.modal-footer {
+    border-top: 1px solid var(--line);
+    gap: 0.5rem;
+}
+
+.modal-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--ink-strong);
+}
+
+/* --------------------------------------------------------------------------
+   8. Accessibility — focus ring, motion
+   -------------------------------------------------------------------------- */
+
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    .card-custom:hover,
+    .btn-primary-custom:hover {
+        transform: none !important;
+    }
+}

@@ -9,6 +9,9 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.min.css">
+    <!-- IMS shared UI: typography, colours and shared components. Loaded after
+         Bootstrap so its token overrides win; per-page styles still follow. -->
+    <link rel="stylesheet" href="{{ asset('css/ims-ui.css') }}?v={{ filemtime(public_path('css/ims-ui.css')) }}">
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -437,10 +440,16 @@
             border-radius: 16px;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
             background: #ffffff;
-            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: border-color 0.18s ease, box-shadow 0.18s ease;
         }
 
+        /* No lift: this class also wraps full-height table containers, which
+           used to jump under the cursor. Interactive cards opt in below. */
         .card-custom:hover {
+            border-color: #CBD5E1;
+        }
+
+        .card-custom.is-interactive:hover {
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
             transform: translateY(-2px);
         }
@@ -522,7 +531,7 @@
             border-radius: 10px;
             padding: 0.6rem 1.4rem;
             color: #ffffff;
-            transition: all 0.2s;
+            transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
             text-decoration: none;
         }
 
@@ -556,7 +565,7 @@
             font-weight: 500;
             border-radius: 10px;
             padding: 0.6rem 1.4rem;
-            transition: all 0.2s;
+            transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
             text-decoration: none;
         }
 
@@ -616,10 +625,8 @@
             font-size: 0.85rem;
         }
 
-        /* Micro-animations */
-        .btn, .card-custom {
-            transition: all 0.2s ease-in-out;
-        }
+        /* Micro-animations: specific properties only, never `all` (it animates
+           layout-affecting values on every interaction). */
 
         /* ========================================
            MOBILE DRAWER (< 992px, unchanged)

@@ -357,7 +357,7 @@
                                         <td>
                                             <div class="pl-block">
                                                 @forelse ($delivery->productBreakdown() ?: [$delivery->product => (int) $delivery->qty_to_receive] as $product => $qty)
-                                                    <div class="pl-row">{{ array_search($product, \App\Models\Order::PRODUCT_TYPES, true) ?: $product }} - {{ number_format($qty) }}</div>
+                                                    <div class="pl-row"><x-product-chip :code="array_search($product, \App\Models\Order::PRODUCT_TYPES, true) ?: $product" :title="$product" /> {{ number_format($qty) }}</div>
                                                 @empty
                                                     <div class="pl-row">{{ number_format($delivery->qty_to_receive) }}</div>
                                                 @endforelse
@@ -431,7 +431,7 @@
                                     <div class="pl-block">
                                         @forelse ($delivery->items as $line)
                                             <div class="pl-row" title="{{ $line->product_name }}">
-                                                <span class="pl-key">{{ $line->product_type ?: '—' }}</span> - {{ number_format($line->qty_out) }}
+                                                <span class="pl-key"><x-product-chip :code="$line->product_type" :title="$line->product_name" /></span> {{ number_format($line->qty_out) }}
                                             </div>
                                         @empty
                                             <div class="pl-row">{{ number_format($delivery->qty_out) }}</div>

@@ -26,7 +26,7 @@
             // Kept identical to the Orders Dashboard so the two read as one set.
             $chipStyles = [
                 'U' => 'background:#dcfce7;color:#166534;border:1px solid #bbf7d0;',
-                'D' => 'background:#e0e7ff;color:#3730a3;border:1px solid #c7d2fe;',
+                'D' => 'background:#fef3c7;color:#92400e;border:1px solid #fde68a;',
                 'P' => 'background:#fee2e2;color:#991b1b;border:1px solid #fecaca;',
             ];
 
@@ -206,7 +206,7 @@
                                             <div class="pl-block">
                                                 @foreach ($po->items as $it)
                                                     <div class="pl-row" title="{{ $it->product }}">
-                                                        <span class="pl-key">{{ \Illuminate\Support\Str::substr($it->product, 0, 1) }}</span> - {{ number_format($it->quantity_ordered) }}
+                                                        <span class="pl-key">{!! $chip(\Illuminate\Support\Str::substr($it->product, 0, 1), $it->product) !!}</span> {{ number_format($it->quantity_ordered) }}
                                                     </div>
                                                 @endforeach
                                             </div>
@@ -219,7 +219,7 @@
                                             <div class="pl-block">
                                                 @foreach ($po->items as $it)
                                                     <div class="pl-row" title="{{ $it->product }}">
-                                                        <span class="pl-key">{{ \Illuminate\Support\Str::substr($it->product, 0, 1) }}</span> - {{ number_format((float) $it->unit_price, 2) }}
+                                                        <span class="pl-key">{!! $chip(\Illuminate\Support\Str::substr($it->product, 0, 1), $it->product) !!}</span> {{ number_format((float) $it->unit_price, 2) }}
                                                     </div>
                                                 @endforeach
                                             </div>

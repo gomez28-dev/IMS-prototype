@@ -35,12 +35,12 @@
 @endphp
 <style>
     .btn-add-product {
-        border: 1px solid #ff4d00;
-        color: #ff4d00;
+        border: 1px solid var(--brand-color);
+        color: var(--brand-color);
         background: #fff;
     }
     .btn-add-product:hover {
-        background: #ff4d00;
+        background: var(--brand-color);
         color: #fff;
     }
 </style>

@@ -7,7 +7,7 @@
     // Product chip colors: U = Unleaded, D = Diesel, P = Premium
     $chipStyles = [
         'U' => 'background:#dcfce7;color:#166534;border:1px solid #bbf7d0;',
-        'D' => 'background:#e0e7ff;color:#3730a3;border:1px solid #c7d2fe;',
+        'D' => 'background:#fef3c7;color:#92400e;border:1px solid #fde68a;',
         'P' => 'background:#fee2e2;color:#991b1b;border:1px solid #fecaca;',
     ];
 
@@ -409,7 +409,7 @@
                                 <div class="pl-block">
                                     @forelse ($order->items as $item)
                                         <div class="pl-row" title="{{ $item->product_name }}">
-                                            <span class="pl-key">{{ $item->product_type ?: '—' }}</span> - {{ number_format($item->qty) }}
+                                            <span class="pl-key">{!! $chip($item->product_type, $item->product_name) !!}</span> {{ number_format($item->qty) }}
                                         </div>
                                     @empty
                                         <div class="pl-row">{{ number_format($order->effective_qty_ordered) }}</div>
@@ -422,7 +422,7 @@
                                 <div class="pl-block">
                                     @forelse ($order->items as $item)
                                         <div class="pl-row" title="{{ $item->product_name }}">
-                                            <span class="pl-key">{{ $item->product_type ?: '—' }}</span> - {{ (float) $item->price > 0 ? number_format((float) $item->price, 2) : '—' }}
+                                            <span class="pl-key">{!! $chip($item->product_type, $item->product_name) !!}</span> {{ (float) $item->price > 0 ? number_format((float) $item->price, 2) : '—' }}
                                         </div>
                                     @empty
                                         <div class="pl-row">{{ (float) $order->price > 0 ? number_format((float) $order->price, 2) : '—' }}</div>
