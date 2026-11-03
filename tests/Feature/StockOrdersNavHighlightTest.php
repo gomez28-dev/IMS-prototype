@@ -269,7 +269,7 @@ class StockOrdersNavHighlightTest extends TestCase
             ->assertOk()
             ->getContent();
 
-        $this->assertStringContainsString('Sales Orders Needing an ATL', $html);
+        $this->assertStringContainsString('Fuel Trading Dashboard', $html);
         $this->assertStringContainsString('Orders Listed', $html);
     }
 }

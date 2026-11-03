@@ -1,29 +1,20 @@
 @extends('layouts.app')
 
-@section('title', 'VP Approval Queue - Stock Orders')
+@section('title', 'Approval Queue List')
+
+@section('hide-portal-label', true)
+
+@push('page-actions')
+    <a href="{{ route('stock-orders.index') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i> Back to Orders
+    </a>
+@endpush
 
 @section('content')
 <div class="row justify-content-center">
     <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
-            <div>
-                <nav aria-label="breadcrumb">
-                    <ol class="breadcrumb mb-1 small">
-                        <li class="breadcrumb-item"><a href="{{ route('portal') }}" class="text-decoration-none text-secondary">Portal</a></li>
-                        <li class="breadcrumb-item"><a href="{{ route('stock-orders.dashboard') }}" class="text-decoration-none text-secondary">Stock Orders</a></li>
-                        <li class="breadcrumb-item active" aria-current="page">VP Approval Queue</li>
-                    </ol>
-                </nav>
-                <h3 class="fw-bold text-dark mb-0">
-                    <i class="bi bi-patch-check text-success me-2"></i>Executive Approval Queue (Vice President)
-                </h3>
-            </div>
-            <div>
-                <a href="{{ route('stock-orders.index') }}" class="btn btn-outline-secondary">
-                    <i class="bi bi-arrow-left me-1"></i> Back to Orders
-                </a>
-            </div>
-        </div>
+        {{-- No breadcrumb, badge or heading: the page name is in the top bar,
+             and the two queue tabs open the page. --}}
 
         {{-- Two queues: Purchase Orders and ATLs, both awaiting VP approval --}}
         <div class="d-flex flex-row align-items-center gap-4 mb-4 border-bottom pb-2">

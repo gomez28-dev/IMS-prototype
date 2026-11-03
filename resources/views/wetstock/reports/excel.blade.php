@@ -267,4 +267,72 @@
             </tr>
         </table>
     @endforeach
+
+    <tr></tr>
+
+    <!-- ============ PRODUCT BREAKDOWN ============ -->
+    @php
+        $prodNames = ['D' => 'DIESEL', 'U' => 'UNLEADED', 'P' => 'PREMIUM', 'X' => 'UNSPECIFIED'];
+        $mapVal = fn($b, $key, $code) => $fmt($b[$key][$code] ?? 0);
+        $pendingDeliveryByProduct = function ($b, $code) {
+            return ($b['big_tanker_by_product'][$code] ?? 0) + ($b['small_tanker_by_product'][$code] ?? 0);
+        };
+        $showUnspecified = false;
+        foreach ([$b1, $b2] as $bb) {
+            if ($bb && array_sum([
+                $bb['depot_by_product']['X'] ?? 0,
+                $bb['tanker_by_product']['X'] ?? 0,
+                $bb['contaminated_by_product']['X'] ?? 0,
+                $bb['client_pickup_by_product']['X'] ?? 0,
+                $pendingDeliveryByProduct($bb, 'X'),
+            ]) > 0) {
+                $showUnspecified = true;
+            }
+        }
+    @endphp
+    <table>
+        <tr>
+            <td></td>
+            <td colspan="6" style="{{ $o }}">{{ $w1 ? strtoupper($w1['name']) . ' PRODUCT BREAKDOWN' : '' }}</td>
+            <td></td>
+            <td colspan="6" style="{{ $o }}">{{ $w2 ? strtoupper($w2['name']) . ' PRODUCT BREAKDOWN' : '' }}</td>
+        </tr>
+        <tr>
+            <td></td>
+            <td style="{{ $p }}">PRODUCT</td>
+            <td style="{{ $p }}">DEPOT</td>
+            <td style="{{ $p }}">TANKERS</td>
+            <td style="{{ $p }}">CONTAMINATED</td>
+            <td style="{{ $p }}">CLIENT PICK UP</td>
+            <td style="{{ $p }}">CLIENT PENDING</td>
+            <td></td>
+            <td style="{{ $p }}">PRODUCT</td>
+            <td style="{{ $p }}">DEPOT</td>
+            <td style="{{ $p }}">TANKERS</td>
+            <td style="{{ $p }}">CONTAMINATED</td>
+            <td style="{{ $p }}">CLIENT PICK UP</td>
+            <td style="{{ $p }}">CLIENT PENDING</td>
+        </tr>
+        @foreach (array_keys($prodNames) as $code)
+            @if ($code === 'X' && ! $showUnspecified)
+                @continue
+            @endif
+            <tr>
+                <td></td>
+                <td style="{{ $n }}">{{ $prodNames[$code] }}</td>
+                <td style="{{ $v }}">{{ $b1 ? $mapVal($b1, 'depot_by_product', $code) : '' }}</td>
+                <td style="{{ $v }}">{{ $b1 ? $mapVal($b1, 'tanker_by_product', $code) : '' }}</td>
+                <td style="{{ $v }}">{{ $b1 ? $mapVal($b1, 'contaminated_by_product', $code) : '' }}</td>
+                <td style="{{ $v }}">{{ $b1 ? $mapVal($b1, 'client_pickup_by_product', $code) : '' }}</td>
+                <td style="{{ $v }}">{{ $b1 ? $fmt($pendingDeliveryByProduct($b1, $code)) : '' }}</td>
+                <td></td>
+                <td style="{{ $n }}">{{ $prodNames[$code] }}</td>
+                <td style="{{ $v }}">{{ $b2 ? $mapVal($b2, 'depot_by_product', $code) : '' }}</td>
+                <td style="{{ $v }}">{{ $b2 ? $mapVal($b2, 'tanker_by_product', $code) : '' }}</td>
+                <td style="{{ $v }}">{{ $b2 ? $mapVal($b2, 'contaminated_by_product', $code) : '' }}</td>
+                <td style="{{ $v }}">{{ $b2 ? $mapVal($b2, 'client_pickup_by_product', $code) : '' }}</td>
+                <td style="{{ $v }}">{{ $b2 ? $fmt($pendingDeliveryByProduct($b2, $code)) : '' }}</td>
+            </tr>
+        @endforeach
+    </table>
 @endforeach

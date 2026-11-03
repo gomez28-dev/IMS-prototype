@@ -1115,6 +1115,10 @@
                 <div class="app-topbar d-none d-lg-flex">
                     <div class="topbar-title">
                         <span>@yield('title', 'IMS')</span>
+                        {{-- The portal badge is optional: a page that defines the
+                             hide-portal-label section drops it, so the top bar
+                             carries the page name alone. --}}
+                        @unless (\Illuminate\Support\Facades\View::hasSection('hide-portal-label'))
                         <span class="topbar-portal-label">
                             @if (request()->is('wetstock*'))
                                 Wet Stock
@@ -1124,6 +1128,7 @@
                                 Sales Documentation
                             @endif
                         </span>
+                        @endunless
                     </div>
                     <div class="topbar-actions">
                         @stack('page-actions')

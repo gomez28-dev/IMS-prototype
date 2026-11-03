@@ -3,6 +3,21 @@
 @section('title', 'Wet Stock Report')
 
 @section('content')
+@php
+    // Product chips, the same shape the Orders Dashboard uses.
+    $chipStyles = [
+        'U' => 'background:#dcfce7;color:#166534;border:1px solid #bbf7d0;',
+        'D' => 'background:#fef3c7;color:#92400e;border:1px solid #fde68a;',
+        'P' => 'background:#fee2e2;color:#991b1b;border:1px solid #fecaca;',
+        'X' => 'background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb;',
+    ];
+    $chip = function ($code, $title = '') use ($chipStyles) {
+        $style = $chipStyles[$code] ?? $chipStyles['X'];
+
+        return '<span class="prod-chip" style="' . $style . '" title="' . e($title) . '">' . e($code ?: '—') . '</span>';
+    };
+    $prodNames = ['D' => 'Diesel', 'U' => 'Unleaded', 'P' => 'Premium', 'X' => 'Unspecified'];
+@endphp
 <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
     <div>
         <h2 class="fw-bold text-dark mb-1">Wet Stock Report</h2>
@@ -39,6 +54,30 @@
     <div class="tab-pane fade {{ $activeTab === 'live' ? 'show active' : '' }}" id="liveReport" role="tabpanel">
         
         <!-- Summary Cards per Location -->
+        <style>
+            .prod-chip {
+                display: inline-block;
+                font-size: 0.65rem;
+                font-weight: 700;
+                line-height: 1;
+                padding: 0.2rem 0.4rem;
+                border-radius: 0.35rem;
+            }
+            .prod-breakdown th {
+                font-size: 0.66rem;
+                letter-spacing: 0.04em;
+                text-transform: uppercase;
+                color: #6b7280;
+                font-weight: 600;
+                padding: 0.25rem 0.35rem;
+                border-bottom: 1px solid #e5e7eb;
+            }
+            .prod-breakdown td {
+                font-size: 0.78rem;
+                padding: 0.3rem 0.35rem;
+                border-bottom: 1px solid #f1f5f9;
+            }
+        </style>
         <div class="row g-3 mb-4">
             @foreach ($reportData['warehouses'] as $wh)
                 @php $b = $reportData['blocks'][$wh->id]; @endphp
@@ -70,8 +109,46 @@
                                 </div>
                             </div>
                         </div>
-                        <hr class="my-3 text-muted opacity-25">
-                        <div class="d-flex justify-content-between align-items-center fs-7">
+                        {{-- The same three figures split by product: the breakdown
+                             is read from the tanks' own product codes, so it can
+                             never disagree with the totals above it. --}}
+                        @php
+                            $hasUnspecified = (($b['depot_by_product']['X'] ?? 0)
+                                + ($b['tanker_by_product']['X'] ?? 0)
+                                + ($b['contaminated_by_product']['X'] ?? 0)) > 0;
+                        @endphp
+                        <div class="table-responsive mt-3">
+                            <table class="table prod-breakdown mb-0 align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Product</th>
+                                        <th class="text-end">Depot</th>
+                                        <th class="text-end">Tankers</th>
+                                        <th class="text-end">Contaminated</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (['D', 'U', 'P'] as $code)
+                                        <tr>
+                                            <td>{!! $chip($code, $prodNames[$code]) !!} <span class="ms-1">{{ $prodNames[$code] }}</span></td>
+                                            <td class="text-end fw-semibold">{{ number_format($b['depot_by_product'][$code] ?? 0) }}</td>
+                                            <td class="text-end fw-semibold">{{ number_format($b['tanker_by_product'][$code] ?? 0) }}</td>
+                                            <td class="text-end fw-semibold">{{ number_format($b['contaminated_by_product'][$code] ?? 0) }}</td>
+                                        </tr>
+                                    @endforeach
+                                    @if ($hasUnspecified)
+                                        <tr class="text-muted">
+                                            <td>{!! $chip('X', 'No product recorded') !!} <span class="ms-1">Unspecified</span></td>
+                                            <td class="text-end">{{ number_format($b['depot_by_product']['X'] ?? 0) }}</td>
+                                            <td class="text-end">{{ number_format($b['tanker_by_product']['X'] ?? 0) }}</td>
+                                            <td class="text-end">{{ number_format($b['contaminated_by_product']['X'] ?? 0) }}</td>
+                                        </tr>
+                                    @endif
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center fs-7 mt-2">
                             <span class="text-muted">Total Available On-Hand For Selling:</span>
                             <span class="fw-bold fs-5 {{ $b['total_available_on_hand_for_selling'] < 0 ? 'text-danger' : 'text-success' }}">
                                 {{ number_format($b['total_available_on_hand_for_selling']) }} L
@@ -186,6 +263,7 @@
                                     <thead>
                                         <tr>
                                             <th>Depot Tank</th>
+                                            <th>Product</th>
                                             <th class="text-end">Volume</th>
                                             <th>Status / Remarks</th>
                                         </tr>
@@ -194,6 +272,13 @@
                                         @forelse ($b['depot_tanks'] as $tank)
                                             <tr>
                                                 <td class="fw-semibold">{{ $tank->name }}</td>
+                                                <td>
+                                                    @if ($tank->product_type)
+                                                        {!! $chip($tank->product_type, $prodNames[$tank->product_type] ?? '') !!}
+                                                    @else
+                                                        <span class="text-muted">—</span>
+                                                    @endif
+                                                </td>
                                                 <td class="text-end">{{ number_format($tank->stock_available) }} L</td>
                                                 <td>
                                                     @if ($tank->is_contaminated)
@@ -204,7 +289,7 @@
                                                 </td>
                                             </tr>
                                         @empty
-                                            <tr><td colspan="3" class="text-center text-muted">No depot tanks configured.</td></tr>
+                                            <tr><td colspan="4" class="text-center text-muted">No depot tanks configured.</td></tr>
                                         @endforelse
                                     </tbody>
                                 </table>
@@ -219,6 +304,7 @@
                                     <thead>
                                         <tr>
                                             <th>Tanker ID / Plate #</th>
+                                            <th>Product</th>
                                             <th class="text-end">Volume</th>
                                             <th>Status / Remarks</th>
                                         </tr>
@@ -227,6 +313,13 @@
                                         @forelse ($b['tanker_tanks'] as $tank)
                                             <tr>
                                                 <td class="fw-semibold">{{ $tank->name }}</td>
+                                                <td>
+                                                    @if ($tank->product_type)
+                                                        {!! $chip($tank->product_type, $prodNames[$tank->product_type] ?? '') !!}
+                                                    @else
+                                                        <span class="text-muted">—</span>
+                                                    @endif
+                                                </td>
                                                 <td class="text-end">{{ number_format($tank->stock_available) }} L</td>
                                                 <td>
                                                     @if ($tank->is_contaminated)
@@ -237,7 +330,7 @@
                                                 </td>
                                             </tr>
                                         @empty
-                                            <tr><td colspan="3" class="text-center text-muted">No tankers configured.</td></tr>
+                                            <tr><td colspan="4" class="text-center text-muted">No tankers configured.</td></tr>
                                         @endforelse
                                     </tbody>
                                 </table>
@@ -307,6 +400,7 @@
                                         <tr>
                                             <th>SO#</th>
                                             <th>Client</th>
+                                            <th>Product</th>
                                             <th class="text-end">Liters</th>
                                         </tr>
                                     </thead>
@@ -315,6 +409,13 @@
                                             <tr>
                                                 <td class="fw-semibold">{{ $del->order->so_number ?? 'N/A' }}</td>
                                                 <td>{{ $del->order->account ?? 'N/A' }}</td>
+                                                <td>
+                                                    @if ($del->product_type)
+                                                        {!! $chip($del->product_type, $prodNames[$del->product_type] ?? '') !!}
+                                                    @else
+                                                        <span class="text-muted">—</span>
+                                                    @endif
+                                                </td>
                                                 <td class="text-end">{{ number_format($del->qty_out) }} L</td>
                                             </tr>
                                         @empty
@@ -334,6 +435,7 @@
                                         <tr>
                                             <th>SO#</th>
                                             <th>Client</th>
+                                            <th>Product</th>
                                             <th class="text-end">Liters</th>
                                         </tr>
                                     </thead>
@@ -342,6 +444,13 @@
                                             <tr>
                                                 <td class="fw-semibold">{{ $del->order->so_number ?? 'N/A' }}</td>
                                                 <td>{{ $del->order->account ?? 'N/A' }}</td>
+                                                <td>
+                                                    @if ($del->product_type)
+                                                        {!! $chip($del->product_type, $prodNames[$del->product_type] ?? '') !!}
+                                                    @else
+                                                        <span class="text-muted">—</span>
+                                                    @endif
+                                                </td>
                                                 <td class="text-end">{{ number_format($del->qty_out) }} L</td>
                                             </tr>
                                         @empty
@@ -361,6 +470,7 @@
                                         <tr>
                                             <th>SO#</th>
                                             <th>Client</th>
+                                            <th>Product</th>
                                             <th class="text-end">Liters</th>
                                         </tr>
                                     </thead>
@@ -369,6 +479,13 @@
                                             <tr>
                                                 <td class="fw-semibold">{{ $del->order->so_number ?? 'N/A' }}</td>
                                                 <td>{{ $del->order->account ?? 'N/A' }}</td>
+                                                <td>
+                                                    @if ($del->product_type)
+                                                        {!! $chip($del->product_type, $prodNames[$del->product_type] ?? '') !!}
+                                                    @else
+                                                        <span class="text-muted">—</span>
+                                                    @endif
+                                                </td>
                                                 <td class="text-end">{{ number_format($del->qty_out) }} L</td>
                                             </tr>
                                         @empty

@@ -44,6 +44,19 @@
             };
             $prodRows = [['D', 'Diesel'], ['U', 'Unleaded'], ['P', 'Premium']];
 
+            // A product reaches these pages either as a code (D) or a name
+            // (Diesel); the chip only ever shows the code, so both resolve here.
+            $productCodes = \App\Models\Order::PRODUCT_TYPES;
+            $toCode = function ($product) use ($productCodes) {
+                if (isset($productCodes[$product])) {
+                    return $product;
+                }
+
+                $code = array_search($product, $productCodes, true);
+
+                return $code !== false ? $code : \Illuminate\Support\Str::substr((string) $product, 0, 1);
+            };
+
             $volumeCards = [
                 ['title' => 'Qty Ordered', 'icon' => 'bi-clipboard-check', 'tint' => 'background:#ecfeff;color:#0891b2;', 'key' => 'ordered', 'class' => 'text-dark'],
                 ['title' => "Total ATL'd", 'icon' => 'bi-file-earmark-text', 'tint' => 'background:#eef2ff;color:#4f46e5;', 'key' => 'atl_issued', 'class' => 'text-primary'],
@@ -66,7 +79,7 @@
             .stat-total { display: flex; justify-content: space-between; padding: 0.25rem 0.3rem 0; color: #6b7280; }
             .stat-total .stat-val { font-weight: 700; color: #111827; }
             .prod-chip {
-                display: inline-block; font-size: 0.65rem; font-weight: 700; line-height: 1;
+                display: inline-block; vertical-align: middle; font-size: 0.65rem; font-weight: 700; line-height: 1;
                 padding: 0.2rem 0.4rem; border-radius: 0.35rem; margin: 0 1px;
             }
         </style>
@@ -167,17 +180,11 @@
                                     <td class="small">{{ $poNumbers }}</td>
                                     <td class="small">{{ $atl->receiving_date ? $atl->receiving_date->format('M d, Y') : '—' }}</td>
                                     <td class="small">
-                                        @php
-                                            // The same U / D / P shorthand the chips use: a
-                                            // product name the shorthand knows becomes its
-                                            // code, anything else stays readable as-is.
-                                            $productCodes = \App\Models\Order::PRODUCT_TYPES;
-                                        @endphp
                                         @if ($breakdown === [])
-                                            <span class="text-muted">{{ array_search($atl->product, $productCodes, true) ?: ($atl->product ?: '—') }} - {{ number_format($atl->qty_to_receive) }}</span>
+                                            <div>{!! $chip($toCode($atl->product), $atl->product ?: 'Unspecified') !!} <span class="ms-1">{{ number_format($atl->qty_to_receive) }}</span></div>
                                         @else
                                             @foreach ($breakdown as $product => $qty)
-                                                <div><strong>{{ array_search($product, $productCodes, true) ?: $product }}</strong> - {{ number_format($qty) }}</div>
+                                                <div>{!! $chip($toCode($product), $product) !!} <span class="ms-1">{{ number_format($qty) }}</span></div>
                                             @endforeach
                                         @endif
                                     </td>

@@ -2,40 +2,31 @@
 
 @section('title', 'Purchase Order Details')
 
+@push('page-actions')
+    <div class="d-flex gap-2 flex-wrap">
+        {{-- One action at a time. Editing an approved PO is not offered,
+             so the figures the VP signed off cannot drift afterwards. --}}
+        @if ($purchaseOrder->isVpApproved())
+            <a href="{{ route('stock-orders.po-pdf', $purchaseOrder->id) }}"
+               class="btn btn-sm btn-outline-danger" title="PO PDF" aria-label="Download PO PDF">
+                <i class="bi bi-file-earmark-pdf"></i>
+            </a>
+        @elseif (Auth::user()->canEditStockOrders())
+            <a href="{{ route('stock-orders.edit-supplier-po', $purchaseOrder->id) }}" class="btn btn-sm btn-primary-custom">
+                <i class="bi bi-pencil me-1"></i> Edit PO
+            </a>
+        @endif
+        <a href="{{ route('stock-orders.purchase-orders.index') }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i> Back to Purchase Orders
+        </a>
+    </div>
+@endpush
+
 @section('content')
 <div class="row justify-content-center">
     <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
-            <div>
-                <nav aria-label="breadcrumb">
-                    <ol class="breadcrumb mb-1 small">
-                        <li class="breadcrumb-item"><a href="{{ route('portal') }}" class="text-decoration-none text-secondary">Portal</a></li>
-                        <li class="breadcrumb-item"><a href="{{ route('stock-orders.purchase-orders.index') }}" class="text-decoration-none text-secondary">Purchase Orders</a></li>
-                        <li class="breadcrumb-item active" aria-current="page">{{ $purchaseOrder->po_number ?: 'Pending PO#' }}</li>
-                    </ol>
-                </nav>
-                <h3 class="fw-bold text-dark mb-0">
-                    <i class="bi bi-card-checklist text-primary me-2"></i>Purchase Order &mdash; {{ $purchaseOrder->po_number ?: '(Pending PO#)' }}
-                </h3>
-            </div>
-            <div class="d-flex gap-2 flex-wrap">
-                {{-- One action at a time. Editing an approved PO is not offered,
-                     so the figures the VP signed off cannot drift afterwards. --}}
-                @if ($purchaseOrder->isVpApproved())
-                    <a href="{{ route('stock-orders.po-pdf', $purchaseOrder->id) }}"
-                       class="btn btn-outline-danger" title="PO PDF" aria-label="Download PO PDF">
-                        <i class="bi bi-file-earmark-pdf"></i>
-                    </a>
-                @elseif (Auth::user()->canEditStockOrders())
-                    <a href="{{ route('stock-orders.edit-supplier-po', $purchaseOrder->id) }}" class="btn btn-primary-custom">
-                        <i class="bi bi-pencil me-1"></i> Edit PO
-                    </a>
-                @endif
-                <a href="{{ route('stock-orders.purchase-orders.index') }}" class="btn btn-outline-secondary">
-                    <i class="bi bi-arrow-left me-1"></i> Back to Purchase Orders
-                </a>
-            </div>
-        </div>
+        {{-- No breadcrumb and no page heading: the PO number is the page name
+             in the top bar, and the volume cards open the page. --}}
 
         @php
             // Same card set and styling as the Orders Dashboard and the
@@ -53,6 +44,19 @@
             };
 
             $prodRows = [['D', 'Diesel'], ['U', 'Unleaded'], ['P', 'Premium']];
+
+            // A product reaches these pages either as a code (D) or a name
+            // (Diesel); the chip only ever shows the code, so both resolve here.
+            $productCodes = \App\Models\Order::PRODUCT_TYPES;
+            $toCode = function ($product) use ($productCodes) {
+                if (isset($productCodes[$product])) {
+                    return $product;
+                }
+
+                $code = array_search($product, $productCodes, true);
+
+                return $code !== false ? $code : \Illuminate\Support\Str::substr((string) $product, 0, 1);
+            };
 
             $volumeCards = [
                 ['title' => 'Total Qty. Ordered', 'icon' => 'bi-boxes', 'tint' => 'background:#ecfeff;color:#0891b2;', 'data' => $volumes['ordered']],
@@ -76,7 +80,7 @@
             .stat-total .stat-val { font-weight: 600; color: #111827; }
             .stat-big { font-size: 3.6rem; font-weight: 800; line-height: 1; color: #111827; }
             .prod-chip {
-                display: inline-block; font-size: 0.65rem; font-weight: 700; line-height: 1;
+                display: inline-block; vertical-align: middle; font-size: 0.65rem; font-weight: 700; line-height: 1;
                 padding: 0.2rem 0.4rem; border-radius: 0.35rem; margin: 0 1px;
             }
         </style>
@@ -175,12 +179,12 @@
                                     </td>
                                     <td class="text-end small font-monospace">
                                         @foreach ($rates as $product => $qty)
-                                            <div>{{ \Illuminate\Support\Str::substr((string) $product, 0, 1) }} &mdash; {{ number_format($qty) }}</div>
+                                            <div>{!! $chip($toCode($product), $product) !!} <span class="ms-1">{{ number_format($qty) }}</span></div>
                                         @endforeach
                                     </td>
                                     <td class="text-end small font-monospace">
                                         @foreach ($rates as $product => $qty)
-                                            <div>{{ \Illuminate\Support\Str::substr((string) $product, 0, 1) }} &mdash; {{ number_format((float) ($priceByProduct[$product] ?? 0), 2) }}</div>
+                                            <div>{!! $chip($toCode($product), $product) !!} <span class="ms-1">{{ number_format((float) ($priceByProduct[$product] ?? 0), 2) }}</span></div>
                                         @endforeach
                                     </td>
                                     <td class="text-end small fw-semibold font-monospace">{{ number_format($amount, 2) }}</td>

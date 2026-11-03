@@ -30,6 +30,28 @@
 
         return '<span class="' . $class . '"' . ($style ? ' style="' . $style . '"' : '') . ($title ? ' title="' . e($title) . '"' : '') . '>' . e($order->formatted_so_number) . '</span>';
     };
+
+    // Product chips, identical to the Orders Dashboard so the two read as one set.
+    $chipStyles = [
+        'U' => 'background:#dcfce7;color:#166534;border:1px solid #bbf7d0;',
+        'D' => 'background:#fef3c7;color:#92400e;border:1px solid #fde68a;',
+        'P' => 'background:#fee2e2;color:#991b1b;border:1px solid #fecaca;',
+    ];
+
+    $chip = function ($code, $title = '') use ($chipStyles) {
+        $style = $chipStyles[$code] ?? 'background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb;';
+
+        return '<span class="prod-chip" style="' . $style . '" title="' . e($title) . '">' . e($code ?: '—') . '</span>';
+    };
+
+    $prodRows = [['D', 'Diesel'], ['U', 'Unleaded'], ['P', 'Premium']];
+
+    // One card per volume metric; each lists its litres per product.
+    $statCards = [
+        ['title' => 'Qty Ordered', 'icon' => 'bi-boxes', 'tint' => 'background:#ecfeff;color:#0891b2;', 'key' => 'ordered'],
+        ['title' => 'Qty Delivered', 'icon' => 'bi-truck', 'tint' => 'background:#f0fdf4;color:#16a34a;', 'key' => 'delivered'],
+        ['title' => 'Remaining Bal', 'icon' => 'bi-clock-history', 'tint' => 'background:#fffbeb;color:#d97706;', 'key' => 'balance'],
+    ];
 @endphp
 <style>
     /* Labels/badges sized like the Orders Dashboard list */
@@ -40,6 +62,55 @@
     .so-pill {
         white-space: nowrap;
         letter-spacing: 0.01em;
+    }
+
+    /* ---- Summary cards: the Orders Dashboard's card set ---- */
+    .stat-title {
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: #374151;
+    }
+    .stat-icon {
+        width: 46px;
+        height: 46px;
+        border-radius: 0.8rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.3rem;
+        flex-shrink: 0;
+    }
+    .stat-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.6rem;
+        padding: 0.45rem 0.8rem;
+        margin-bottom: 0.45rem;
+        background: #fff;
+    }
+    .stat-row .stat-val { font-weight: 700; color: #111827; }
+    .stat-total {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.25rem 0.3rem 0;
+        color: #6b7280;
+    }
+    .stat-total .stat-val { font-weight: 600; color: #111827; }
+    .stat-big { font-size: 3.6rem; font-weight: 800; line-height: 1; color: #111827; }
+
+    /* Product chips, the same shape the dashboard and Module 3 use */
+    .prod-chip {
+        display: inline-block;
+        font-size: 0.65rem;
+        font-weight: 700;
+        line-height: 1;
+        padding: 0.2rem 0.4rem;
+        border-radius: 0.35rem;
+        margin: 0 1px;
     }
 </style>
 <div class="mb-3">
@@ -136,60 +207,44 @@
 </div>
 
 @if ($activeFilter)
-<!-- Stats Overview Cards -->
+{{-- Product-aware summary cards. The figures are read off every order the
+     list can show, so "Total Orders" and "Showing N order(s)" are the same
+     number, and each card's rows add up to its own total. --}}
 <div class="row g-4 mb-5">
-    <div class="col-md-3 col-sm-6">
-        <div class="card card-custom p-3 border-0">
-            <div class="d-flex align-items-center">
-                <div class="rounded-3 p-3 bg-primary bg-opacity-10 text-primary me-3">
-                    <i class="bi bi-journal-text fs-4"></i>
-                </div>
-                <div>
-                    <span class="text-muted small d-block">Total Orders</span>
-                    <h4 class="fw-bold mb-0 text-dark">{{ number_format($totalOrders) }}</h4>
-                </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="card card-custom p-3 border-0 h-100">
+            <div class="d-flex align-items-center gap-3">
+                <div class="stat-icon" style="background:#fff1ee;color:#f04a1a;"><i class="bi bi-journal-text"></i></div>
+                <span class="stat-title">Total Orders</span>
+            </div>
+            <div class="d-flex flex-grow-1 align-items-center justify-content-center py-3">
+                <span class="stat-big">{{ number_format($totalOrders) }}</span>
             </div>
         </div>
     </div>
-    <div class="col-md-3 col-sm-6">
-        <div class="card card-custom p-3 border-0">
-            <div class="d-flex align-items-center">
-                <div class="rounded-3 p-3 bg-info bg-opacity-10 text-info me-3" style="background-color: #ecfeff !important; color: #0891b2 !important;">
-                    <i class="bi bi-boxes fs-4"></i>
-                </div>
-                <div>
-                    <span class="text-muted small d-block">Qty Ordered</span>
-                    <h4 class="fw-bold mb-0 text-dark">{{ number_format($totalQtyOrdered) }}</h4>
-                </div>
+
+    @foreach ($statCards as $card)
+    <div class="col-xl-3 col-md-6">
+        <div class="card card-custom p-3 border-0 h-100">
+            <div class="d-flex align-items-center gap-3 mb-3">
+                <div class="stat-icon" style="{{ $card['tint'] }}"><i class="bi {{ $card['icon'] }}"></i></div>
+                <span class="stat-title">{{ $card['title'] }}</span>
+            </div>
+            @foreach ($prodRows as [$code, $name])
+            @php $value = $productStats[$code][$card['key']] ?? 0; @endphp
+            <div class="stat-row">
+                <span>{!! $chip($code, $name) !!} <span class="ms-2">{{ $name }}</span></span>
+                <span class="stat-val {{ $value < 0 ? 'text-danger' : '' }}">{{ number_format($value) }}</span>
+            </div>
+            @endforeach
+            @php $cardTotal = array_sum(array_column($productStats, $card['key'])); @endphp
+            <div class="stat-total">
+                <span>Total</span>
+                <span class="stat-val {{ $cardTotal < 0 ? 'text-danger' : '' }}">{{ number_format($cardTotal) }}</span>
             </div>
         </div>
     </div>
-    <div class="col-md-3 col-sm-6">
-        <div class="card card-custom p-3 border-0">
-            <div class="d-flex align-items-center">
-                <div class="rounded-3 p-3 bg-success bg-opacity-10 text-success me-3" style="background-color: #f0fdf4 !important; color: #16a34a !important;">
-                    <i class="bi bi-truck fs-4"></i>
-                </div>
-                <div>
-                    <span class="text-muted small d-block">Qty Delivered</span>
-                    <h4 class="fw-bold mb-0 text-dark">{{ number_format($totalQtyDelivered) }}</h4>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3 col-sm-6">
-        <div class="card card-custom p-3 border-0">
-            <div class="d-flex align-items-center">
-                <div class="rounded-3 p-3 bg-warning bg-opacity-10 text-warning me-3" style="background-color: #fffbeb !important; color: #d97706 !important;">
-                    <i class="bi bi-clock-history fs-4"></i>
-                </div>
-                <div>
-                    <span class="text-muted small d-block">Remaining Bal</span>
-                    <h4 class="fw-bold mb-0 text-dark">{{ number_format($totalRemaining) }}</h4>
-                </div>
-            </div>
-        </div>
-    </div>
+    @endforeach
 </div>
 
 <div class="d-flex flex-column gap-2 mb-3">
@@ -235,8 +290,8 @@
                             <th class="ps-4">Account</th>
                             <th>Order Date</th>
                             <th>SO#</th>
-                            <th class="text-end">Qty Ordered</th>
-                            <th class="text-end">Qty Out</th>
+                            <th class="text-center">Qty Ordered</th>
+                            <th class="text-center">Qty Out</th>
                             <th class="text-center">Balance</th>
                             <th class="text-end pe-4">Deliveries</th>
                         </tr>
@@ -253,18 +308,37 @@
                                     @endif
                                     {!! $soBadge($order) !!}
                                 </td>
-                                <td class="text-end fw-medium">{{ number_format($order->effective_qty_ordered) }}</td>
-                                <td class="text-end fw-medium text-secondary">{{ number_format($order->total_qty_out) }}</td>
-                                <td class="text-center">
-                                    @if ($order->remaining_balance == 0)
-                                        <span class="badge badge-balance-zero rounded-pill">
-                                            <i class="bi bi-check-circle-fill me-1"></i> 0
-                                        </span>
-                                    @else
-                                        <span class="badge badge-balance-positive rounded-pill">
-                                            <i class="bi bi-clock-history me-1"></i> {{ number_format($order->remaining_balance) }}
-                                        </span>
-                                    @endif
+                                {{-- One line per product, keyed by its initial: the same
+                                     breakdown the cards sum up. --}}
+                                <td>
+                                    <div class="pl-block">
+                                        @foreach ($rowLines[$order->id] ?? [] as $code => $line)
+                                            <div class="pl-row" title="{{ \App\Models\Order::PRODUCT_TYPES[$code] ?? 'Unspecified' }}">
+                                                <span class="pl-key">{!! $chip($code) !!}</span>
+                                                <span class="pl-num">{{ number_format($line['ordered']) }}</span>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="pl-block">
+                                        @foreach ($rowLines[$order->id] ?? [] as $code => $line)
+                                            <div class="pl-row" title="{{ \App\Models\Order::PRODUCT_TYPES[$code] ?? 'Unspecified' }}">
+                                                <span class="pl-key">{!! $chip($code) !!}</span>
+                                                <span class="pl-num text-secondary">{{ number_format($line['delivered']) }}</span>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="pl-block">
+                                        @foreach ($rowLines[$order->id] ?? [] as $code => $line)
+                                            <div class="pl-row" title="{{ \App\Models\Order::PRODUCT_TYPES[$code] ?? 'Unspecified' }}">
+                                                <span class="pl-key">{!! $chip($code) !!}</span>
+                                                <span class="pl-num {{ $line['balance'] < 0 ? 'text-danger' : ($line['balance'] === 0 ? 'text-success' : '') }}">{{ number_format($line['balance']) }}</span>
+                                            </div>
+                                        @endforeach
+                                    </div>
                                 </td>
                                 <td class="text-end pe-4">
                                     <a href="{{ route('order.deliveries', $order->id) }}?{{ http_build_query(array_filter(['from' => $from, 'to' => $to, 'month' => $month, 'year' => $year, 'type' => $type, 'account' => $account])) }}" class="btn btn-sm btn-outline-primary rounded-3 px-2 py-1">

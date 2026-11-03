@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use App\Models\Order;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromArray;
@@ -17,13 +18,49 @@ class ReportsExport implements FromArray, WithHeadings, WithColumnWidths, WithEv
     protected Collection $orders;
 
     /**
+     * Per-order product lines, keyed by order id: the same breakdown the report
+     * page prints in its Qty Ordered / Qty Out cells, so the file and the page
+     * never disagree about which product a litre belongs to.
+     *
+     * @var array<int, array<string, array{ordered:int, delivered:int, balance:int}>>
+     */
+    protected array $productLines = [];
+
+    /**
      * Excel row numbers belonging to cancelled orders (for red highlighting).
      */
     protected array $cancelledRows = [];
 
-    public function __construct(Collection $orders)
+    public function __construct(Collection $orders, array $productLines = [])
     {
         $this->orders = $orders;
+        $this->productLines = $productLines;
+    }
+
+    /**
+     * One order's products as a readable cell, e.g.
+     * "Diesel 30,000 | Unleaded 5,000".
+     */
+    protected function productSummary(Order $order): string
+    {
+        $parts = [];
+
+        foreach ($this->productLines[$order->id] ?? [] as $code => $line) {
+            $name = Order::PRODUCT_TYPES[$code] ?? 'Unspecified';
+            $parts[] = $name . ' ' . number_format($line['ordered']);
+        }
+
+        return implode(' | ', $parts);
+    }
+
+    /**
+     * The product a single delivery carried, with its own quantity.
+     */
+    protected function deliveryProduct($delivery): string
+    {
+        $name = Order::PRODUCT_TYPES[$delivery->product_type] ?? 'Unspecified';
+
+        return $name . ' ' . number_format((int) $delivery->qty_out);
     }
 
     public function array(): array
@@ -50,6 +87,7 @@ class ReportsExport implements FromArray, WithHeadings, WithColumnWidths, WithEv
                     'DELIVERY STATUS' => '',
                     'TYPE' => '',
                     'REMARKS' => '',
+                    'PRODUCTS' => $this->productSummary($order),
                 ];
 
                 if ($orderCancelled) {
@@ -79,6 +117,9 @@ class ReportsExport implements FromArray, WithHeadings, WithColumnWidths, WithEv
                         'DELIVERY STATUS' => $statusMapped,
                         'TYPE' => $delivery->type,
                         'REMARKS' => $delivery->remarks ?? '',
+                        'PRODUCTS' => $idx === 0
+                            ? $this->productSummary($order)
+                            : $this->deliveryProduct($delivery),
                     ];
                     $rows[] = $row;
 
@@ -106,6 +147,7 @@ class ReportsExport implements FromArray, WithHeadings, WithColumnWidths, WithEv
             'DELIVERY STATUS',
             'TYPE',
             'REMARKS',
+            'PRODUCTS',
         ];
     }
 
@@ -123,6 +165,7 @@ class ReportsExport implements FromArray, WithHeadings, WithColumnWidths, WithEv
             'I' => 19,
             'J' => 13,
             'K' => 32,
+            'L' => 34,
         ];
     }
 
@@ -146,7 +189,7 @@ class ReportsExport implements FromArray, WithHeadings, WithColumnWidths, WithEv
 
     protected function styleHeader($sheet): void
     {
-        $sheet->getStyle('A1:K1')->applyFromArray([
+        $sheet->getStyle('A1:L1')->applyFromArray([
             'font' => [
                 'bold' => true,
                 'color' => ['rgb' => 'FFFFFF'],
@@ -171,7 +214,7 @@ class ReportsExport implements FromArray, WithHeadings, WithColumnWidths, WithEv
             return;
         }
 
-        $sheet->getStyle("A2:K{$lastRow}")->applyFromArray([
+        $sheet->getStyle("A2:L{$lastRow}")->applyFromArray([
             'font' => [
                 'name' => 'Verdana',
                 'size' => 10,
@@ -261,7 +304,7 @@ class ReportsExport implements FromArray, WithHeadings, WithColumnWidths, WithEv
                 continue;
             }
 
-            $sheet->getStyle("A{$row}:K{$row}")->applyFromArray([
+            $sheet->getStyle("A{$row}:L{$row}")->applyFromArray([
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
                     'startColor' => ['rgb' => 'FFEBEE'],

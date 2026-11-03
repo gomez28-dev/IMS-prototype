@@ -1,23 +1,13 @@
 @extends('layouts.app')
 
-@section('title', 'Purchase Orders')
+@section('title', 'Purchase Orders Dashboard')
 
 @section('content')
 <div class="row justify-content-center">
     <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
-            <div>
-                <nav aria-label="breadcrumb">
-                    <ol class="breadcrumb mb-1 small">
-                        <li class="breadcrumb-item"><a href="{{ route('portal') }}" class="text-decoration-none text-secondary">Portal</a></li>
-                        <li class="breadcrumb-item active" aria-current="page">Purchase Orders</li>
-                    </ol>
-                </nav>
-                <h3 class="fw-bold text-dark mb-0">
-                    <i class="bi bi-card-checklist text-primary me-2"></i>Purchase Orders
-                </h3>
-            </div>
-        </div>
+        {{-- No breadcrumb and no page heading: the page name lives in the top
+             bar, and the stat cards open the page the way the Orders Dashboard
+             does. --}}
 
         {{-- Fuel Trade Queue Card (if pending SOs exist) --}}
 

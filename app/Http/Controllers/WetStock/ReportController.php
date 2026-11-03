@@ -161,7 +161,7 @@ class ReportController extends Controller
             };
 
             // Pending deliveries query
-            $allPendingDeliveries = Delivery::with(['order', 'allocations.tank'])
+            $allPendingDeliveries = Delivery::with(['order', 'allocations.tank', 'items'])
                 ->where('status', 'PENDING')
                 ->whereHas('order', fn($q) => $q->where('status', '!=', 'Cancelled'))
                 ->get();
@@ -187,6 +187,7 @@ class ReportController extends Controller
             // 2.8 Sales Docs Pending Clearance (Hold for Clearing)
             $pendingClearanceOrders = \App\Models\Order::where('clearing_status', 'Pending')
                 ->where('status', '!=', 'Cancelled')
+                ->with('items')
                 ->get()
                 ->filter(fn ($order) => strtolower(trim($order->location)) === strtolower(trim($warehouse->name)));
             $pendingClearanceOrdersTotal = $pendingClearanceOrders->sum('qty_ordered');
@@ -197,6 +198,68 @@ class ReportController extends Controller
             $totalHoldForClearing = $pendingClearanceOrdersTotal + $clientPickupTotal + $clientPendingDeliveryTotal;
             $totalAvailableForSale = $totalCommitmentsIn + $totalHoldForClearing;
             $totalAvailableOnHandForSelling = ($depotTotal + $tankerTotal) - $clientPickupTotal;
+
+            // ---- Product breakdown ----
+            // Tanks and deliveries carry a product code. Anything untagged is
+            // kept in its own bucket rather than being counted as Diesel, so a
+            // mixed-fuel tanker never lands under a product it does not hold.
+            $codes = ['D', 'U', 'P'];
+            $blank = ['D' => 0, 'U' => 0, 'P' => 0, 'X' => 0];
+            $addTo = function (array &$map, ?string $code, int $qty) use ($codes) {
+                $key = in_array($code, $codes, true) ? $code : 'X';
+                $map[$key] = ($map[$key] ?? 0) + $qty;
+            };
+
+            $depotByProduct = $blank;
+            foreach ($depotTanks as $tank) {
+                $addTo($depotByProduct, $tank->product_type, (int) $tank->stock_available);
+            }
+
+            $tankerByProduct = $blank;
+            foreach ($tankerTanks as $tank) {
+                $addTo($tankerByProduct, $tank->product_type, (int) $tank->stock_available);
+            }
+
+            $contaminatedByProduct = $blank;
+            foreach ($contaminatedTanks as $tank) {
+                $addTo($contaminatedByProduct, $tank->product_type, (int) $tank->contaminated_liters);
+            }
+
+            $pendingClearanceByProduct = $blank;
+            foreach ($pendingClearanceOrders as $order) {
+                if ($order->items->isNotEmpty()) {
+                    foreach ($order->items as $item) {
+                        $addTo($pendingClearanceByProduct, $item->product_type, (int) $item->qty);
+                    }
+                } else {
+                    $addTo($pendingClearanceByProduct, $order->getAttribute('product_type'), (int) $order->qty_ordered);
+                }
+            }
+
+            // Splits a pending-delivery list the same way, sharing the warehouse
+            // quantity out across a multi-product DR's own lines.
+            $deliveryByProduct = function ($deliveries) use ($blank, $addTo, $qtyForWarehouse): array {
+                $map = $blank;
+
+                foreach ($deliveries as $delivery) {
+                    $qty = (int) $qtyForWarehouse($delivery);
+
+                    if ($delivery->items->isNotEmpty()) {
+                        $total = (int) $delivery->items->sum('qty_out') ?: 1;
+                        foreach ($delivery->items as $item) {
+                            $addTo($map, $item->product_type, (int) round($qty * (int) $item->qty_out / $total));
+                        }
+                    } else {
+                        $addTo($map, $delivery->product_type, $qty);
+                    }
+                }
+
+                return $map;
+            };
+
+            $bigTankerByProduct = $deliveryByProduct($bigTankerDeliveries);
+            $smallTankerByProduct = $deliveryByProduct($smallTankerDeliveries);
+            $clientPickupByProduct = $deliveryByProduct($clientPickupDeliveries);
 
             $reportBlocks[$warehouse->id] = [
                 'warehouse' => $warehouse,
@@ -224,6 +287,16 @@ class ReportController extends Controller
                 'total_hold_for_clearing' => $totalHoldForClearing,
                 'total_available_for_sale' => $totalAvailableForSale,
                 'total_available_on_hand_for_selling' => $totalAvailableOnHandForSelling,
+
+                // Product breakdown, per metric (D / U / P, plus X when a tank
+                // or delivery carries no product at all).
+                'depot_by_product' => $depotByProduct,
+                'tanker_by_product' => $tankerByProduct,
+                'contaminated_by_product' => $contaminatedByProduct,
+                'pending_clearance_by_product' => $pendingClearanceByProduct,
+                'big_tanker_by_product' => $bigTankerByProduct,
+                'small_tanker_by_product' => $smallTankerByProduct,
+                'client_pickup_by_product' => $clientPickupByProduct,
             ];
         }
 

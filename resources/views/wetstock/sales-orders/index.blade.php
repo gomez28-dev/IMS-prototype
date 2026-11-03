@@ -1,29 +1,16 @@
 @extends('layouts.app')
 
-@section('title', 'Sales Orders')
+@section('title', 'Fuel Trading Dashboard')
+
+@section('hide-portal-label', true)
 
 @section('content')
 <div class="row justify-content-center">
     <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
-            <div>
-                <nav aria-label="breadcrumb">
-                    <ol class="breadcrumb mb-1 small">
-                        <li class="breadcrumb-item"><a href="{{ route('portal') }}" class="text-decoration-none text-secondary">Portal</a></li>
-                        <li class="breadcrumb-item"><a href="{{ route('stock-orders.purchase-orders.index') }}" class="text-decoration-none text-secondary">Stock Orders</a></li>
-                        <li class="breadcrumb-item active" aria-current="page">Sales Orders</li>
-                    </ol>
-                </nav>
-                <h3 class="fw-bold text-dark mb-0">
-                    <i class="bi bi-patch-check text-primary me-2"></i>Sales Orders Needing an ATL
-                </h3>
-                <p class="text-muted small mb-0 mt-1">Fuel Trade and Buy Back pick-up orders, whatever their clearance status.</p>
-            </div>
-            {{-- A "Stock Orders Dashboard" button used to sit here. It linked to
-                 stock-orders.purchase-orders.index - the Purchase Orders page -
-                 under a label that promised somewhere else entirely, so it is
-                 gone rather than relabelled. --}}
-        </div>
+        {{-- No breadcrumb, badge, heading or subtitle: the page name is in the
+             top bar, and the stat cards open the page as they do on the Orders
+             Dashboard. A "Stock Orders Dashboard" button used to sit here; it
+             pointed at the Purchase Orders page, so it went. --}}
 
         @php
             // Product chip colours: U = Unleaded, D = Diesel, P = Premium.
@@ -139,27 +126,30 @@
             @endforeach
         </div>
 
-        {{-- Search --}}
-        <div class="card card-custom border-0 shadow-sm mb-4">
-            <div class="card-body p-3">
-                <form method="GET" action="{{ route('stock-orders.sales-orders.index') }}" class="row g-2 align-items-center">
-                    <div class="col-md-6">
-                        <input type="text" name="search" class="form-control form-control-sm"
-                               placeholder="Search by SO# or Account..." value="{{ $search }}">
-                    </div>
-                    <div class="col-md-6 d-flex gap-2">
-                        <button type="submit" class="btn btn-sm btn-primary">Search</button>
-                        <a href="{{ route('stock-orders.sales-orders.index') }}" class="btn btn-sm btn-outline-secondary">Reset</a>
-                    </div>
-                </form>
-            </div>
+        {{-- Search: the Orders Dashboard's control row, directly above the
+             table it narrows. --}}
+        <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+            <form method="GET" action="{{ route('stock-orders.sales-orders.index') }}"
+                  class="d-flex gap-2 align-items-center">
+                <div class="input-group flex-shrink-0" style="width: 320px;">
+                    <span class="input-group-text bg-white border-end-0">
+                        <i class="bi bi-search text-muted"></i>
+                    </span>
+                    <input type="text" name="search" class="form-control border-start-0"
+                           placeholder="Search by SO# or Account..." value="{{ $search }}">
+                </div>
+                <button type="submit" class="btn btn-primary-custom">Search</button>
+                @if ($search)
+                    <a href="{{ route('stock-orders.sales-orders.index') }}" class="btn btn-secondary-custom">Reset</a>
+                @endif
+            </form>
         </div>
 
         {{-- Orders --}}
         <div class="card card-custom border-0 shadow-sm">
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
+                    <table class="table table-custom table-hover align-middle mb-0">
                         <thead class="bg-light">
                             <tr>
                                 <th class="ps-3 py-3">SO Number</th>
@@ -192,17 +182,23 @@
                                     <td><strong>{{ $row->account }}</strong></td>
                                     <td>
                                         @if ($rowVolumes === [])
-                                            <span class="text-muted">—</span>
-                                            <div class="small text-muted font-monospace">{{ number_format($row->qty_ordered) }} L</div>
-                                        @else
-                                            @foreach ($rowVolumes as $product => $qty)
-                                                @php $code = \Illuminate\Support\Str::substr((string) $product, 0, 1); @endphp
-                                                <div class="mb-1">
-                                                    {!! $chip($code, $product) !!}
-                                                    <span class="ms-2 text-muted small">{{ $product }}</span>
-                                                    <span class="fw-bold font-monospace ms-2">{{ number_format($qty) }}</span>
+                                            <div class="pl-block">
+                                                <div class="pl-row">
+                                                    <span class="pl-num">{{ number_format($row->qty_ordered) }}</span>
                                                 </div>
-                                            @endforeach
+                                            </div>
+                                        @else
+                                            {{-- One line per product, keyed by its initial: the
+                                                 Orders Dashboard's product lines. --}}
+                                            <div class="pl-block">
+                                                @foreach ($rowVolumes as $product => $qty)
+                                                    @php $code = \Illuminate\Support\Str::substr((string) $product, 0, 1); @endphp
+                                                    <div class="pl-row" title="{{ $product }}">
+                                                        <span class="pl-key">{!! $chip($code, $product) !!}</span>
+                                                        <span class="pl-num">{{ number_format($qty) }}</span>
+                                                    </div>
+                                                @endforeach
+                                            </div>
                                         @endif
                                     </td>
                                     <td class="text-center">
