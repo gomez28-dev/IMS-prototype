@@ -784,6 +784,21 @@
                             @endif
                         </a>
                     @endif
+                @elseif (request()->is('logistics*'))
+                    <a class="nav-link d-flex align-items-center" href="{{ route('logistics.schedule') }}">
+                        <i class="bi bi-calendar3 me-2"></i> Trip Schedule
+                    </a>
+                    <a class="nav-link d-flex align-items-center" href="{{ route('logistics.job-orders.index') }}">
+                        <i class="bi bi-clipboard-check me-2"></i> Job Orders
+                    </a>
+                    <a class="nav-link d-flex align-items-center" href="{{ route('logistics.units') }}">
+                        <i class="bi bi-truck me-2"></i> Manage Units
+                    </a>
+                    @if (Auth::user()->canManagePersonnel())
+                        <a class="nav-link d-flex align-items-center" href="{{ route('logistics.personnel.index') }}">
+                            <i class="bi bi-people me-2"></i> Manage Personnel
+                        </a>
+                    @endif
                 @elseif (request()->is('stock-orders*'))
                     {{-- Mobile nav mirrors the desktop sidebar: three dedicated
                          pages, then Approvals (admin/vp only), Suppliers, Reports. --}}
@@ -887,6 +902,8 @@
                 Wet Stock
             @elseif (request()->is('stock-orders*'))
                 Stock Orders (Module 3)
+            @elseif (request()->is('logistics*'))
+                Logistics (Module 4)
             @else
                 Sales Documentation
             @endif
@@ -936,6 +953,25 @@
                     @if ($__pendingM2Count > 0)
                         <span class="badge rounded-pill ms-auto bg-danger text-white">{{ $__pendingM2Count }}</span>
                     @endif
+                </a>
+                @endif
+            @elseif (request()->is('logistics*'))
+                <a href="{{ route('logistics.schedule') }}" class="sidebar-nav-link {{ request()->routeIs('logistics.schedule*') || request()->routeIs('logistics.index') ? 'active' : '' }}" title="Trip Schedule">
+                    <i class="bi bi-calendar3"></i>
+                    <span class="nav-label">Trip Schedule</span>
+                </a>
+                <a href="{{ route('logistics.job-orders.index') }}" class="sidebar-nav-link {{ request()->routeIs('logistics.job-orders.*') ? 'active' : '' }}" title="Job Orders">
+                    <i class="bi bi-clipboard-check"></i>
+                    <span class="nav-label">Job Orders</span>
+                </a>
+                <a href="{{ route('logistics.units') }}" class="sidebar-nav-link {{ request()->routeIs('logistics.units*') ? 'active' : '' }}" title="Manage Units">
+                    <i class="bi bi-truck"></i>
+                    <span class="nav-label">Manage Units</span>
+                </a>
+                @if (Auth::user()->canManagePersonnel())
+                <a href="{{ route('logistics.personnel.index') }}" class="sidebar-nav-link {{ request()->routeIs('logistics.personnel.*') ? 'active' : '' }}" title="Manage Personnel">
+                    <i class="bi bi-people"></i>
+                    <span class="nav-label">Manage Personnel</span>
                 </a>
                 @endif
             @elseif (request()->is('stock-orders*'))
@@ -1124,6 +1160,8 @@
                                 Wet Stock
                             @elseif (request()->is('stock-orders*'))
                                 Stock Orders
+                            @elseif (request()->is('logistics*'))
+                                Logistics
                             @else
                                 Sales Documentation
                             @endif

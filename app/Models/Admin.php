@@ -160,6 +160,29 @@ class Admin extends Authenticatable
         return in_array($this->role, ['admin', 'ops_admin', 'ops_mgr', 'ops_wh', 'ops_log', 'hod', 'vp']);
     }
 
+    // Module 4 — Logistics
+
+    /**
+     * Logistics module access.
+     *
+     * hod and vp may look but not touch, which is why these are separate from
+     * canEditModule2(): that helper admits both.
+     */
+    public function canViewLogistics(): bool
+    {
+        return in_array($this->role, ['admin', 'ops_admin', 'ops_mgr', 'ops_wh', 'ops_log', 'hod', 'vp']);
+    }
+
+    public function canEditLogistics(): bool
+    {
+        return in_array($this->role, ['admin', 'ops_admin', 'ops_mgr', 'ops_wh', 'ops_log']);
+    }
+
+    public function canManagePersonnel(): bool
+    {
+        return in_array($this->role, ['admin', 'ops_admin', 'ops_mgr']);
+    }
+
     // Approval Permissions
     public function canApproveModule1Modification(): bool
     {

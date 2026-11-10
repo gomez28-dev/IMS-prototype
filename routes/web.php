@@ -290,6 +290,9 @@ Route::post('/warehouses/{warehouse}/tanks', [WetStock\StorageTankController::cl
         Route::get('/{purchaseOrder}', [WetStock\StockOrderController::class, 'show'])->name('show');
     });
 
+    // Module 4 — Logistics
+    require __DIR__ . '/logistics.php';
+
     // Push subscription stub (real Web Push lands later; prevents 500 from layout snippet)
     Route::post('/push/subscribe', function () {
         return response()->noContent();

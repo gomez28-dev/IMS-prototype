@@ -43,6 +43,25 @@
         </div>
     </div>
 
+    @if (Auth::user()->canViewLogistics())
+        <div class="col-md-4 mb-4">
+            <div class="card card-custom h-100 p-4 border-0 text-center shadow-sm">
+                <div class="card-body d-flex flex-column align-items-center justify-content-between">
+                    <div class="mb-4">
+                        <div class="rounded-circle bg-light d-inline-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px; color: var(--brand-color);">
+                            <i class="bi bi-truck fs-1"></i>
+                        </div>
+                        <h4 class="fw-bold text-dark mb-2">Logistics</h4>
+                        <p class="text-muted small">Plan tanker trips, turn deliveries into drop-offs, track where every unit is, and keep the driver list.</p>
+                    </div>
+                    <a href="{{ route('logistics.schedule') }}" class="btn btn-primary-custom w-100 py-2 fs-6">
+                        Enter Logistics <i class="bi bi-arrow-right ms-1"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    @endif
+
     @if (Auth::user()->canAccessStockOrders())
         <div class="col-md-4 mb-4">
             <div class="card card-custom h-100 p-4 border-0 text-center shadow-sm">

@@ -95,6 +95,14 @@ class Delivery extends Model
         return $this->hasMany(DeliveryAllocation::class, 'delivery_id');
     }
 
+    /**
+     * Trip stops that reference this delivery (Module 4).
+     */
+    public function tripStops(): HasMany
+    {
+        return $this->hasMany(LogisticsTripStop::class, 'delivery_id');
+    }
+
     public function getAllocatedQuantityAttribute(): int
     {
         return (int) $this->allocations()->sum('quantity');
