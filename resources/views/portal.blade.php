@@ -3,6 +3,9 @@
 @section('title', 'Select Portal')
 
 @section('content')
+{{-- The modules read in the order the business runs: sales first, then the fuel
+     that serves them, then the stock orders that replenish it, then delivery.
+     The Executive Overview is not a module, so it sits above them as a banner. --}}
 <div class="row justify-content-center align-items-center my-4">
     <div class="col-12 text-center mb-5">
         <h2 class="fw-bold text-dark display-6 mb-2">Welcome to IMS Portal</h2>
@@ -10,17 +13,19 @@
     </div>
 
     @if (Auth::user()->canViewExecutiveDashboard())
-        <div class="col-md-4 mb-4">
-            <div class="card card-custom h-100 p-4 border-0 text-center shadow-sm">
-                <div class="card-body d-flex flex-column align-items-center justify-content-between">
-                    <div class="mb-4">
-                        <div class="rounded-circle bg-light d-inline-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px; color: var(--brand-color);">
-                            <i class="bi bi-speedometer2 fs-1"></i>
+        <div class="col-12 mb-4">
+            <div class="card card-custom border-0 shadow-sm">
+                <div class="card-body d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 p-4">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="rounded-circle bg-light d-inline-flex align-items-center justify-content-center flex-shrink-0" style="width: 64px; height: 64px; color: var(--brand-color);">
+                            <i class="bi bi-speedometer2 fs-2"></i>
                         </div>
-                        <h4 class="fw-bold text-dark mb-2">Executive Overview</h4>
-                        <p class="text-muted small">One page for all four modules: sales, stock on hand, purchase orders and today's trips, with what needs a decision.</p>
+                        <div>
+                            <h4 class="fw-bold text-dark mb-1">Executive Overview</h4>
+                            <p class="text-muted small mb-0">One page for all four modules: sales, stock on hand, purchase orders and today's trips, with what needs a decision.</p>
+                        </div>
                     </div>
-                    <a href="{{ route('executive.dashboard') }}" class="btn btn-primary-custom w-100 py-2 fs-6">
+                    <a href="{{ route('executive.dashboard') }}" class="btn btn-primary-custom px-4 py-2 fs-6 text-nowrap">
                         Open Executive Overview <i class="bi bi-arrow-right ms-1"></i>
                     </a>
                 </div>
@@ -28,7 +33,7 @@
         </div>
     @endif
 
-    <div class="col-md-5 col-lg-4 mb-4">
+    <div class="col-sm-6 col-xl-3 mb-4">
         <div class="card card-custom h-100 p-4 border-0 text-center shadow-sm">
             <div class="card-body d-flex flex-column align-items-center justify-content-between">
                 <div class="mb-4">
@@ -45,7 +50,7 @@
         </div>
     </div>
 
-    <div class="col-md-4 mb-4">
+    <div class="col-sm-6 col-xl-3 mb-4">
         <div class="card card-custom h-100 p-4 border-0 text-center shadow-sm">
             <div class="card-body d-flex flex-column align-items-center justify-content-between">
                 <div class="mb-4">
@@ -62,27 +67,8 @@
         </div>
     </div>
 
-    @if (Auth::user()->canViewLogistics())
-        <div class="col-md-4 mb-4">
-            <div class="card card-custom h-100 p-4 border-0 text-center shadow-sm">
-                <div class="card-body d-flex flex-column align-items-center justify-content-between">
-                    <div class="mb-4">
-                        <div class="rounded-circle bg-light d-inline-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px; color: var(--brand-color);">
-                            <i class="bi bi-truck fs-1"></i>
-                        </div>
-                        <h4 class="fw-bold text-dark mb-2">Logistics</h4>
-                        <p class="text-muted small">Plan tanker trips, turn deliveries into drop-offs, track where every unit is, and keep the driver list.</p>
-                    </div>
-                    <a href="{{ route('logistics.schedule') }}" class="btn btn-primary-custom w-100 py-2 fs-6">
-                        Enter Logistics <i class="bi bi-arrow-right ms-1"></i>
-                    </a>
-                </div>
-            </div>
-        </div>
-    @endif
-
     @if (Auth::user()->canAccessStockOrders())
-        <div class="col-md-4 mb-4">
+        <div class="col-sm-6 col-xl-3 mb-4">
             <div class="card card-custom h-100 p-4 border-0 text-center shadow-sm">
                 <div class="card-body d-flex flex-column align-items-center justify-content-between">
                     <div class="mb-4">
@@ -94,6 +80,25 @@
                     </div>
                     <a href="{{ route('stock-orders.purchase-orders.index') }}" class="btn btn-primary-custom w-100 py-2 fs-6">
                         Enter Stock Orders <i class="bi bi-arrow-right ms-1"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if (Auth::user()->canViewLogistics())
+        <div class="col-sm-6 col-xl-3 mb-4">
+            <div class="card card-custom h-100 p-4 border-0 text-center shadow-sm">
+                <div class="card-body d-flex flex-column align-items-center justify-content-between">
+                    <div class="mb-4">
+                        <div class="rounded-circle bg-light d-inline-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px; color: var(--brand-color);">
+                            <i class="bi bi-truck fs-1"></i>
+                        </div>
+                        <h4 class="fw-bold text-dark mb-2">Logistics</h4>
+                        <p class="text-muted small">Plan tanker trips, turn deliveries into drop-offs, track where every unit is, and keep the driver list.</p>
+                    </div>
+                    <a href="{{ route('logistics.schedule') }}" class="btn btn-primary-custom w-100 py-2 fs-6">
+                        Enter Logistics <i class="bi bi-arrow-right ms-1"></i>
                     </a>
                 </div>
             </div>

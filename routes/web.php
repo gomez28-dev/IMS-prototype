@@ -267,6 +267,11 @@ Route::post('/warehouses/{warehouse}/tanks', [WetStock\StorageTankController::cl
         Route::get('/{purchaseOrder}/atl', [WetStock\StockOrderController::class, 'createAtl'])->name('add-atl');
         Route::post('/{purchaseOrder}/atl', [WetStock\StockOrderController::class, 'storeAtl'])->name('store-atl');
         Route::get('/approvals', [WetStock\StockOrderController::class, 'approvals'])->name('approvals');
+
+        // The Stock Orders report. Declared before the {purchaseOrder} wildcard
+        // below, which would otherwise take "reports" as a PO id.
+        Route::get('/reports', [WetStock\StockOrderReportController::class, 'index'])->name('reports.index');
+        Route::get('/reports/export', [WetStock\StockOrderReportController::class, 'export'])->name('reports.export');
         Route::prefix('suppliers')->name('suppliers.')->group(function () {
             Route::get('/', [WetStock\SupplierController::class, 'index'])->name('index');
             Route::get('/create', [WetStock\SupplierController::class, 'create'])->name('create');

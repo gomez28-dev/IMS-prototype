@@ -844,7 +844,7 @@
                             <i class="bi bi-building me-2"></i> Suppliers
                         </a>
                     @endif
-                    <a class="nav-link d-flex align-items-center disabled opacity-50" aria-disabled="true" onclick="return false;">
+                    <a class="nav-link d-flex align-items-center {{ request()->routeIs('stock-orders.reports.*') ? 'active' : '' }}" href="{{ route('stock-orders.reports.index') }}">
                         <i class="bi bi-graph-up me-2"></i> Reports
                     </a>
                 @elseif (!request()->routeIs('portal'))
@@ -1051,7 +1051,7 @@
                     <span class="nav-label">Suppliers</span>
                 </a>
                 @endif
-                <a href="#" class="sidebar-nav-link disabled opacity-50" title="Reports (coming soon)" aria-disabled="true" onclick="return false;">
+                <a href="{{ route('stock-orders.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('stock-orders.reports.*') ? 'active' : '' }}" title="Reports">
                     <i class="bi bi-graph-up"></i>
                     <span class="nav-label">Reports</span>
                 </a>
