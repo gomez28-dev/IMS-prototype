@@ -179,13 +179,18 @@ class AtlStatusControlTest extends TestCase
         $this->assertStringNotContainsString('>Type</th>', $html);
     }
 
-    public function test_the_products_read_as_code_dash_litres(): void
+    public function test_the_products_read_as_a_chip_and_its_litres(): void
     {
         [$order] = $this->atlOrder();
 
         $html = $this->showHtml($order);
 
-        $this->assertStringContainsString('<strong>D</strong> - 5,000', $html);
+        // The product is the shared coloured chip, followed by the volume on the
+        // same line: the old bare "D - 5,000" text was replaced app-wide by chips.
+        $this->assertMatchesRegularExpression(
+            '/prod-chip[^>]*>D<\/span>\s*<span class="ms-1">5,000<\/span>/',
+            $html
+        );
     }
 
     public function test_the_status_cell_carries_no_driver_line(): void

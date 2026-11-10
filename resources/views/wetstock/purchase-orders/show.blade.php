@@ -1,6 +1,9 @@
 @extends('layouts.app')
 
-@section('title', 'Purchase Order Details')
+{{-- The top bar is this page's heading (the in-content heading and breadcrumb
+     were dropped), so it has to carry the PO number: without it the page never
+     says which purchase order you are looking at. --}}
+@section('title', 'Purchase Order ' . ($purchaseOrder->po_number ?: '(Pending PO#)'))
 
 @push('page-actions')
     <div class="d-flex gap-2 flex-wrap">
