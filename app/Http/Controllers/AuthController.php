@@ -37,7 +37,13 @@ class AuthController extends Controller
 
             $request->session()->regenerate();
             
-            return redirect()->intended(route('portal'))
+            // The President, VP and an administrator start on the cross-module
+            // overview; everyone else lands on the module picker as before.
+            $fallback = Auth::user()->canViewExecutiveDashboard()
+                ? route('executive.dashboard')
+                : route('portal');
+
+            return redirect()->intended($fallback)
                 ->with('success', 'Logged in successfully.');
         }
 

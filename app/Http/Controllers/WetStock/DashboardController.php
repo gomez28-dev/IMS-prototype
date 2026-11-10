@@ -27,13 +27,7 @@ class DashboardController extends Controller
 
         return view('wetstock.dashboard', [
             'warehouses' => $warehouses,
-            'unassignedCount' => Delivery::where('status', '!=', 'CANCELLED')
-            ->whereHas('order', fn($q) => $q->where('status', '!=', 'Cancelled'))
-            ->where(function ($q) {
-                $q->whereDoesntHave('allocations')
-                    ->orWhereRaw('(SELECT COALESCE(SUM(quantity), 0) FROM delivery_allocations WHERE delivery_id = deliveries.id) < qty_out');
-            })
-            ->count(),
+            'unassignedCount' => Delivery::unassignedToTank()->count(),
         ]);
     }
 }

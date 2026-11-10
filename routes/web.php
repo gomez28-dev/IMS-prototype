@@ -6,6 +6,7 @@ use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeliveryController;
+use App\Http\Controllers\ExecutiveDashboardController;
 use App\Http\Controllers\ModificationRequestController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PortalController;
@@ -24,6 +25,11 @@ Route::middleware('auth')->group(function () {
 
     // Portal selection screen
     Route::get('/', [PortalController::class, 'index'])->name('portal');
+
+    // Executive overview — read-only summary of all four modules
+    Route::get('/executive', [ExecutiveDashboardController::class, 'index'])
+        ->middleware('role:admin,vp,viewer')
+        ->name('executive.dashboard');
 
     // Sales Inventory Portal Routes
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');

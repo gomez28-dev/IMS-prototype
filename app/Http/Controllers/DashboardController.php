@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
+use App\Services\Sales\OrderProductStats;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -101,76 +102,10 @@ class DashboardController extends Controller
     }
 
     /**
-     * Per-product totals for the summary cards.
-     *
-     * - Ordered: product lines, minus liters on cancelled DRs.
-     * - Delivered: fulfilled DR lines. Fuel Trade orders (which count PO pick-ups) are
-     *   spread across the order's products in proportion to what was ordered.
-     * - Undelivered: ordered minus delivered.
-     * Orders with no product lines count as Diesel, matching the rest of the app.
+     * Per-product totals for the summary cards — see OrderProductStats for the rules.
      */
     private function productStats($orders): array
     {
-        $codes = ['D', 'U', 'P'];
-        $ordered = array_fill_keys($codes, 0);
-        $delivered = array_fill_keys($codes, 0);
-        $undelivered = array_fill_keys($codes, 0);
-
-        foreach ($orders as $o) {
-            $lines = [];
-            foreach ($o->items as $i) {
-                $c = in_array($i->product_type, $codes, true) ? $i->product_type : 'D';
-                $lines[$c] = ($lines[$c] ?? 0) + (int) $i->qty;
-            }
-            if (empty($lines)) {
-                $legacy = $o->getAttribute('product_type');
-                $c = in_array($legacy, $codes, true) ? $legacy : 'D';
-                $lines[$c] = (int) $o->qty_ordered;
-            }
-            $fallback = array_key_first($lines);
-
-            $done = [];
-            $cancel = [];
-            foreach ($o->deliveries as $d) {
-                if (!in_array($d->status, ['FULFILLED', 'CANCELLED'], true)) {
-                    continue;
-                }
-
-                $parts = $d->items->isNotEmpty()
-                    ? $d->items->map(fn ($i) => [$i->product_type, (int) $i->qty_out])->all()
-                    : [[$d->product_type, (int) $d->qty_out]];
-
-                foreach ($parts as [$code, $qty]) {
-                    $code = in_array($code, $codes, true) ? $code : $fallback;
-                    if ($d->status === 'CANCELLED') {
-                        $cancel[$code] = ($cancel[$code] ?? 0) + $qty;
-                    } else {
-                        $done[$code] = ($done[$code] ?? 0) + $qty;
-                    }
-                }
-            }
-
-            $out = (int) $o->total_qty_out;
-            if ($out !== array_sum($done)) {
-                $base = array_sum($lines) ?: 1;
-                $done = [];
-                foreach ($lines as $c => $q) {
-                    $done[$c] = (int) round($out * $q / $base);
-                }
-            }
-
-            foreach ($lines as $c => $q) {
-                $ordered[$c] += max(0, $q - ($cancel[$c] ?? 0));
-            }
-            foreach ($done as $c => $q) {
-                $delivered[$c] += $q;
-            }
-        }
-
-        foreach ($codes as $c) {
-            $undelivered[$c] = max(0, $ordered[$c] - $delivered[$c]);
-        }
-
-        return compact('ordered', 'delivered', 'undelivered');
+        return (new OrderProductStats())->forCollection($orders);
     }
 }

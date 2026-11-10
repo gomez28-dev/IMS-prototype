@@ -748,7 +748,27 @@
                 <h5 class="fw-bold mb-0 text-dark">Menu</h5>
             </div>
             <nav class="flex-grow-1">
-                @if (request()->is('wetstock*'))
+                @if (request()->is('executive*'))
+                    <a class="nav-link d-flex align-items-center" href="{{ route('executive.dashboard') }}">
+                        <i class="bi bi-speedometer2 me-2"></i> Overview
+                    </a>
+                    <a class="nav-link d-flex align-items-center" href="{{ route('dashboard') }}">
+                        <i class="bi bi-box-seam me-2"></i> Sales Documentation
+                    </a>
+                    <a class="nav-link d-flex align-items-center" href="{{ route('wetstock.dashboard') }}">
+                        <i class="bi bi-fuel-pump me-2"></i> Wet Stock
+                    </a>
+                    @if (Auth::user()->canAccessStockOrders())
+                        <a class="nav-link d-flex align-items-center" href="{{ route('stock-orders.purchase-orders.index') }}">
+                            <i class="bi bi-cart-check me-2"></i> Stock Orders
+                        </a>
+                    @endif
+                    @if (Auth::user()->canViewLogistics())
+                        <a class="nav-link d-flex align-items-center" href="{{ route('logistics.schedule') }}">
+                            <i class="bi bi-truck me-2"></i> Logistics
+                        </a>
+                    @endif
+                @elseif (request()->is('wetstock*'))
                     <a class="nav-link d-flex align-items-center" href="{{ route('wetstock.dashboard') }}">
                         <i class="bi bi-speedometer2 me-2"></i> Dashboard
                     </a>
@@ -904,6 +924,8 @@
                 Stock Orders (Module 3)
             @elseif (request()->is('logistics*'))
                 Logistics (Module 4)
+            @elseif (request()->is('executive*'))
+                Executive Overview
             @else
                 Sales Documentation
             @endif
@@ -911,7 +933,32 @@
 
         {{-- Nav links --}}
         <nav class="sidebar-nav">
-            @if (request()->is('wetstock*'))
+            @if (request()->is('executive*'))
+                <a href="{{ route('executive.dashboard') }}" class="sidebar-nav-link {{ request()->routeIs('executive.dashboard') ? 'active' : '' }}" title="Executive Overview">
+                    <i class="bi bi-speedometer2"></i>
+                    <span class="nav-label">Overview</span>
+                </a>
+                <a href="{{ route('dashboard') }}" class="sidebar-nav-link" title="Sales Documentation">
+                    <i class="bi bi-box-seam"></i>
+                    <span class="nav-label">Sales Documentation</span>
+                </a>
+                <a href="{{ route('wetstock.dashboard') }}" class="sidebar-nav-link" title="Wet Stock">
+                    <i class="bi bi-fuel-pump"></i>
+                    <span class="nav-label">Wet Stock</span>
+                </a>
+                @if (Auth::user()->canAccessStockOrders())
+                <a href="{{ route('stock-orders.purchase-orders.index') }}" class="sidebar-nav-link" title="Stock Orders">
+                    <i class="bi bi-cart-check"></i>
+                    <span class="nav-label">Stock Orders</span>
+                </a>
+                @endif
+                @if (Auth::user()->canViewLogistics())
+                <a href="{{ route('logistics.schedule') }}" class="sidebar-nav-link" title="Logistics">
+                    <i class="bi bi-truck"></i>
+                    <span class="nav-label">Logistics</span>
+                </a>
+                @endif
+            @elseif (request()->is('wetstock*'))
                 <a href="{{ route('wetstock.dashboard') }}" class="sidebar-nav-link {{ request()->routeIs('wetstock.dashboard') ? 'active' : '' }}" title="Dashboard">
                     <i class="bi bi-speedometer2"></i>
                     <span class="nav-label">Dashboard</span>

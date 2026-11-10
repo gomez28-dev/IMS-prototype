@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -101,6 +102,22 @@ class Delivery extends Model
     public function tripStops(): HasMany
     {
         return $this->hasMany(LogisticsTripStop::class, 'delivery_id');
+    }
+
+    /**
+     * Deliveries whose litres are not yet covered by tank stock.
+     *
+     * Shared by the Wet Stock dashboard card and the executive overview, so the
+     * two can never disagree about how many loads are still waiting on a tank.
+     */
+    public function scopeUnassignedToTank(Builder $query): Builder
+    {
+        return $query->where('status', '!=', 'CANCELLED')
+            ->whereHas('order', fn ($q) => $q->where('status', '!=', 'Cancelled'))
+            ->where(function ($q) {
+                $q->whereDoesntHave('allocations')
+                    ->orWhereRaw('(SELECT COALESCE(SUM(quantity), 0) FROM delivery_allocations WHERE delivery_id = deliveries.id) < qty_out');
+            });
     }
 
     public function getAllocatedQuantityAttribute(): int

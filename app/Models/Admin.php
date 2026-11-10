@@ -183,6 +183,17 @@ class Admin extends Authenticatable
         return in_array($this->role, ['admin', 'ops_admin', 'ops_mgr']);
     }
 
+    // Executive overview
+
+    /**
+     * The cross-module home page. Read-only for everyone who can open it: the
+     * President (viewer), the VP and an administrator.
+     */
+    public function canViewExecutiveDashboard(): bool
+    {
+        return in_array($this->role, ['admin', 'vp', 'viewer'], true);
+    }
+
     // Approval Permissions
     public function canApproveModule1Modification(): bool
     {
