@@ -1215,13 +1215,13 @@
                         </span>
                         @endunless
                     </div>
-                    <div class="topbar-actions">
+                    <div class="topbar-actions" data-realtime-container="page-actions">
                         @stack('page-actions')
                     </div>
                 </div>
 
                 {{-- Main content area --}}
-                <div class="container-fluid px-4 py-4 flex-grow-1">
+                <div class="container-fluid px-4 py-4 flex-grow-1" data-realtime-container="main">
                     @if (session('success'))
                         <div class="alert alert-success alert-dismissible fade show rounded-4 shadow-sm mb-4 p-3 border-0" role="alert" style="background-color: #dcfce7; color: #15803d;">
                             <i class="bi bi-check-circle-fill me-2"></i> {{ session('success') }}
@@ -1280,6 +1280,302 @@
 
     <!-- Bootstrap 5 JS Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+@auth
+{{-- Realtime state sync.
+
+     Every open screen polls a tiny checksum endpoint. When another user
+     changes a status, this one patches the clearing badges it is already
+     showing and then quietly re-renders the page body from the same URL - no
+     full page reload, so scroll position and typed-in values survive.
+
+     Hostinger's shared plan has no websockets, hence polling. --}}
+<script id="ims-realtime-sync">
+(function () {
+    'use strict';
+
+    var ENDPOINT = @json(route('realtime.state'));
+    var POLL_MS = 4000;
+    var CONTAINER = '[data-realtime-container]';
+
+    // The last checksum seen. Null until the first poll, which only records
+    // it: a page that has just been rendered is already up to date.
+    var lastChecksum = null;
+    var polling = false;
+    var pendingSync = false;
+    var formSubmitting = false;
+
+    var BADGE_BASE = 'badge rounded-pill border px-2 py-1 ';
+    var BADGE_COLOURS = {
+        Approved: 'bg-success-subtle text-success border-success-subtle',
+        Declined: 'bg-danger-subtle text-danger border-danger-subtle',
+        Hold: 'bg-warning-subtle text-warning-emphasis border-warning-subtle',
+        Pending: 'bg-secondary-subtle text-secondary border-secondary-subtle'
+    };
+
+    // ===== Badge patch =====
+    // Clearing status lives on orders, and the endpoint sends the current one
+    // for the orders it knows about, so a badge can flip before the body is
+    // refetched.
+    function patchClearingBadges(orders) {
+        if (!orders) return;
+
+        Object.keys(orders).forEach(function (id) {
+            var status = (orders[id] || {}).clearing_status || '';
+            var label = status || 'Pending';
+
+            Array.prototype.forEach.call(
+                document.querySelectorAll('[data-clearing-badge="' + id + '"]'),
+                function (badge) {
+                    if (badge.getAttribute('data-clearing-status') === status) return;
+                    badge.setAttribute('data-clearing-status', status);
+                    badge.textContent = label;
+                    badge.className = BADGE_BASE + (BADGE_COLOURS[status] || BADGE_COLOURS.Pending);
+                }
+            );
+
+            Array.prototype.forEach.call(
+                document.querySelectorAll('[data-clearing-select="' + id + '"]'),
+                function (select) {
+                    if (select.value !== label) select.value = label;
+                }
+            );
+        });
+    }
+
+    // ===== User-interaction guard =====
+    // Replacing the page body while someone is typing, mid-modal, or submitting
+    // a form would throw their work away. Keep the change pending instead and
+    // apply it as soon as they are idle.
+    function isUserBusy() {
+        if (formSubmitting) return true;
+
+        var active = document.activeElement;
+        if (active && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)) {
+            if (['hidden', 'submit', 'button', 'reset'].indexOf(active.type) === -1) return true;
+        }
+
+        return !!document.querySelector(
+            '.modal.show, .modal[style*="display: block"], .offcanvas.show, dialog[open], .dropdown-menu.show'
+        );
+    }
+
+    // ===== Silent body sync =====
+    function captureValues(container) {
+        var saved = [];
+
+        Array.prototype.forEach.call(container.querySelectorAll('input, select, textarea'), function (el) {
+            var key = el.name || el.id;
+            if (!key) return;
+            saved.push({ key: key, type: el.type, value: el.value, checked: el.checked });
+        });
+
+        return saved;
+    }
+
+    function restoreValues(container, saved) {
+        if (!saved.length) return;
+
+        var byKey = {};
+        Array.prototype.forEach.call(container.querySelectorAll('input, select, textarea'), function (el) {
+            var key = el.name || el.id;
+            if (key) byKey[key] = el;
+        });
+
+        saved.forEach(function (entry) {
+            var el = byKey[entry.key];
+            if (!el || el.type !== entry.type) return;
+
+            if (el.type === 'checkbox' || el.type === 'radio') el.checked = entry.checked;
+            else el.value = entry.value;
+        });
+    }
+
+    // Page scripts were written to run once, against the document they were
+    // served with. Swapping the body throws those listeners away with the old
+    // nodes, so the fresh copies are replayed against the new DOM.
+    function replayScripts(root) {
+        var nativeAdd = document.addEventListener;
+
+        // A replayed script that waits for DOMContentLoaded would wait forever:
+        // this runs long after load. Run those callbacks now instead.
+        document.addEventListener = function (type, handler, options) {
+            if (type === 'DOMContentLoaded') {
+                window.setTimeout(handler, 0);
+                return;
+            }
+            return nativeAdd.call(document, type, handler, options);
+        };
+
+        try {
+            Array.prototype.forEach.call(root.querySelectorAll('script'), function (old) {
+                var type = (old.getAttribute('type') || '').toLowerCase();
+
+                // Only real scripts: data blocks (application/json, importmaps)
+                // came across with the innerHTML and must not be re-parsed.
+                if (old.src || (type && type !== 'text/javascript' && type !== 'module')) return;
+
+                var copy = document.createElement('script');
+                Array.prototype.forEach.call(old.attributes, function (attr) {
+                    copy.setAttribute(attr.name, attr.value);
+                });
+                copy.textContent = old.textContent;
+
+                document.body.appendChild(copy);
+                document.body.removeChild(copy);
+            });
+        } finally {
+            document.addEventListener = nativeAdd;
+        }
+    }
+
+    function syncContainers(freshDoc) {
+        Array.prototype.forEach.call(document.querySelectorAll(CONTAINER), function (node) {
+            var name = node.getAttribute('data-realtime-container');
+            var fresh = freshDoc.querySelector('[data-realtime-container="' + name + '"]');
+            if (!fresh) return;
+
+            var saved = captureValues(node);
+
+            node.innerHTML = fresh.innerHTML;
+
+            restoreValues(node, saved);
+            replayScripts(node);
+        });
+    }
+
+    // The sidebar counters sit outside the swapped region, so their badges are
+    // carried across link by link from the same freshly rendered HTML.
+    function syncSidebarBadges(freshDoc) {
+        ['.app-sidebar .sidebar-nav-link', '.sidebar-drawer .nav-link'].forEach(function (selector) {
+            var incoming = {};
+
+            Array.prototype.forEach.call(freshDoc.querySelectorAll(selector), function (link) {
+                var href = link.getAttribute('href');
+                if (!href) return;
+                var badge = link.querySelector('.badge');
+                incoming[href] = badge ? badge.outerHTML : null;
+            });
+
+            Array.prototype.forEach.call(document.querySelectorAll(selector), function (link) {
+                var href = link.getAttribute('href');
+                if (!href || !(href in incoming)) return;
+
+                var badge = link.querySelector('.badge');
+                var next = incoming[href];
+
+                if (next === null) {
+                    if (badge) badge.remove();
+                } else if (badge) {
+                    badge.outerHTML = next;
+                } else {
+                    link.insertAdjacentHTML('beforeend', next);
+                }
+            });
+        });
+    }
+
+    function refreshPage() {
+        return fetch(window.location.href, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' },
+            credentials: 'same-origin',
+            cache: 'no-store'
+        }).then(function (response) {
+            if (response.redirected && /\/login(\?|$)/.test(new URL(response.url).pathname)) {
+                // The session ended while the page sat open.
+                window.location.reload();
+                return null;
+            }
+
+            if (!response.ok) return null;
+
+            return response.text().then(function (html) {
+                var freshDoc = new DOMParser().parseFromString(html, 'text/html');
+                var top = window.scrollY;
+
+                syncContainers(freshDoc);
+                syncSidebarBadges(freshDoc);
+
+                window.scrollTo(0, top);
+                return null;
+            });
+        });
+    }
+
+    // ===== The poll =====
+    function poll() {
+        if (polling || document.hidden) return;
+        polling = true;
+
+        fetch(ENDPOINT, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+            credentials: 'same-origin',
+            cache: 'no-store'
+        }).then(function (response) {
+            if (response.redirected && /\/login(\?|$)/.test(new URL(response.url).pathname)) {
+                window.location.reload();
+                return null;
+            }
+
+            if (!response.ok) return null;
+
+            return response.json().then(function (state) {
+                if (lastChecksum === null) {
+                    lastChecksum = state.checksum;
+                    return null;
+                }
+
+                if (state.checksum === lastChecksum) {
+                    // Nothing changed - unless an earlier change is still
+                    // waiting for the user to finish what they were doing.
+                    if (pendingSync && !isUserBusy()) {
+                        pendingSync = false;
+                        return refreshPage();
+                    }
+                    return null;
+                }
+
+                lastChecksum = state.checksum;
+                patchClearingBadges(state.orders);
+
+                if (isUserBusy()) {
+                    pendingSync = true;
+                    return null;
+                }
+
+                return refreshPage();
+            });
+        }).catch(function () {
+            // A dropped poll is not worth telling the user about; the next tick retries.
+        }).then(function () {
+            polling = false;
+        });
+    }
+
+    window.setInterval(poll, POLL_MS);
+
+    // Coming back to a tab shows the state immediately instead of up to a poll
+    // interval later.
+    document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) poll();
+    });
+
+    // A change deferred while the user was busy lands as soon as they leave the
+    // field, close the modal, or pick an option.
+    ['focusout', 'change', 'hidden.bs.modal', 'hidden.bs.offcanvas'].forEach(function (type) {
+        document.addEventListener(type, function () {
+            if (pendingSync) window.setTimeout(poll, 300);
+        });
+    });
+
+    document.addEventListener('submit', function () {
+        formSubmitting = true;
+        window.setTimeout(function () { formSubmitting = false; }, 10000);
+    }, true);
+
+    window.addEventListener('pageshow', function () { formSubmitting = false; });
+})();
+</script>
+@endauth
     <script>
         // ===== Mobile drawer (preserved) =====
         function openSidebar() {

@@ -10,6 +10,7 @@ use App\Http\Controllers\ExecutiveDashboardController;
 use App\Http\Controllers\ModificationRequestController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PortalController;
+use App\Http\Controllers\RealtimeStateController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\WetStock;
 use Illuminate\Support\Facades\Route;
@@ -25,6 +26,10 @@ Route::middleware('auth')->group(function () {
 
     // Portal selection screen
     Route::get('/', [PortalController::class, 'index'])->name('portal');
+
+    // State fingerprint polled by the layout so one user's status change
+    // reaches every other open screen without a manual refresh.
+    Route::get('/realtime/state', RealtimeStateController::class)->name('realtime.state');
 
     // Executive overview — read-only summary of all four modules
     Route::get('/executive', [ExecutiveDashboardController::class, 'index'])

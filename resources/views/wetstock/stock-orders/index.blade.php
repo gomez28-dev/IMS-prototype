@@ -88,7 +88,9 @@
                                                 };
                                             @endphp
                                             <td class="text-center">
-                                                <span class="badge rounded-pill border px-2 py-1 {{ $badgeClass }}">
+                                                <span class="badge rounded-pill border px-2 py-1 {{ $badgeClass }}"
+                                                      data-clearing-badge="{{ $ft->id }}"
+                                                      data-clearing-status="{{ $ft->clearing_status }}">
                                                     {{ $ft->clearing_status ?: 'Pending' }}
                                                 </span>
                                             </td>

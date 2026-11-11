@@ -447,7 +447,7 @@
                                 @if (auth()->user()->canClearOrders())
                                 <form method="POST" action="{{ route('order.clearance', $order->id) }}" class="d-inline">
                                     @csrf
-                                    <select name="clearing_status" class="form-select form-select-sm d-inline-block w-auto" onchange="this.form.submit()">
+                                    <select name="clearing_status" class="form-select form-select-sm d-inline-block w-auto" data-clearing-select="{{ $order->id }}" onchange="this.form.submit()">
                                         <option value="Pending" {{ $cls === 'Pending' ? 'selected' : '' }}>Pending</option>
                                         <option value="Declined" {{ $cls === 'Declined' ? 'selected' : '' }}>Declined</option>
                                         <option value="Hold" {{ $cls === 'Hold' ? 'selected' : '' }}>Hold</option>
@@ -455,7 +455,7 @@
                                     </select>
                                 </form>
                                 @else
-                                <span class="badge rounded-pill px-2 py-1 border {{ $badgeClass }}">{{ $cls }}</span>
+                                <span class="badge rounded-pill px-2 py-1 border {{ $badgeClass }}" data-clearing-badge="{{ $order->id }}" data-clearing-status="{{ $cls }}">{{ $cls }}</span>
                                 @endif
                             </td>
                             <td>
@@ -639,7 +639,7 @@
                             @if (auth()->user()->canClearOrders())
                                 <form method="POST" action="{{ route('order.clearance', $order->id) }}" class="d-inline">
                                     @csrf
-                                    <select name="clearing_status" class="form-select form-select-sm d-inline-block w-auto" onchange="this.form.submit()">
+                                    <select name="clearing_status" class="form-select form-select-sm d-inline-block w-auto" data-clearing-select="{{ $order->id }}" onchange="this.form.submit()">
                                         <option value="Pending" {{ $cls === 'Pending' ? 'selected' : '' }}>Pending</option>
                                         <option value="Declined" {{ $cls === 'Declined' ? 'selected' : '' }}>Declined</option>
                                         <option value="Hold" {{ $cls === 'Hold' ? 'selected' : '' }}>Hold</option>
@@ -647,7 +647,7 @@
                                     </select>
                                 </form>
                             @else
-                                <span class="badge rounded-pill px-3 py-1 border {{ $badgeClass }}">{{ $cls }}</span>
+                                <span class="badge rounded-pill px-3 py-1 border {{ $badgeClass }}" data-clearing-badge="{{ $order->id }}" data-clearing-status="{{ $cls }}">{{ $cls }}</span>
                             @endif
                         </div>
                         <div class="d-flex gap-2">

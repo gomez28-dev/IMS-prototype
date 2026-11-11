@@ -210,7 +210,9 @@
                                                 default => 'bg-secondary-subtle text-secondary border border-secondary-subtle',
                                             };
                                         @endphp
-                                        <span class="badge rounded-pill border px-2 py-1 {{ $clearanceClass }}">
+                                        <span class="badge rounded-pill border px-2 py-1 {{ $clearanceClass }}"
+                                              data-clearing-badge="{{ $row->id }}"
+                                              data-clearing-status="{{ $row->clearing_status }}">
                                             {{ $row->clearing_status ?: 'Pending' }}
                                         </span>
                                     </td>
