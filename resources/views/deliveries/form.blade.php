@@ -185,6 +185,14 @@
                         </div>
                     </div>
 
+                    <div class="mb-3">
+                        <label for="delivery_address" class="form-label fw-medium text-secondary small">Delivery Address</label>
+                        <textarea name="delivery_address" id="delivery_address" class="form-control @error('delivery_address') is-invalid @enderror" rows="2" maxlength="500" placeholder="Type the delivery address (prints on the Delivery Receipt)...">{{ old('delivery_address', $delivery ? $delivery->delivery_address : '') }}</textarea>
+                        @error('delivery_address')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+
                     <div class="mb-4">
                         <label for="remarks" class="form-label fw-medium text-secondary small">Additional Notes</label>
                         <textarea name="remarks" id="remarks" class="form-control @error('remarks') is-invalid @enderror" rows="3" placeholder="Optional additional notes...">{{ old('remarks', $delivery ? $delivery->remarks : '') }}</textarea>

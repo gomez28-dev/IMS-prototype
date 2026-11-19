@@ -21,6 +21,8 @@
     if (empty($existingItems)) {
         $existingItems = [$blankItem];
     }
+
+    $currentVat = old('vat_type', $order && $order->vat_type ? $order->vat_type : 'VAT_EX');
 @endphp
 <div class="row justify-content-center">
     <div class="col-md-8 col-lg-6">
@@ -34,11 +36,11 @@
                 <h4 class="fw-bold mb-4 text-dark">
                     <i class="bi {{ $order ? 'bi-journal-check' : 'bi-journal-plus' }} text-primary me-2"></i>{{ $title }}
                 </h4>
-                
+
                 <form method="POST" action="{{ $order ? route('order.update', $order->id) : route('order.store') }}" novalidate>
                     @csrf
                     <input type="hidden" name="return_to" value="{{ old('return_to', $returnTo ?? route('dashboard')) }}">
-                    
+
                     <div class="mb-3">
                         <label for="account" class="form-label fw-medium text-secondary small">Account <span class="text-danger">*</span></label>
                         <select name="account" id="account" class="form-control form-select @error('account') is-invalid @enderror" required>
@@ -122,12 +124,26 @@
                         </div>
                     </div>
 
-                    <div class="mb-4">
-                        <label for="po_number" class="form-label fw-medium text-secondary small">PO Number</label>
-                        <input type="text" name="po_number" id="po_number" class="form-control @error('po_number') is-invalid @enderror" placeholder="e.g. PO-12345 (optional)" value="{{ old('po_number', $order ? $order->po_number : '') }}">
-                        @error('po_number')
-                            <div class="invalid-feedback">{{ $message }}</div>
-                        @enderror
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <label for="po_number" class="form-label fw-medium text-secondary small">PO Number</label>
+                            <input type="text" name="po_number" id="po_number" class="form-control @error('po_number') is-invalid @enderror" placeholder="e.g. PO-12345 (optional)" value="{{ old('po_number', $order ? $order->po_number : '') }}">
+                            @error('po_number')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="col-md-6">
+                            <label for="sales_rep" class="form-label fw-medium text-secondary small">Sales Representative</label>
+                            <select name="sales_rep" id="sales_rep" class="form-control form-select @error('sales_rep') is-invalid @enderror">
+                                <option value="" {{ old('sales_rep', $order ? $order->sales_rep : '') === '' || old('sales_rep', $order ? $order->sales_rep : '') === null ? 'selected' : '' }}>Select sales representative...</option>
+                                @foreach (\App\Models\Order::SALES_REPS as $rep)
+                                    <option value="{{ $rep }}" {{ old('sales_rep', $order ? $order->sales_rep : '') === $rep ? 'selected' : '' }}>{{ $rep }}</option>
+                                @endforeach
+                            </select>
+                            @error('sales_rep')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
                     </div>
 
                     {{-- Products: one row per product (type, qty, price) --}}
@@ -151,7 +167,7 @@
                         </div>
                     </div>
 
-                    <div class="row mb-4">
+                    <div class="row mb-3">
                         <div class="col-md-6">
                             <label for="status" class="form-label fw-medium text-secondary small">Status <span class="text-danger">*</span></label>
                             <select name="status" id="status" class="form-control form-select @error('status') is-invalid @enderror" required>
@@ -169,6 +185,18 @@
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="vat_type" class="form-label fw-medium text-secondary small">VAT <span class="text-danger">*</span></label>
+                        <select name="vat_type" id="vat_type" class="form-control form-select @error('vat_type') is-invalid @enderror" required>
+                            @foreach (\App\Models\Order::VAT_TYPES as $code => $label)
+                                <option value="{{ $code }}" {{ $currentVat === $code ? 'selected' : '' }}>{{ $label }}{{ $code === 'VAT_INC' ? ' (adds 12% tax on the receipt)' : ' (no tax added)' }}</option>
+                            @endforeach
+                        </select>
+                        @error('vat_type')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
                     </div>
 
                     <div class="d-flex justify-content-end gap-2">

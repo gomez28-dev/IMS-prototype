@@ -24,6 +24,7 @@ class Delivery extends Model
         'revised_at',
         'type',
         'remarks',
+        'delivery_address',
         'assigned_by',
         'fulfilled_by',
         'fulfilled_at',

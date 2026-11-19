@@ -14,6 +14,8 @@ use App\Http\Controllers\RealtimeStateController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\WetStock;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\SalesOrderReceiptController;
+use App\Http\Controllers\DeliveryReceiptController;
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
@@ -41,7 +43,9 @@ Route::middleware('auth')->group(function () {
 
     // Delivery index — accessible to all authenticated users
     Route::get('/order/{order}/deliveries', [DeliveryController::class, 'index'])->name('order.deliveries');
-
+    Route::get('/order/{order}/receipt', [SalesOrderReceiptController::class, 'download'])->name('order.receipt');
+        Route::get('/delivery/{delivery}/receipt', [DeliveryReceiptController::class, 'download'])->name('delivery.receipt');
+    
     // Reports — accessible to all authenticated users (view-only)
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
     Route::get('/reports/export', [ReportController::class, 'export'])->name('reports.export');

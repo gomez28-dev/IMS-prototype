@@ -303,6 +303,7 @@ class DeliveryController extends Controller
             'delivery_date' => ['required', 'date'],
             'status' => ['required', 'string', "in:{$allowedStatuses}"],
             'type' => ['required', 'string', 'in:PICK-UP,BIG TANKER,SMALL TANKER,DELIVERY'],
+            'delivery_address' => ['nullable', 'string', 'max:500'],
             'remarks' => ['nullable', 'string'],
         ], $this->itemRules($productKeys)), $this->itemMessages());
 
@@ -395,6 +396,7 @@ class DeliveryController extends Controller
             'delivery_date' => ['required', 'date'],
             'status' => ['required', 'string', "in:{$allowedStatuses}"],
             'type' => ['required', 'string', 'in:PICK-UP,BIG TANKER,SMALL TANKER,DELIVERY'],
+            'delivery_address' => ['nullable', 'string', 'max:500'],
             'remarks' => ['nullable', 'string'],
             'modification_reason' => ['nullable', 'string', 'max:1000'],
         ], $this->itemRules($productKeys)), $this->itemMessages());
@@ -421,7 +423,7 @@ class DeliveryController extends Controller
         }
 
         $changes = [];
-        $comparableFields = ['dr_number', 'atl_number', 'delivery_date', 'product_type', 'qty_out', 'status', 'type', 'remarks'];
+        $comparableFields = ['dr_number', 'atl_number', 'delivery_date', 'product_type', 'qty_out', 'status', 'type', 'delivery_address', 'remarks'];
 
         foreach ($comparableFields as $field) {
             $oldVal = $delivery->{$field};

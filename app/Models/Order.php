@@ -22,6 +22,19 @@ class Order extends Model
         'D' => 'Diesel',
         'P' => 'Premium',
     ];
+    
+        /**
+     * Sales representatives offered on the New Order form.
+     */
+    public const SALES_REPS = ['Anna', 'Gold', 'Danica'];
+
+        /**
+     * VAT handling on the Sales Order Receipt.
+     * VAT_INC adds the 12% VAT on top of the product total; VAT_EX adds none.
+     */
+    public const VAT_RATE = 0.12;
+
+    public const VAT_TYPES = ['VAT_EX' => 'VAT EX.', 'VAT_INC' => 'VAT INC.'];
 
     /** fulfillment_type values */
     public const FULFILLMENT_DELIVERY = 'DELIVERY';
@@ -96,6 +109,8 @@ class Order extends Model
         'linked_purchase_order_id',
         'revised_at',
         'terms',
+        'sales_rep',
+        'vat_type',
         'location',
         'created_by',
         // Virtual attribute: a readable string of product lines

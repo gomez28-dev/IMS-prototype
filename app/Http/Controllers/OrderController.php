@@ -62,44 +62,44 @@ class OrderController extends Controller
         return Order::formatItems($lines);
     }
 
-/**
- * Map the single "Order Category" dropdown (REGULAR / FUEL_TRADE / BUY_BACK / CONSUMO)
- * onto the existing columns, so isFuelTrade() / isBuyBack() and the Module 3
- * queries keep working:
- *   REGULAR    -> DELIVERY   + CLIENT_ORDER
- *   FUEL_TRADE -> FUEL_TRADE + CLIENT_ORDER
- *   CONSUMO    -> DELIVERY   + CONSUMO   (tag only, fulfilled like a regular order)
- *
- * BUY_BACK additionally picks how the fuel reaches Doyen:
- *   Pick-up    -> DEPOT_PICKUP + BUY_BACK  (Module 3, collected at a depot)
- *   Delivery   -> DELIVERY     + BUY_BACK  (Module 2 Stock Requests)
- * That pair is the one combination the Module 3 Sales Orders query excludes.
- *
- * An existing regular order that is already a depot pick-up keeps that setting.
- */
-private function resolveOrderType(string $orderType, ?string $buyBackFulfillment = null, ?Order $existing = null): array
-{
-    if ($orderType === 'FUEL_TRADE') {
-        return ['fulfillment_type' => Order::FULFILLMENT_FUEL_TRADE, 'order_category' => Order::CATEGORY_CLIENT_ORDER];
-    }
+    /**
+     * Map the single "Order Category" dropdown (REGULAR / FUEL_TRADE / BUY_BACK / CONSUMO)
+     * onto the existing columns, so isFuelTrade() / isBuyBack() and the Module 3
+     * queries keep working:
+     *   REGULAR    -> DELIVERY   + CLIENT_ORDER
+     *   FUEL_TRADE -> FUEL_TRADE + CLIENT_ORDER
+     *   CONSUMO    -> DELIVERY   + CONSUMO   (tag only, fulfilled like a regular order)
+     *
+     * BUY_BACK additionally picks how the fuel reaches Doyen:
+     *   Pick-up    -> DEPOT_PICKUP + BUY_BACK  (Module 3, collected at a depot)
+     *   Delivery   -> DELIVERY     + BUY_BACK  (Module 2 Stock Requests)
+     * That pair is the one combination the Module 3 Sales Orders query excludes.
+     *
+     * An existing regular order that is already a depot pick-up keeps that setting.
+     */
+    private function resolveOrderType(string $orderType, ?string $buyBackFulfillment = null, ?Order $existing = null): array
+    {
+        if ($orderType === 'FUEL_TRADE') {
+            return ['fulfillment_type' => Order::FULFILLMENT_FUEL_TRADE, 'order_category' => Order::CATEGORY_CLIENT_ORDER];
+        }
 
-    if ($orderType === 'BUY_BACK') {
-        // Delivery is opt-in; anything else keeps the historic depot pick-up.
-        $delivery = $buyBackFulfillment === Order::BUY_BACK_FULFILLMENT_DELIVERY;
+        if ($orderType === 'BUY_BACK') {
+            // Delivery is opt-in; anything else keeps the historic depot pick-up.
+            $delivery = $buyBackFulfillment === Order::BUY_BACK_FULFILLMENT_DELIVERY;
 
-        return [
-            'fulfillment_type' => $delivery ? Order::FULFILLMENT_DELIVERY : Order::FULFILLMENT_PICKUP,
-            'order_category' => Order::CATEGORY_BUY_BACK,
-        ];
-    }
+            return [
+                'fulfillment_type' => $delivery ? Order::FULFILLMENT_DELIVERY : Order::FULFILLMENT_PICKUP,
+                'order_category' => Order::CATEGORY_BUY_BACK,
+            ];
+        }
 
-    if ($orderType === 'CONSUMO') {
-        return ['fulfillment_type' => Order::FULFILLMENT_DELIVERY, 'order_category' => Order::CATEGORY_CONSUMO];
-    }
+        if ($orderType === 'CONSUMO') {
+            return ['fulfillment_type' => Order::FULFILLMENT_DELIVERY, 'order_category' => Order::CATEGORY_CONSUMO];
+        }
 
-    $keepDepotPickup = $existing
-        && $existing->fulfillment_type === Order::FULFILLMENT_PICKUP
-        && $existing->order_category !== Order::CATEGORY_BUY_BACK;
+        $keepDepotPickup = $existing
+            && $existing->fulfillment_type === Order::FULFILLMENT_PICKUP
+            && $existing->order_category !== Order::CATEGORY_BUY_BACK;
 
         return [
             'fulfillment_type' => $keepDepotPickup ? 'DEPOT_PICKUP' : 'DELIVERY',
@@ -154,21 +154,23 @@ private function resolveOrderType(string $orderType, ?string $buyBackFulfillment
                 Rule::unique('orders', 'so_number')->where(fn($q) => $q->where('location', $request->location)),
             ],
             'po_number' => ['nullable', 'string', 'max:64', 'unique:orders,po_number'],
+            'sales_rep' => ['nullable', 'string', Rule::in(Order::SALES_REPS)],
             'location' => ['required', 'string', 'in:Valenzuela,San Simon'],
             'status' => ['required', 'string', 'in:Active,Cancelled'],
             'order_type' => ['required', 'string', 'in:REGULAR,FUEL_TRADE,BUY_BACK,CONSUMO'],
-// Only a Buy Back order picks how the fuel arrives. Optional on every
-                // other category, so the field is simply ignored for them. A Buy
-                // Back posted without a choice keeps its historic pick-up routing.
-                'buy_back_fulfillment' => [
-                    'nullable', 'string', 'in:'.Order::BUY_BACK_FULFILLMENT_PICKUP.','.Order::BUY_BACK_FULFILLMENT_DELIVERY,
-                ],
+            // Only a Buy Back order picks how the fuel arrives. Optional on every
+            // other category, so the field is simply ignored for them. A Buy
+            // Back posted without a choice keeps its historic pick-up routing.
+            'buy_back_fulfillment' => [
+                'nullable', 'string', 'in:'.Order::BUY_BACK_FULFILLMENT_PICKUP.','.Order::BUY_BACK_FULFILLMENT_DELIVERY,
+            ],
             // Optional for every category, and saved empty when left blank.
             // The date the fuel is needed was removed from the SO: the M3 ATL
             // form's Authorized Pick Up Date is the only date the delivery
             // side reads now, so a stale client still posting date_needed is
             // simply ignored by validate() dropping it.
             'terms' => ['required', 'string', 'max:64'],
+            'vat_type' => ['required', 'string', Rule::in(array_keys(Order::VAT_TYPES))],
         ], $this->itemRules()), $this->itemMessages(), $this->itemAttributes());
 
         $validated = array_merge($validated, $this->resolveOrderType(
@@ -241,6 +243,7 @@ private function resolveOrderType(string $orderType, ?string $buyBackFulfillment
                     ->ignore($order->id),
             ],
             'po_number' => ['nullable', 'string', 'max:64', 'unique:orders,po_number,' . $order->id],
+            'sales_rep' => ['nullable', 'string', Rule::in(Order::SALES_REPS)],
             'location' => ['required', 'string', 'in:Valenzuela,San Simon'],
             'status' => ['required', 'string', 'in:Active,Cancelled'],
             'order_type' => ['required', 'string', 'in:REGULAR,FUEL_TRADE,BUY_BACK,CONSUMO'],
@@ -249,6 +252,7 @@ private function resolveOrderType(string $orderType, ?string $buyBackFulfillment
                 'required_if:order_type,BUY_BACK',
             ],
             'terms' => ['required', 'string', 'max:64'],
+            'vat_type' => ['required', 'string', Rule::in(array_keys(Order::VAT_TYPES))],
             'modification_reason' => ['nullable', 'string', 'max:1000'],
         ], $this->itemRules()), $this->itemMessages(), $this->itemAttributes());
 
@@ -268,7 +272,7 @@ private function resolveOrderType(string $orderType, ?string $buyBackFulfillment
         // Diff changes against existing model attributes.
         // (qty_ordered / price / amount are derived from the product lines.)
         $changes = [];
-        $comparableFields = ['account', 'date', 'products', 'so_number', 'po_number', 'location', 'status', 'fulfillment_type', 'order_category', 'terms'];
+        $comparableFields = ['account', 'date', 'products', 'so_number', 'po_number', 'sales_rep', 'location', 'status', 'fulfillment_type', 'order_category', 'terms', 'vat_type'];
 
         foreach ($comparableFields as $field) {
             $oldVal = $order->{$field};

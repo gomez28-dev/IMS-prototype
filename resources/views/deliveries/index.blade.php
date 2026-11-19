@@ -448,9 +448,12 @@
                                         <span class="badge badge-type-big-tanker rounded-pill px-2 py-1">BIG TANKER</span>
                                     @endif
                                 </td>
-                                @if (Auth::user()->canEditModule1())
                                 <td>
                                     <div class="d-flex justify-content-center gap-1">
+                                        <a href="{{ route('delivery.receipt', $delivery->id) }}" class="btn btn-sm btn-outline-success action-icon" title="Download DR Receipt">
+                                            <i class="bi bi-file-earmark-pdf"></i>
+                                        </a>
+                                        @if (Auth::user()->canEditModule1())
                                         <a href="{{ route('delivery.edit', $delivery->id) }}" class="btn btn-sm btn-outline-secondary action-icon" title="Edit Delivery">
                                             <i class="bi bi-pencil"></i>
                                         </a>
@@ -462,11 +465,9 @@
                                             </button>
                                         </form>
                                         @endif
+                                        @endif
                                     </div>
-                                </td>
-                                @else
-                                <td>—</td>
-                                @endif
+                                </td>   
                             </tr>
                             @endforeach
                         @else

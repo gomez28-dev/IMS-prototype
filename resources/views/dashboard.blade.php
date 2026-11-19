@@ -463,6 +463,9 @@
                                     <a href="{{ route('order.deliveries', $order->id) }}" class="btn btn-sm btn-outline-primary rounded-3 px-2 py-1" title="View Deliveries">
                                         <i class="bi bi-truck me-1"></i> Deliveries
                                     </a>
+                                    <a href="{{ route('order.receipt', $order->id) }}" class="btn btn-sm btn-outline-success rounded-3 px-2 py-1" title="Download SO Receipt">
+                                        <i class="bi bi-file-earmark-pdf"></i>
+                                    </a>
                                     @if (Auth::user()->canEditModule1())
                                     <a href="{{ route('order.edit', $order->id) }}" class="btn btn-sm btn-outline-secondary rounded-3 px-2 py-1" title="Edit Order">
                                         <i class="bi bi-pencil"></i>
@@ -653,6 +656,9 @@
                         <div class="d-flex gap-2">
                             <a href="{{ route('order.deliveries', $order->id) }}" class="btn btn-sm btn-outline-primary rounded-3 px-3 py-2 flex-fill text-center">
                                 <i class="bi bi-truck me-1"></i> Deliveries
+                            </a>
+                            <a href="{{ route('order.receipt', $order->id) }}" class="btn btn-sm btn-outline-success rounded-3 px-3 py-2 text-center" title="Download SO Receipt">
+                                <i class="bi bi-file-earmark-pdf"></i>
                             </a>
                             @if (Auth::user()->canEditModule1())
                             <a href="{{ route('order.edit', $order->id) }}" class="btn btn-sm btn-outline-secondary rounded-3 px-3 py-2 flex-fill text-center">
