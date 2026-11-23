@@ -100,9 +100,39 @@ class PurchaseOrderController extends Controller
             $p->rejecter_name = $staffNames[$p->rejected_by] ?? null;
         });
 
+        // Every logged action for these POs, in one query, so History matches
+        // the PO detail page's Activity history. POs from before the log existed
+        // have no rows and fall back to their dates below.
+        $activityByPo = \App\Models\PurchaseOrderActivity::with('actor')
+            ->whereIn('purchase_order_id', $recentPos->pluck('id'))
+            ->get()
+            ->groupBy('purchase_order_id');
+        $activityMap = [
+            'submitted' => ['created', 'was submitted'],
+            'resubmitted' => ['created', 'was resubmitted'],
+            'edited' => ['created', 'was edited'],
+            'approved' => ['approved', 'was approved'],
+            'rejected' => ['returned', 'was returned for changes'],
+        ];
         $historyEvents = collect();
 
         foreach ($recentPos as $p) {
+            if (isset($activityByPo[$p->id])) {
+                foreach ($activityByPo[$p->id] as $a) {
+                    [$type, $label] = $activityMap[$a->action] ?? ['created', 'had activity: '.$a->action];
+                    $historyEvents->push([
+                        'id' => $p->id,
+                        'po' => $p->po_number,
+                        'type' => $type,
+                        'label' => $label,
+                        'by' => $a->actor->name ?? null,
+                        'at' => Carbon::parse($a->created_at),
+                        // A rejection's note is the reason: requester only.
+                        'note' => ($a->action !== 'rejected' || (int) $p->requested_by === (int) Auth::id()) ? $a->note : null,
+                    ]);
+                }
+                continue;
+            }
             if ($p->created_at) {
                 $historyEvents->push([
                     'id' => $p->id,

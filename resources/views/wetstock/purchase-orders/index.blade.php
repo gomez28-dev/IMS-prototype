@@ -428,9 +428,12 @@
                             <div>
                                 <div>
                                     <a href="{{ route('stock-orders.purchase-orders.show', $e['id']) }}" class="pn-po text-decoration-none">{{ $e['po'] ?: 'Pending PO#' }}</a>
-                                    <span class="text-muted">{{ $evText[$e['type']] ?? $e['type'] }}</span>
+                                    <span class="text-muted">{{ $e['label'] ?? ($evText[$e['type']] ?? $e['type']) }}</span>
                                 </div>
                                 <div class="pn-meta">{{ $e['by'] ? 'By '.$e['by'].' on ' : 'On ' }}{{ $e['at']->format('M d, Y g:i A') }}</div>
+                                @if (!empty($e['note']))
+                                    <div class="small mt-1" style="white-space: pre-wrap;">{{ $e['note'] }}</div>
+                                @endif
                             </div>
                         </div>
                     @empty
