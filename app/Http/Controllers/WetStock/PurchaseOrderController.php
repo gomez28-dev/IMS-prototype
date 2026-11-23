@@ -3,11 +3,16 @@
 namespace App\Http\Controllers\WetStock;
 
 use App\Http\Controllers\Controller;
+use App\Models\Admin;
+use App\Models\AtlAllocation;
 use App\Models\Client;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderDelivery;
 use App\Models\Warehouse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 /**
@@ -49,9 +54,102 @@ class PurchaseOrderController extends Controller
 
         $purchaseOrders = $query->latest()->paginate(15);
 
+        // Lifted volume per PO and product, for the whole page in one query.
+        $liftedByPo = [];
+
+        if ($purchaseOrders->isNotEmpty()) {
+            $liftedRows = AtlAllocation::query()
+                ->join('purchase_order_deliveries', 'atl_allocations.purchase_order_delivery_id', '=', 'purchase_order_deliveries.id')
+                ->where('purchase_order_deliveries.lift_status', PurchaseOrderDelivery::LIFT_LIFTED)
+                ->where('purchase_order_deliveries.status', '!=', 'Cancelled')
+                ->whereIn('atl_allocations.purchase_order_id', $purchaseOrders->pluck('id'))
+                ->selectRaw('atl_allocations.purchase_order_id AS po_id, atl_allocations.product, SUM(atl_allocations.quantity) AS qty')
+                ->groupBy('atl_allocations.purchase_order_id', 'atl_allocations.product')
+                ->get();
+
+            foreach ($liftedRows as $row) {
+                $liftedByPo[$row->po_id][$row->product] = (int) $row->qty;
+            }
+        }
+
+        // Purchase orders returned to the signed-in requester (the bell). Only
+        // the requester's own POs are ever read here, so a reason is never
+        // shown to anyone else.
+        $returnedPos = PurchaseOrder::query()
+            ->where('requested_by', Auth::id())
+            ->where('request_status', 'REQUESTED')
+            ->whereNotNull('rejection_reason')
+            ->orderByDesc('rejected_at')
+            ->limit(20)
+            ->get();
+
+        // Recent created / approved / returned events (the history icon).
+        // Reasons are deliberately left out of these.
+        $recentPos = PurchaseOrder::createdPos()
+            ->with(['requester', 'approver'])
+            ->orderByDesc('updated_at')
+            ->limit(40)
+            ->get();
+
+        $staffNames = Admin::whereIn(
+            'id',
+            $returnedPos->pluck('rejected_by')->merge($recentPos->pluck('rejected_by'))->filter()->unique()
+        )->pluck('name', 'id');
+
+        $returnedPos->each(function ($p) use ($staffNames) {
+            $p->rejecter_name = $staffNames[$p->rejected_by] ?? null;
+        });
+
+        $historyEvents = collect();
+
+        foreach ($recentPos as $p) {
+            if ($p->created_at) {
+                $historyEvents->push([
+                    'id' => $p->id,
+                    'po' => $p->po_number,
+                    'type' => 'created',
+                    'by' => $p->requester->name ?? null,
+                    'at' => Carbon::parse($p->created_at),
+                ]);
+            }
+
+            if ($p->approved_at) {
+                $historyEvents->push([
+                    'id' => $p->id,
+                    'po' => $p->po_number,
+                    'type' => 'approved',
+                    'by' => $p->approver->name ?? null,
+                    'at' => Carbon::parse($p->approved_at),
+                ]);
+            }
+
+            if ($p->rejected_at) {
+                $historyEvents->push([
+                    'id' => $p->id,
+                    'po' => $p->po_number,
+                    'type' => 'returned',
+                    'by' => $staffNames[$p->rejected_by] ?? null,
+                    'at' => Carbon::parse($p->rejected_at),
+                ]);
+            }
+        }
+
+        $historyEvents = $historyEvents
+            ->sortByDesc(fn ($e) => $e['at']->getTimestamp())
+            ->take(25)
+            ->values();
+
         return view('wetstock.purchase-orders.index', [
             'purchaseOrders' => $purchaseOrders,
+            'liftedByPo' => $liftedByPo,
+            'returnedPos' => $returnedPos,
+            'historyEvents' => $historyEvents,
             'stats' => $this->stats(),
+            'rejectionCount' => PurchaseOrder::where('requested_by', Auth::id())
+                ->where('request_status', 'REQUESTED')
+                ->whereNotNull('rejection_reason')
+                ->whereNull('rejection_seen_at')
+                ->count(),
         ]);
     }
 
@@ -112,7 +210,7 @@ class PurchaseOrderController extends Controller
         ));
     }
 
-/**
+    /**
      * Headline figures shown as stat cards at the top of the list.
      *
      * The count is scoped to created POs so stock requests do not inflate it.
@@ -127,5 +225,20 @@ class PurchaseOrderController extends Controller
             'total' => PurchaseOrder::createdPos()->count(),
             'volumes' => PurchaseOrder::volumeTotals(),
         ];
+    }
+
+    /**
+     * The requester has opened the feedback on a returned PO, so its bell
+     * badge clears. Only the requester can mark it.
+     */
+    public function markRejectionSeen(Request $request, PurchaseOrder $purchaseOrder): JsonResponse
+    {
+        abort_unless((int) $purchaseOrder->requested_by === (int) Auth::id(), 403);
+
+        if ($purchaseOrder->rejection_reason !== null && $purchaseOrder->rejection_seen_at === null) {
+            $purchaseOrder->forceFill(['rejection_seen_at' => now()])->save();
+        }
+
+        return response()->json(['ok' => true]);
     }
 }

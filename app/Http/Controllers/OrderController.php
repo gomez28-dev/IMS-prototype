@@ -150,6 +150,7 @@ class OrderController extends Controller
         $validated = $request->validate(array_merge([
             'account' => ['required', 'string', 'max:128'],
             'date' => ['required', 'date'],
+            'date_needed' => ['nullable', 'date'],
             'so_number' => ['required', 'string', 'max:64',
                 Rule::unique('orders', 'so_number')->where(fn($q) => $q->where('location', $request->location)),
             ],
@@ -237,6 +238,7 @@ class OrderController extends Controller
         $validated = $request->validate(array_merge([
             'account' => ['required', 'string', 'max:128'],
             'date' => ['required', 'date'],
+            'date_needed' => ['nullable', 'date'],
             'so_number' => ['required', 'string', 'max:64',
                 Rule::unique('orders', 'so_number')
                     ->where(fn($q) => $q->where('location', $request->location))
@@ -272,11 +274,11 @@ class OrderController extends Controller
         // Diff changes against existing model attributes.
         // (qty_ordered / price / amount are derived from the product lines.)
         $changes = [];
-        $comparableFields = ['account', 'date', 'products', 'so_number', 'po_number', 'sales_rep', 'location', 'status', 'fulfillment_type', 'order_category', 'terms', 'vat_type'];
+        $comparableFields = ['account', 'date', 'products', 'so_number', 'po_number', 'sales_rep', 'location', 'status', 'fulfillment_type', 'order_category', 'terms', 'vat_type', 'date_needed'];
 
         foreach ($comparableFields as $field) {
             $oldVal = $order->{$field};
-            if ($field === 'date' && $oldVal) {
+            if (in_array($field, ['date', 'date_needed'], true) && $oldVal) {
                 $oldVal = $oldVal->format('Y-m-d');
             }
             $newVal = $validated[$field] ?? null;

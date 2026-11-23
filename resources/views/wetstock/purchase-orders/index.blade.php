@@ -2,14 +2,26 @@
 
 @section('title', 'Purchase Orders Dashboard')
 
+@push('page-actions')
+    {{-- Both icons are always drawn. The bell never hides when there is nothing
+         to read; the red badge only appears while feedback is unread. --}}
+    <button type="button" class="btn btn-sm btn-light border position-relative pn-icon" onclick="openPn('pnHistory')" title="History" aria-label="History">
+        <i class="bi bi-clock-history"></i>
+    </button>
+    <button type="button" class="btn btn-sm btn-light border position-relative pn-icon" onclick="openPn('pnBell')" title="Notifications" aria-label="Notifications">
+        <i class="bi bi-bell"></i>
+        @if (($rejectionCount ?? 0) > 0)
+            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">{{ $rejectionCount }}</span>
+        @endif
+    </button>
+@endpush
+
 @section('content')
 <div class="row justify-content-center">
     <div class="col-12">
         {{-- No breadcrumb and no page heading: the page name lives in the top
              bar, and the stat cards open the page the way the Orders Dashboard
              does. --}}
-
-        {{-- Fuel Trade Queue Card (if pending SOs exist) --}}
 
         @php
             // Product chip colours: U = Unleaded, D = Diesel, P = Premium.
@@ -33,6 +45,15 @@
                 ['title' => 'Total Qty. Lifted', 'icon' => 'bi-truck', 'tint' => 'background:#f0fdf4;color:#16a34a;', 'data' => $stats['volumes']['lifted']],
                 ['title' => 'Total Qty. Unlifted', 'icon' => 'bi-clock-history', 'tint' => 'background:#fffbeb;color:#d97706;', 'data' => $stats['volumes']['unlifted']],
             ];
+
+            // The same soft badge colours the Orders Dashboard uses for its status badges.
+            $badgeWait = 'bg-warning-subtle text-warning-emphasis border border-warning-subtle';
+            $badgeOk = 'bg-success-subtle text-success border border-success-subtle';
+            $badgeRet = 'bg-danger-subtle text-danger border border-danger-subtle';
+            $badgeNone = 'bg-secondary-subtle text-secondary border border-secondary-subtle';
+
+            $returnedPos = $returnedPos ?? collect();
+            $historyEvents = $historyEvents ?? collect();
         @endphp
         <style>
             .stat-title {
@@ -79,6 +100,51 @@
                 padding: 0.2rem 0.4rem;
                 border-radius: 0.35rem;
                 margin: 0 1px;
+            }
+
+            /* Top-right icons and the floating cards they open. */
+            .pn-icon { width: 36px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0; color: #475569; }
+            .pn-overlay { position: fixed; inset: 0; z-index: 2050; display: none; align-items: center; justify-content: center; padding: 1rem; background: rgba(15, 23, 42, .5); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+            .pn-overlay.show { display: flex; animation: pnFade .22s ease-out both; }
+            .pn-scene { perspective: 1100px; max-height: 100%; }
+            .pn-float { animation: pnRise .5s cubic-bezier(.2, .9, .3, 1.1) both, pnFloat 6s ease-in-out .5s infinite; }
+            .pn-float:hover { animation-play-state: running, paused; }
+            .pn-card { width: min(94vw, 520px); max-height: 82vh; display: flex; flex-direction: column; background: #fff; border-radius: 20px; overflow: hidden; border-top: 4px solid #ff5a1f; transition: transform .18s ease-out; box-shadow: 0 1px 0 rgba(255, 255, 255, .9) inset, 0 44px 80px -24px rgba(15, 23, 42, .5), 0 20px 32px -20px rgba(15, 23, 42, .4), 0 0 0 1px rgba(15, 23, 42, .06); }
+            .pn-head { display: flex; justify-content: space-between; align-items: center; padding: 1.1rem 1.4rem .85rem; border-bottom: 1px solid #e2e8f0; }
+            .pn-head h5 { margin: 0; font-size: 1.2rem; font-weight: 700; color: #0f172a; }
+            .pn-x { border: 0; background: transparent; color: #64748b; font-size: 1.05rem; line-height: 1; padding: .35rem; border-radius: 8px; }
+            .pn-x:hover { background: #f1f5f9; color: #0f172a; }
+            .pn-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: .6rem 1.4rem 1rem; }
+            .pn-foot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .6rem; padding: .8rem 1.4rem; border-top: 1px solid #e2e8f0; background: #f8fafc; }
+            .pn-foot > [data-pn-close] { margin-left: auto; }
+            .pn-item[hidden], .pn-ev[hidden], .pn-pager[hidden] { display: none !important; }
+            .pn-pager { display: flex; align-items: center; gap: .6rem; }
+            .pn-pg-btn { border: 1px solid #e2e8f0; background: #fff; color: #334155; border-radius: 999px; padding: .25rem .75rem; font-size: .8rem; line-height: 1.4; }
+            .pn-pg-btn:hover:not(:disabled) { background: #f1f5f9; }
+            .pn-pg-btn:disabled { opacity: .4; cursor: default; }
+            .pn-dots { display: flex; align-items: center; gap: .4rem; }
+            .pn-dot { width: 8px; height: 8px; padding: 0; border: 0; border-radius: 999px; background: #cbd5e1; transition: width .18s ease, background-color .18s ease; }
+            .pn-dot:hover { background: #94a3b8; }
+            .pn-dot.active { width: 20px; background: #ff5a1f; }
+            .pn-empty { text-align: center; color: #64748b; padding: 2rem 0; font-size: .92rem; }
+            .pn-item { display: block; padding: .8rem .2rem; border-bottom: 1px solid #eef2f7; text-decoration: none; color: inherit; }
+            .pn-item:last-child { border-bottom: 0; }
+            .pn-item:hover .pn-po { text-decoration: underline; }
+            .pn-po { font-weight: 700; color: #0f172a; }
+            .pn-new { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #dc3545; margin-left: .4rem; vertical-align: middle; }
+            .pn-meta { font-size: .78rem; color: #64748b; margin-top: .1rem; }
+            .pn-reason { margin-top: .45rem; white-space: pre-wrap; font-size: .9rem; color: #334155; background: #f8fafc; border-radius: 10px; padding: .6rem .75rem; }
+            .pn-ev { display: flex; gap: .75rem; padding: .7rem 0; border-bottom: 1px solid #eef2f7; }
+            .pn-ev:last-child { border-bottom: 0; }
+            .pn-ev-dot { flex: 0 0 auto; width: 10px; height: 10px; border-radius: 50%; margin-top: .4rem; background: #94a3b8; }
+            .pn-ev-dot.approved { background: #16a34a; }
+            .pn-ev-dot.returned { background: #dc3545; }
+            @keyframes pnFade { from { opacity: 0; } to { opacity: 1; } }
+            @keyframes pnRise { from { opacity: 0; transform: translateY(28px) scale(.94); } to { opacity: 1; transform: none; } }
+            @keyframes pnFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+            @media (prefers-reduced-motion: reduce) {
+                .pn-float { animation: none; }
+                .pn-card { transition: none; }
             }
         </style>
 
@@ -152,128 +218,140 @@
             @endif
         </div>
 
-        {{-- Purchase Orders Master Table --}}
+        {{-- Purchase Orders list. It uses the same table-custom class, cell markup and
+             badge colours as the Orders Dashboard in Module 1, so the shared stylesheet
+             gives both lists the same type scale. --}}
         <div class="card card-custom border-0 shadow-sm">
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-center table-hover align-middle mb-0">
-                        <thead class="bg-light">
+                    <table class="table table-custom table-hover align-middle mb-0">
+                        <thead>
                             <tr>
-                                <th class="ps-3 py-3">PO #</th>
-                                <th class="py-3">Supplier</th>
-                                <th class="py-3">Qty.</th>
-                                <th class="py-3">Price</th>
-                                <th class="py-3">Amount</th>
-                                <th class="py-3">Status</th>
-                                <th class="py-3 table-actions">Action</th>
+                                <th>PO #</th>
+                                <th>Supplier</th>
+                                <th>Qty.</th>
+                                <th>Price</th>
+                                <th>Amount</th>
+                                <th>Terms</th>
+                                <th>Status</th>
+                                <th>Action</th>
                             </tr>
                         </thead>
                         <tbody>
                             @forelse ($purchaseOrders as $po)
+                                @php
+                                    $approved = $po->isVpApproved();
+
+                                    // Status comes from the approver's side of the workflow:
+                                    // a PO sent to the VP waits as "For Approval", becomes
+                                    // "Approved" once the VP signs it, and is "Returned" if
+                                    // the VP sent it back for changes. RECEIVED is this
+                                    // codebase's pending-VP-approval state.
+                                    if ($approved) {
+                                        $stLabel = 'Approved';
+                                        $stClass = $badgeOk;
+                                    } elseif ($po->request_status === 'REQUESTED' && ! empty($po->rejection_reason)) {
+                                        $stLabel = 'Returned';
+                                        $stClass = $badgeRet;
+                                    } elseif ($po->request_status === 'RECEIVED') {
+                                        $stLabel = 'For Approval';
+                                        $stClass = $badgeWait;
+                                    } else {
+                                        $stLabel = $po->computed_status ?: 'Draft';
+                                        $stClass = $badgeNone;
+                                    }
+
+                                    $termText = trim((string) $po->terms);
+
+                                    // Legacy POs predate the stored total, so fall back to
+                                    // summing their own line items.
+                                    $amount = (float) ($po->total_amount
+                                        ?: $po->items->sum(fn ($i) => $i->quantity_ordered * (float) $i->unit_price));
+                                @endphp
                                 <tr>
-                                    <td class="ps-3 fw-bold text-dark">
+                                    <td class="fw-semibold">
                                         {{ $po->po_number ?: 'Pending PO#' }}
                                         @if ($po->linkedOrder)
-                                            <div class="small text-muted">SO: {{ $po->linkedOrder->so_number }}</div>
+                                            <div class="small text-muted fw-normal">SO: {{ $po->linkedOrder->so_number }}</div>
                                         @endif
                                     </td>
-                                    <td>
-                                        <strong>{{ $po->supplier_name ?: ($po->client->name ?? '—') }}</strong>
-                                    </td>
-                                        {{-- Qty / Price / Amount, broken out per product. Amount is the
-                                             stored total; the line columns are the per-product detail
-                                             behind it. Legacy POs with no item rows fall back to the
-                                             PO's single ordered volume.
+                                    <td>{{ $po->supplier_name ?: ($po->client->name ?? '—') }}</td>
 
-                                             Qty and Price are marked up the way the Orders Dashboard
-                                             marks up its own: one centred line per product, keyed by
-                                             its initial. These were monospace - a face used nowhere else
-                                             in the system - which made these three columns read as a
-                                             different table from the rest. Amount follows the Dashboard's
-                                             text-nowrap cell. --}}
-                                    <td>
-                                        @if ($po->items->isNotEmpty())
-                                            <div class="pl-block">
-                                                @foreach ($po->items as $it)
-                                                    <div class="pl-row" title="{{ $it->product }}">
-                                                        <span class="pl-key">{!! $chip(\Illuminate\Support\Str::substr($it->product, 0, 1), $it->product) !!}</span>
-                                                        <span class="pl-num">{{ number_format($it->quantity_ordered) }}</span>
-                                                    </div>
-                                                @endforeach
-                                            </div>
-                                        @else
-                                            <div class="pl-row"><span class="pl-num">{{ number_format($po->qty_ordered) }}</span></div>
-                                        @endif
+                                    {{-- Qty: one line per product, the way the Orders Dashboard
+                                         marks up its own. Legacy POs with no item rows fall back
+                                         to the PO's single ordered volume. --}}
+                                    <td class="text-center">
+                                        <div class="pl-block">
+                                            @forelse ($po->items as $it)
+                                                <div class="pl-row" title="{{ $it->product }}">
+                                                    <span class="pl-key">{!! $chip(\Illuminate\Support\Str::substr($it->product, 0, 1), $it->product) !!}</span>
+                                                    <span class="pl-num">{{ number_format($it->quantity_ordered) }}</span>
+                                                </div>
+                                            @empty
+                                                <div class="pl-row"><span class="pl-num">{{ number_format($po->qty_ordered) }}</span></div>
+                                            @endforelse
+                                        </div>
                                     </td>
-                                    <td>
-                                        @if ($po->items->isNotEmpty())
-                                            <div class="pl-block">
-                                                @foreach ($po->items as $it)
-                                                    <div class="pl-row" title="{{ $it->product }}">
-                                                        <span class="pl-key">{!! $chip(\Illuminate\Support\Str::substr($it->product, 0, 1), $it->product) !!}</span>
-                                                        <span class="pl-num">{{ number_format((float) $it->unit_price, 2) }}</span>
-                                                    </div>
-                                                @endforeach
-                                            </div>
-                                        @else
-                                            <div class="pl-row text-muted"><span class="pl-num">&mdash;</span></div>
-                                        @endif
+
+                                    {{-- Price: one line per product --}}
+                                    <td class="text-center">
+                                        <div class="pl-block">
+                                            @forelse ($po->items as $it)
+                                                <div class="pl-row" title="{{ $it->product }}">
+                                                    <span class="pl-key">{!! $chip(\Illuminate\Support\Str::substr($it->product, 0, 1), $it->product) !!}</span>
+                                                    <span class="pl-num">{{ (float) $it->unit_price > 0 ? number_format((float) $it->unit_price, 2) : '—' }}</span>
+                                                </div>
+                                            @empty
+                                                <div class="pl-row"><span class="pl-num">&mdash;</span></div>
+                                            @endforelse
+                                        </div>
                                     </td>
+
+                                    {{-- Amount: total of the whole PO --}}
                                     <td class="text-nowrap">
-                                        @php
-                                            // Legacy POs predate the stored total, so fall
-                                            // back to summing their own line items.
-                                            $amount = (float) ($po->total_amount
-                                                ?: $po->items->sum(fn ($i) => $i->quantity_ordered * (float) $i->unit_price));
-                                        @endphp
-                                        <div class="fw-bold">{{ number_format($amount, 2) }}</div>
+                                        {{ $amount > 0 ? number_format($amount, 2) : '—' }}
                                     </td>
-                                    <td>
-                                        {{-- One label, not two. This cell previously stacked a
-                                             numbered request_status badge over computed_status,
-                                             which read as two answers to the same question - "3.
-                                             CONFIRMED (Approved)" over "Pending", "4. FOR
-                                             DELIVERY" over "Fulfilled".
 
-                                             The numbered badge is gone, at the user's direction.
-                                             Note what that costs: computed_status reads the
-                                             lifecycle column and never mentions approval, so an
-                                             approved PO now shows only "Pending" here. The one
-                                             remaining approval signal in this row is the Print
-                                             button replacing Edit in the Action cell. --}}
-                                        <span class="badge rounded-pill px-3 py-1 {{ $po->computed_status_badge_class }}">
-                                            {{ $po->computed_status }}
-                                        </span>
+                                    {{-- Terms: text only, as on the Orders Dashboard --}}
+                                    <td>
+                                        <span class="terms-cell" title="{{ $termText }}">{{ $termText !== '' ? $termText : '—' }}</span>
                                     </td>
-                                    <td class="table-actions">
-                                        {{-- Exactly two actions besides View, and which two
+
+                                    <td class="text-center">
+                                        <span class="badge rounded-pill px-2 py-1 {{ $stClass }}">{{ $stLabel }}</span>
+                                    </td>
+
+                                    <td>
+                                        {{-- Exactly two actions besides View Detailed, and which two
                                              depends on where the PO is in its life: Print is
                                              released only once the VP has approved, and an
                                              approved PO can no longer be edited. So each state
                                              offers Print XOR Edit. The routes enforce the same
                                              thing, so this is a convenience rather than the
                                              gate. --}}
-                                        <div class="d-inline-flex gap-1 align-items-center justify-content-center">
-                                            @if ($po->isVpApproved())
+                                        <div class="d-flex justify-content-center gap-1">
+                                            @if ($approved)
                                                 <a href="{{ route('stock-orders.po-pdf', $po->id) }}"
-                                                   class="btn btn-sm btn-action btn-outline-danger rounded-pill px-2 py-1" title="Print Purchase Order">
+                                                   class="btn btn-sm btn-outline-danger rounded-3 px-2 py-1 text-nowrap" title="Print Purchase Order">
                                                     <i class="bi bi-printer me-1"></i> Print
                                                 </a>
                                             @elseif (Auth::user()->canEditStockOrders())
-                                                <a href="{{ route('stock-orders.edit-supplier-po', $po->id) }}" class="btn btn-sm btn-action btn-light border rounded-pill px-2 py-1 text-secondary" title="Edit purchase order">
+                                                <a href="{{ route('stock-orders.edit-supplier-po', $po->id) }}"
+                                                   class="btn btn-sm btn-outline-secondary rounded-3 px-2 py-1 text-nowrap" title="Edit purchase order">
                                                     <i class="bi bi-pencil me-1"></i> Edit
                                                 </a>
                                             @endif
 
-                                            <a href="{{ route('stock-orders.purchase-orders.show', $po->id) }}" class="btn btn-sm btn-action btn-light border rounded-pill px-2 py-1 text-secondary" title="Open purchase order">
-                                                <i class="bi bi-eye me-1"></i> View
+                                            <a href="{{ route('stock-orders.purchase-orders.show', $po->id) }}"
+                                               class="btn btn-sm btn-outline-primary rounded-3 px-2 py-1 text-nowrap" title="View detailed purchase order">
+                                                <i class="bi bi-eye me-1"></i> View Detailed
                                             </a>
                                         </div>
                                     </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="text-center py-5 text-muted">No stock orders found matching criteria.</td>
+                                    <td colspan="8" class="text-center py-5 text-muted">No stock orders found matching criteria.</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -287,4 +365,208 @@
         </div>
     </div>
 </div>
+
+{{-- Notifications: purchase orders returned to the signed-in requester, with the reason.
+     The list only ever holds the viewer's own POs, so nobody else sees a reason. --}}
+<div class="pn-overlay" id="pnBell" role="dialog" aria-modal="true" aria-labelledby="pnBellTitle" aria-hidden="true">
+    <div class="pn-scene">
+        <div class="pn-float">
+            <div class="pn-card">
+                <div class="pn-head">
+                    <h5 id="pnBellTitle">Notifications</h5>
+                    <button type="button" class="pn-x" data-pn-close aria-label="Close"><i class="bi bi-x-lg"></i></button>
+                </div>
+                <div class="pn-body" data-pn-per="3">
+                    @forelse ($returnedPos as $r)
+                        <a href="{{ route('stock-orders.purchase-orders.show', $r->id) }}" class="pn-item">
+                            <div>
+                                <span class="pn-po">{{ $r->po_number ?: 'Pending PO#' }}</span>
+                                <span class="text-muted small">was returned for changes</span>
+                                @if (! $r->rejection_seen_at)<span class="pn-new" title="Not read yet"></span>@endif
+                            </div>
+                            <div class="pn-meta">
+                                {{ $r->rejecter_name ? 'By '.$r->rejecter_name : 'By the approver' }}@if ($r->rejected_at) on {{ \Illuminate\Support\Carbon::parse($r->rejected_at)->format('M d, Y g:i A') }}@endif
+                            </div>
+                            <div class="pn-reason">{{ $r->rejection_reason }}</div>
+                        </a>
+                    @empty
+                        <div class="pn-empty">
+                            <i class="bi bi-bell fs-3 d-block mb-2"></i>
+                            No notifications. When one of your purchase orders is returned, the reason shows here.
+                        </div>
+                    @endforelse
+                </div>
+                <div class="pn-foot">
+                    <div class="pn-pager" data-pn-pager hidden>
+                        <button type="button" class="pn-pg-btn" data-pn-prev aria-label="Previous page"><i class="bi bi-chevron-left"></i> Prev</button>
+                        <div class="pn-dots"></div>
+                        <button type="button" class="pn-pg-btn" data-pn-next aria-label="Next page">Next <i class="bi bi-chevron-right"></i></button>
+                    </div>
+                    <button type="button" class="btn btn-light border rounded-pill px-4" data-pn-close>Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- History: recent created, approved and returned events across purchase orders. Reasons are never shown here. --}}
+<div class="pn-overlay" id="pnHistory" role="dialog" aria-modal="true" aria-labelledby="pnHistoryTitle" aria-hidden="true">
+    <div class="pn-scene">
+        <div class="pn-float">
+            <div class="pn-card">
+                <div class="pn-head">
+                    <h5 id="pnHistoryTitle">History</h5>
+                    <button type="button" class="pn-x" data-pn-close aria-label="Close"><i class="bi bi-x-lg"></i></button>
+                </div>
+                <div class="pn-body" data-pn-per="6">
+                    @php
+                        $evText = ['created' => 'was created', 'approved' => 'was approved', 'returned' => 'was returned for changes'];
+                    @endphp
+                    @forelse ($historyEvents as $e)
+                        <div class="pn-ev">
+                            <span class="pn-ev-dot {{ $e['type'] }}"></span>
+                            <div>
+                                <div>
+                                    <a href="{{ route('stock-orders.purchase-orders.show', $e['id']) }}" class="pn-po text-decoration-none">{{ $e['po'] ?: 'Pending PO#' }}</a>
+                                    <span class="text-muted">{{ $evText[$e['type']] ?? $e['type'] }}</span>
+                                </div>
+                                <div class="pn-meta">{{ $e['by'] ? 'By '.$e['by'].' on ' : 'On ' }}{{ $e['at']->format('M d, Y g:i A') }}</div>
+                            </div>
+                        </div>
+                    @empty
+                        <div class="pn-empty">
+                            <i class="bi bi-clock-history fs-3 d-block mb-2"></i>
+                            Nothing has happened on purchase orders yet.
+                        </div>
+                    @endforelse
+                </div>
+                <div class="pn-foot">
+                    <div class="pn-pager" data-pn-pager hidden>
+                        <button type="button" class="pn-pg-btn" data-pn-prev aria-label="Previous page"><i class="bi bi-chevron-left"></i> Prev</button>
+                        <div class="pn-dots"></div>
+                        <button type="button" class="pn-pg-btn" data-pn-next aria-label="Next page">Next <i class="bi bi-chevron-right"></i></button>
+                    </div>
+                    <button type="button" class="btn btn-light border rounded-pill px-4" data-pn-close>Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    // ---- History and notification cards ----
+    let openId = null;
+    let lastFocus = null;
+
+    // Pages the items of a card: Prev / Next buttons and one dot per page.
+    // The card keeps the height of its tallest page so it does not jump.
+    function setupPager(el) {
+        const body = el.querySelector('.pn-body');
+        const pager = el.querySelector('[data-pn-pager]');
+        if (!body || !pager) return;
+
+        const items = Array.from(body.querySelectorAll('.pn-item, .pn-ev'));
+        const per = parseInt(body.dataset.pnPer || '5', 10);
+        const pages = Math.ceil(items.length / per);
+        const dots = pager.querySelector('.pn-dots');
+        const prev = pager.querySelector('[data-pn-prev]');
+        const next = pager.querySelector('[data-pn-next]');
+        let page = 0;
+
+        body.style.minHeight = '';
+        items.forEach(function (it) { it.hidden = false; });
+
+        if (pages <= 1) {
+            pager.hidden = true;
+            return;
+        }
+
+        pager.hidden = false;
+        dots.innerHTML = '';
+        for (let i = 0; i < pages; i++) {
+            const dot = document.createElement('button');
+            dot.type = 'button';
+            dot.className = 'pn-dot';
+            dot.setAttribute('aria-label', 'Page ' + (i + 1));
+            dot.addEventListener('click', function () { show(i); });
+            dots.appendChild(dot);
+        }
+
+        function show(n) {
+            page = Math.max(0, Math.min(pages - 1, n));
+            items.forEach(function (it, idx) { it.hidden = Math.floor(idx / per) !== page; });
+            Array.from(dots.children).forEach(function (d, i) {
+                d.classList.toggle('active', i === page);
+                d.setAttribute('aria-current', i === page ? 'true' : 'false');
+            });
+            prev.disabled = page === 0;
+            next.disabled = page === pages - 1;
+            body.scrollTop = 0;
+        }
+
+        prev.onclick = function () { show(page - 1); };
+        next.onclick = function () { show(page + 1); };
+
+        let tallest = 0;
+        for (let i = 0; i < pages; i++) {
+            show(i);
+            tallest = Math.max(tallest, body.scrollHeight);
+        }
+        body.style.minHeight = Math.min(tallest, Math.round(window.innerHeight * 0.55)) + 'px';
+        show(0);
+    }
+
+    window.openPn = function (id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+
+        lastFocus = document.activeElement;
+        openId = id;
+        el.classList.add('show');
+        el.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+        setupPager(el);
+        const close = el.querySelector('[data-pn-close]');
+        if (close) close.focus();
+    };
+
+    function closePn() {
+        if (!openId) return;
+        const el = document.getElementById(openId);
+        el.classList.remove('show');
+        el.setAttribute('aria-hidden', 'true');
+        const card = el.querySelector('.pn-card');
+        if (card) card.style.transform = '';
+        document.body.style.overflow = '';
+        openId = null;
+        if (lastFocus && lastFocus.focus) lastFocus.focus();
+    }
+
+    document.querySelectorAll('[data-pn-close]').forEach(function (b) { b.addEventListener('click', closePn); });
+    document.querySelectorAll('.pn-overlay').forEach(function (el) {
+        el.addEventListener('mousedown', function (e) {
+            if (e.target === el || e.target.classList.contains('pn-scene')) closePn();
+        });
+
+        // The card tilts slightly toward the pointer.
+        const card = el.querySelector('.pn-card');
+        card.addEventListener('mousemove', function (e) {
+            const r = card.getBoundingClientRect();
+            const x = (e.clientX - r.left) / r.width - 0.5;
+            const y = (e.clientY - r.top) / r.height - 0.5;
+            card.style.transform = 'rotateY(' + (x * 5) + 'deg) rotateX(' + (-y * 5) + 'deg)';
+        });
+        card.addEventListener('mouseleave', function () { card.style.transform = ''; });
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') { closePn(); return; }
+        if (!openId) return;
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            const btn = document.getElementById(openId).querySelector(e.key === 'ArrowLeft' ? '[data-pn-prev]' : '[data-pn-next]');
+            if (btn && !btn.disabled) btn.click();
+        }
+    });
+})();
+</script>
 @endsection

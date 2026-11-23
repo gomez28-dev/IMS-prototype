@@ -30,6 +30,7 @@ class SalesOrderController extends Controller
         $query = Order::query()
             ->with('items')
             ->where('status', '!=', 'Cancelled')
+            ->where('fulfillment_type', 'FUEL_TRADE')
             ->forModuleThree();
 
         if ($request->filled('search')) {
@@ -64,7 +65,7 @@ class SalesOrderController extends Controller
         // ATLs already raised per order, for the "N Unlifted" badge.
         $atlsByOrder = PurchaseOrderDelivery::whereNotNull('atl_number')
             ->orWhereNotNull('client_atl_number')
-            ->get(['order_id', 'atl_number', 'client_atl_number', 'lift_status', 'status'])
+            ->get(['order_id', 'atl_number', 'client_atl_number', 'lift_status', 'status', 'receiving_date'])
             ->groupBy('order_id');
 
         return view('wetstock.sales-orders.index', [

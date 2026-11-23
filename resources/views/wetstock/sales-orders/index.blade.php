@@ -9,8 +9,8 @@
     <div class="col-12">
         {{-- No breadcrumb, badge, heading or subtitle: the page name is in the
              top bar, and the stat cards open the page as they do on the Orders
-             Dashboard. A "Stock Orders Dashboard" button used to sit here; it
-             pointed at the Purchase Orders page, so it went. --}}
+             Dashboard. Only Fuel Trade (FT) orders reach this page: the filter
+             is in SalesOrderController::index(), so the cards follow it too. --}}
 
         @php
             // Product chip colours: U = Unleaded, D = Diesel, P = Premium.
@@ -155,6 +155,7 @@
                                 <th class="ps-3 py-3">SO Number</th>
                                 <th class="py-3">Client / Account</th>
                                 <th class="py-3">Qty Ordered / Products</th>
+                                <th class="py-3 text-center">Pick Up Date</th>
                                 <th class="py-3 text-center">Clearance</th>
                                 <th class="py-3 text-center">ATL Status</th>
                                 <th class="pe-3 py-3 text-end">Action</th>
@@ -166,6 +167,25 @@
                                     $rowAtls = $atlsByOrder[$row->id] ?? [];
                                     $allLifted = count($rowAtls) > 0
                                         && collect($rowAtls)->every(fn($a) => $a->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_LIFTED);
+                                    // Authorized Pick Up Date is entered on the
+                                    // ATL form (purchase_order_deliveries.receiving_date).
+                                    // An order can have several ATLs, so list each
+                                    // distinct date, earliest first.
+                                    $pickupDates = collect($rowAtls)
+                                        ->pluck('receiving_date')
+                                        ->filter()
+                                        ->map(fn($d) => \Illuminate\Support\Carbon::parse($d)->toDateString())
+                                        ->unique()
+                                        ->sort()
+                                        ->values();
+                                    // No ATL date yet: show the Date Needed typed on
+                                    // the sales order, in muted text, until the ATL
+                                    // confirms the real pick up date.
+                                    $fromOrder = false;
+                                    if ($pickupDates->isEmpty() && $row->date_needed) {
+                                        $pickupDates = collect([$row->date_needed->toDateString()]);
+                                        $fromOrder = true;
+                                    }
                                     // Per-product volumes, so a multi-product
                                     // order reports each product's own quantity
                                     // rather than one lump total.
@@ -200,6 +220,16 @@
                                                 @endforeach
                                             </div>
                                         @endif
+                                    </td>
+                                    <td class="text-center text-nowrap">
+                                        @forelse ($pickupDates as $pickupDate)
+                                            <div class="{{ $fromOrder ? 'text-muted' : '' }}"
+                                                 @if ($fromOrder) title="Date needed from the sales order. No ATL pick up date yet." @endif>
+                                                {{ \Illuminate\Support\Carbon::parse($pickupDate)->format('M d, Y') }}
+                                            </div>
+                                        @empty
+                                            <span class="text-muted">—</span>
+                                        @endforelse
                                     </td>
                                     <td class="text-center">
                                         @php
@@ -240,9 +270,9 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="text-center py-5 text-muted">
+                                    <td colspan="7" class="text-center py-5 text-muted">
                                         <i class="bi bi-inbox fs-1 d-block mb-3 text-secondary"></i>
-                                        No Fuel Trade or Buy Back pick-up orders found.
+                                        No Fuel Trade orders found.
                                     </td>
                                 </tr>
                             @endforelse

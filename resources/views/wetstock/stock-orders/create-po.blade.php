@@ -10,11 +10,40 @@
         : route('stock-orders.store-supplier-po');
     // Editing renders one row per existing line; creating renders one blank row.
     $lineItems = ($isEdit && $po && $po->items->isNotEmpty()) ? $po->items->values() : collect([null]);
+
+    // The Date is never typed in. A new PO is dated today (the server sets it
+    // again on save); an existing PO keeps the date it already has.
+    $poDate = ($isEdit && $po?->po_date) ? $po->po_date : now();
+    $dateNeeded = ($isEdit && $po?->date_needed) ? $po->date_needed : $poDate;
 @endphp
 
-@section('title', $isEdit ? 'Edit Purchase Order' : 'New Supplier Purchase Order')
+@section('title', $isEdit ? 'Edit Purchase Order' : 'Create Purchase Order')
 
 @section('content')
+<style>
+    /* Submitted confirmation card. Only the card moves; the form stays still. */
+    .po-overlay { position: fixed; inset: 0; z-index: 2050; display: none; align-items: center; justify-content: center; padding: 1rem; background: rgba(15, 23, 42, .5); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+    .po-overlay.show { display: flex; animation: poFade .25s ease-out both; }
+    .po-scene { perspective: 900px; }
+    .po-float { animation: poRise .55s cubic-bezier(.2, .9, .3, 1.15) both, poFloat 4.5s ease-in-out .55s infinite; }
+    .po-card { position: relative; width: min(92vw, 400px); padding: 3rem 1.75rem 1.5rem; border-radius: 22px; text-align: center; background: #fff; transform-style: preserve-3d; transition: transform .18s ease-out; box-shadow: 0 1px 0 rgba(255, 255, 255, .9) inset, 0 40px 70px -20px rgba(15, 23, 42, .45), 0 18px 30px -18px rgba(15, 23, 42, .35), 0 0 0 1px rgba(15, 23, 42, .06); }
+    .po-badge { width: 76px; height: 76px; margin: -5.4rem auto 1rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2.4rem; color: #fff; background: radial-gradient(circle at 30% 25%, #ff9a6b, #ff5a1f 60%, #e04300); box-shadow: 0 14px 24px -6px rgba(255, 90, 31, .55), inset 0 -6px 10px rgba(0, 0, 0, .18), inset 0 4px 8px rgba(255, 255, 255, .4); transform: translateZ(60px); }
+    .po-card h5 { font-weight: 700; color: #0f172a; margin-bottom: .5rem; transform: translateZ(30px); }
+    .po-card p { color: #475569; font-size: .92rem; margin-bottom: .6rem; transform: translateZ(20px); }
+    .po-ref { display: inline-block; margin: .1rem 0 1.1rem; padding: .3rem .85rem; border-radius: 999px; background: #fff1ea; color: #c2410c; font-weight: 600; font-size: .85rem; transform: translateZ(25px); }
+    .po-card .btn { transform: translateZ(35px); }
+    .po-countdown { margin-top: .9rem; font-size: .78rem; color: #94a3b8; }
+    .po-ground { width: 58%; height: 16px; margin: 28px auto 0; border-radius: 50%; background: rgba(15, 23, 42, .4); filter: blur(10px); animation: poGround 4.5s ease-in-out .55s infinite; }
+    @keyframes poFade { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes poRise { from { opacity: 0; transform: translateY(30px) scale(.92); } to { opacity: 1; transform: none; } }
+    @keyframes poFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+    @keyframes poGround { 0%, 100% { transform: scale(1); opacity: .5; } 50% { transform: scale(.8); opacity: .3; } }
+    @media (prefers-reduced-motion: reduce) {
+        .po-float, .po-ground { animation: none; }
+        .po-card { transition: none; }
+    }
+</style>
+
 <div class="row justify-content-center">
     <div class="col-md-10 col-lg-9">
         <div class="mb-3">
@@ -24,21 +53,17 @@
         </div>
 
         <div class="card card-custom border-0 shadow-sm">
-            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
-                <div>
-                    <h4 class="fw-bold mb-0 text-dark">
-                        <i class="bi bi-{{ $isEdit ? 'pencil-square' : 'bag-plus' }} text-primary me-2"></i>{{ $isEdit ? 'Edit Purchase Order' : 'Create Supplier Purchase Order' }}
-                    </h4>
+            <div class="card-header bg-white py-3 border-bottom">
+                <h4 class="fw-bold mb-0 text-dark">{{ $isEdit ? 'Edit Purchase Order' : 'Create Purchase Order' }}</h4>
+                @if ($isEdit)
                     <p class="text-muted small mb-0 mt-1">
-                        @if ($isEdit && $poLocked)
+                        @if ($poLocked)
                             Editing an approved PO. Saving will send it back to the VP for approval.
-                        @elseif ($isEdit)
-                            Editing PO {{ $po->po_number }} ({{ $po->typeLabel() }}).
                         @else
-                            Contract bulk fuel volume from refinery suppliers (Petron, Shell, etc.) for allocation and drawdown.
+                            Editing PO {{ $po->po_number }}.
                         @endif
                     </p>
-                </div>
+                @endif
             </div>
 
             <div class="card-body p-4">
@@ -55,10 +80,16 @@
                         </div>
                     @endif
 
+                    {{-- Filled by the script when a save is rejected without leaving the page. --}}
+                    <div class="alert alert-danger border-0 rounded-3 shadow-sm mb-4 d-none" id="poFormErrors" role="alert">
+                        <ul class="mb-0 small ps-3" id="poFormErrorList"></ul>
+                    </div>
+
                     <div class="row g-3 mb-4">
+                        {{-- Left column: PO#, Address, Attention. Right column: Vendor Company, Date, Terms. --}}
                         <div class="col-md-6">
                             <label for="po_number" class="form-label fw-semibold small">
-                                Official PO Number
+                                PO#
                                 @unless ($poLocked)<span class="text-danger">*</span>@endunless
                             </label>
                             @php
@@ -82,9 +113,9 @@
                         </div>
 
                         <div class="col-md-6">
-                            <label for="supplier_id" class="form-label fw-semibold small">Company <span class="text-danger">*</span></label>
+                            <label for="supplier_id" class="form-label fw-semibold small">Vendor Company <span class="text-danger">*</span></label>
                             <select class="form-select @error('supplier_id') is-invalid @enderror" id="supplier_id" name="supplier_id" required>
-                                <option value="">-- Choose Company --</option>
+                                <option value="">-- Choose Vendor Company --</option>
                                 @foreach ($suppliers as $supplier)
                                     <option value="{{ $supplier->id }}" data-location="{{ $supplier->location }}" {{ (int) old('supplier_id', $po->supplier_id ?? 0) === $supplier->id ? 'selected' : '' }}>
                                         {{ $supplier->company_name }}
@@ -101,19 +132,38 @@
                         </div>
 
                         <div class="col-md-6">
-                            <label for="supplier_location" class="form-label fw-semibold small">Location <span class="text-danger">*</span></label>
+                            <label for="supplier_location" class="form-label fw-semibold small">Address <span class="text-danger">*</span></label>
                             <select class="form-select" id="supplier_location" required disabled>
-                                <option value="">-- Choose Company first --</option>
+                                <option value="">-- Choose Vendor Company first --</option>
                             </select>
                             <div class="form-text extra-small" id="supplierAddressHint"></div>
                         </div>
 
-                        {{-- PO Classification and Destination Depot are gone. The
-                             category is fixed by the page that raises the PO, and
-                             an allocation pool is not a delivery destination. --}}
-                        <div class="col-md-4">
-                            <label for="date_needed" class="form-label fw-semibold small">Target Availability Date</label>
-                            <input type="date" class="form-control" id="date_needed" name="date_needed" value="{{ old('date_needed', $po?->date_needed?->format('Y-m-d') ?? now()->format('Y-m-d')) }}">
+                        <div class="col-md-6">
+                            <label for="po_date_display" class="form-label fw-semibold small">Date</label>
+                            {{-- Display only. The values that are saved are the hidden fields, and the server sets the date itself on a new PO. --}}
+                            <input type="text" class="form-control bg-light" id="po_date_display" value="{{ $poDate->format('m/d/Y') }}" readonly tabindex="-1">
+                            <input type="hidden" name="po_date" value="{{ $poDate->format('Y-m-d') }}">
+                            <input type="hidden" name="date_needed" value="{{ $dateNeeded->format('Y-m-d') }}">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="attention" class="form-label fw-semibold small">Attention</label>
+                            <input type="text" class="form-control @error('attention') is-invalid @enderror" id="attention" name="attention"
+                                   placeholder="e.g. Mr. Aaron Uy" value="{{ old('attention', $po?->attention) }}">
+                            <div class="form-text extra-small">Defaults to the supplier's contact when left blank.</div>
+                            @error('attention')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="terms" class="form-label fw-semibold small">Terms</label>
+                            <input type="text" class="form-control @error('terms') is-invalid @enderror" id="terms" name="terms"
+                                   placeholder="e.g. VAT EX CASH" value="{{ old('terms', $po?->terms) }}">
+                            @error('terms')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
                         </div>
                     </div>
 
@@ -135,10 +185,9 @@
                                 <table class="table table-borderless align-middle mb-0" id="productsTable">
                                     <thead class="table-light small">
                                         <tr>
-                                            <th class="ps-3" style="width: 30%;">Product</th>
-                                            <th style="width: 22%;">Volume (Liters) <span class="text-danger">*</span></th>
-                                            <th style="width: 18%;">Unit</th>
-                                            <th style="width: 18%;">Price / Liter (&#8369;)</th>
+                                            <th class="ps-3" style="width: 32%;">Product</th>
+                                            <th style="width: 26%;">Volume (Liters) <span class="text-danger">*</span></th>
+                                            <th style="width: 20%;">Price</th>
                                             <th style="width: 12%;">Amount</th>
                                             <th class="pe-3 text-center" style="width: 10%;">Remove</th>
                                         </tr>
@@ -147,6 +196,8 @@
                                         @foreach ($lineItems as $index => $item)
                                             <tr class="product-row">
                                                 <td class="ps-3">
+                                                    {{-- Fuel is always measured in liters, so the unit is no longer shown; it is still sent so saving works as before. --}}
+                                                    <input type="hidden" name="items[{{ $index }}][unit]" value="{{ $item?->unit ?? 'LTRS' }}">
                                                     <select name="items[{{ $index }}][product]" class="form-select form-select-sm" required>
                                                         <option value="Diesel" {{ $item?->product === 'Diesel' ? 'selected' : '' }}>Diesel</option>
                                                         <option value="Premium" {{ $item?->product === 'Premium' ? 'selected' : '' }}>Premium (Mogas 95)</option>
@@ -159,9 +210,6 @@
                                                                placeholder="e.g. 50000" min="1" value="{{ old("items.$index.quantity", $item?->quantity_ordered) }}" required oninput="calculateTotalVolume()">
                                                         <span class="input-group-text">L</span>
                                                     </div>
-                                                </td>
-                                                <td>
-                                                    <input type="text" name="items[{{ $index }}][unit]" class="form-control form-control-sm" value="{{ $item?->unit ?? 'LTRS' }}" readonly>
                                                 </td>
                                                 <td>
                                                     <div class="input-group input-group-sm">
@@ -182,43 +230,14 @@
                                     </tbody>
                                     <tfoot class="table-light border-top">
                                         <tr>
-                                            <td class="ps-3 fw-bold text-dark">Total PO Volume:</td>
-                                            <td colspan="3" class="fw-bold text-primary fs-6 font-monospace" id="totalVolumeDisplay">
+                                            <td class="ps-3 fw-bold text-dark">Total Quantity:</td>
+                                            <td colspan="4" class="fw-bold text-primary fs-6 font-monospace" id="totalVolumeDisplay">
                                                 0 L
                                             </td>
                                         </tr>
                                     </tfoot>
                                 </table>
                             </div>
-                        </div>
-                    </div>
-
-                    {{-- Header details shown on the printed Purchase Order --}}
-                    <div class="row g-3 mb-4">
-                        <div class="col-md-6">
-                            <label for="attention" class="form-label fw-semibold small">Attention</label>
-                            <input type="text" class="form-control @error('attention') is-invalid @enderror" id="attention" name="attention"
-                                   placeholder="e.g. Mr. Aaron Uy" value="{{ old('attention', $po?->attention) }}">
-                            <div class="form-text extra-small">Defaults to the supplier's contact when left blank.</div>
-                            @error('attention')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-                        <div class="col-md-3">
-                            <label for="terms" class="form-label fw-semibold small">Terms</label>
-                            <input type="text" class="form-control @error('terms') is-invalid @enderror" id="terms" name="terms"
-                                   placeholder="e.g. VAT EX CASH" value="{{ old('terms', $po?->terms) }}">
-                            @error('terms')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-                        <div class="col-md-3">
-                            <label for="po_date" class="form-label fw-semibold small">PO Date</label>
-                            <input type="date" class="form-control @error('po_date') is-invalid @enderror" id="po_date" name="po_date"
-                                   value="{{ old('po_date', $po?->po_date?->format('Y-m-d') ?? now()->format('Y-m-d')) }}">
-                            @error('po_date')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
                         </div>
                     </div>
 
@@ -274,18 +293,18 @@
                         </div>
                     </div>
 
-                        <input type="hidden" id="computed_total_amount" name="computed_total_amount" value="0.00">
+                    <input type="hidden" id="computed_total_amount" name="computed_total_amount" value="0.00">
 
-                        <div class="mb-4">
-                            <label for="remarks" class="form-label fw-semibold small">Special Terms / Refinery Remarks</label>
+                    <div class="mb-4">
+                        <label for="remarks" class="form-label fw-semibold small">Additional Remarks</label>
                         <textarea class="form-control" id="remarks" name="remarks" rows="2" placeholder="e.g. Pre-paid contract, valid for lift at Bataan Limay rack until month-end.">{{ old('remarks', $po?->remarks) }}</textarea>
                     </div>
 
                     <div class="d-flex justify-content-end gap-2">
                         <a href="{{ route('stock-orders.purchase-orders.index') }}" class="btn btn-light border rounded-pill px-4">Cancel</a>
-                        <button type="submit" class="btn btn-primary-custom rounded-pill px-4 shadow-sm">
-                            <i class="bi bi-{{ $isEdit ? 'check2-circle' : 'check2-circle' }} me-1"></i>
-                            {{ $isEdit ? 'Save Changes' : 'Save Supplier Purchase Order' }}
+                        <button type="submit" id="poSubmitBtn" class="btn btn-primary-custom rounded-pill px-4 shadow-sm">
+                            <i class="bi bi-check2-circle me-1"></i>
+                            {{ $isEdit ? 'Save Changes' : 'Submit' }}
                         </button>
                     </div>
                 </form>
@@ -294,10 +313,31 @@
     </div>
 </div>
 
+@unless ($isEdit)
+{{-- Shown after a new PO is saved, then returns to the Purchase Orders list. --}}
+<div class="po-overlay" id="poSubmittedOverlay" role="dialog" aria-modal="true" aria-labelledby="poSubmittedTitle" aria-hidden="true">
+    <div class="po-scene">
+        <div class="po-float">
+            <div class="po-card" id="poCard">
+                <div class="po-badge"><i class="bi bi-check-lg"></i></div>
+                <h5 id="poSubmittedTitle">Purchase Order Submitted</h5>
+                <p>Your purchase order is now waiting for approval. You can follow its status from the Purchase Orders list.</p>
+                <div class="po-ref" id="poSubmittedRef"></div>
+                <div>
+                    <button type="button" class="btn btn-primary-custom rounded-pill px-5" id="poOkBtn">OK</button>
+                </div>
+                <div class="po-countdown">Returning to Purchase Orders in <span id="poCountdown">6</span>s</div>
+            </div>
+        </div>
+        <div class="po-ground"></div>
+    </div>
+</div>
+@endunless
+
 <script>
 // Continue numbering after the rows already rendered, so an added line does
-    // not overwrite an existing one when the form posts.
-    let rowIndex = {{ $lineItems->count() }};
+// not overwrite an existing one when the form posts.
+let rowIndex = {{ $lineItems->count() }};
 
 function addProductRow() {
     const tbody = document.getElementById('productRowsBody');
@@ -305,6 +345,7 @@ function addProductRow() {
     tr.className = 'product-row';
     tr.innerHTML = `
         <td class="ps-3">
+            <input type="hidden" name="items[${rowIndex}][unit]" value="LTRS">
             <select name="items[${rowIndex}][product]" class="form-select form-select-sm" required>
                 <option value="Diesel">Diesel</option>
                 <option value="Premium" selected>Premium (Mogas 95)</option>
@@ -317,9 +358,6 @@ function addProductRow() {
                        placeholder="e.g. 20000" min="1" required oninput="calculateTotalVolume()">
                 <span class="input-group-text">L</span>
             </div>
-        </td>
-        <td>
-            <input type="text" name="items[${rowIndex}][unit]" class="form-control form-control-sm" value="LTRS" readonly>
         </td>
         <td>
             <div class="input-group input-group-sm">
@@ -371,10 +409,6 @@ function calculateTotalVolume() {
 }
 
 /**
- * Line amounts and the total come from the product rows, so the stored PO
- * totals can never drift from what was actually ordered. VAT rows stay manual.
- */
-/**
  * Net Payable is the gross less the creditable withholding tax. VAT already
  * sits inside the line total, so it is not subtracted. The field is readonly,
  * so this is display only -- the server recalculates the same figure on save.
@@ -391,6 +425,10 @@ function calculateNetPayable() {
     netPayable.value = Math.max(0, total - lessWTax).toFixed(2);
 }
 
+/**
+ * Line amounts and the total come from the product rows, so the stored PO
+ * totals can never drift from what was actually ordered. VAT rows stay manual.
+ */
 function calculateTotalAmount() {
     let total = 0;
 
@@ -434,7 +472,7 @@ document.addEventListener('DOMContentLoaded', function () {
         lessWTax.addEventListener('change', calculateNetPayable);
     }
 
-    // Supplier company -> location dropdown, filtered to that company only.
+    // Vendor company -> address dropdown, filtered to that company only.
     const companySelect = document.getElementById('supplier_id');
     const locationSelect = document.getElementById('supplier_location');
     const addressHint = document.getElementById('supplierAddressHint');
@@ -454,7 +492,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const placeholder = document.createElement('option');
         placeholder.value = '';
-        placeholder.textContent = companySelect.value ? '-- Choose Location --' : '-- Choose Company first --';
+        placeholder.textContent = companySelect.value ? '-- Choose Address --' : '-- Choose Vendor Company first --';
         locationSelect.appendChild(placeholder);
 
         const keys = Object.keys(locations);
@@ -462,17 +500,21 @@ document.addEventListener('DOMContentLoaded', function () {
             const option = document.createElement('option');
             option.value = key;
             const loc = locations[key];
-            option.textContent = (loc && loc !== '') ? loc : '(no location recorded)';
+            option.textContent = (loc && loc !== '') ? loc : '(no address recorded)';
             locationSelect.appendChild(option);
         });
 
         if (keys.length > 0) {
             locationSelect.disabled = false;
+            // The chosen vendor row already has its own address, so show it.
+            if (companySelect.value && locations[companySelect.value] !== undefined) {
+                locationSelect.value = companySelect.value;
+            }
         }
 
         if (addressHint) {
             addressHint.textContent = keys.length === 0
-                ? 'This supplier has no location recorded yet.'
+                ? 'No address is recorded for this vendor yet.'
                 : '';
         }
     }
@@ -481,6 +523,110 @@ document.addEventListener('DOMContentLoaded', function () {
         companySelect.addEventListener('change', renderLocations);
         renderLocations();
     }
+
+    // Picking a different address of the same company selects that vendor row.
+    if (locationSelect && companySelect) {
+        locationSelect.addEventListener('change', function () {
+            if (locationSelect.value) {
+                companySelect.value = locationSelect.value;
+            }
+        });
+    }
+
+@unless ($isEdit)
+    // ---- Submit a new PO without leaving the page, then confirm with the card ----
+    const form = document.getElementById('supplierPoForm');
+    const submitBtn = document.getElementById('poSubmitBtn');
+    const errorBox = document.getElementById('poFormErrors');
+    const errorList = document.getElementById('poFormErrorList');
+    const overlay = document.getElementById('poSubmittedOverlay');
+    const okBtn = document.getElementById('poOkBtn');
+    const card = document.getElementById('poCard');
+
+    function showErrors(messages) {
+        errorList.innerHTML = '';
+        messages.forEach(function (m) {
+            const li = document.createElement('li');
+            li.textContent = m;
+            errorList.appendChild(li);
+        });
+        errorBox.classList.remove('d-none');
+        errorBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function showSubmittedCard(data) {
+        document.getElementById('poSubmittedRef').textContent = 'PO# ' + (data.po_number || '');
+
+        const countdown = document.getElementById('poCountdown');
+        let left = 6;
+        let done = false;
+        countdown.textContent = left;
+
+        function goToList() {
+            if (done) return;
+            done = true;
+            clearInterval(timer);
+            window.location.href = data.redirect;
+        }
+
+        const timer = setInterval(function () {
+            left -= 1;
+            countdown.textContent = Math.max(left, 0);
+            if (left <= 0) goToList();
+        }, 1000);
+
+        okBtn.onclick = goToList;
+        overlay.classList.add('show');
+        overlay.setAttribute('aria-hidden', 'false');
+        okBtn.focus();
+    }
+
+    // The card tilts gently toward the pointer.
+    card.addEventListener('mousemove', function (e) {
+        const r = card.getBoundingClientRect();
+        const x = (e.clientX - r.left) / r.width - 0.5;
+        const y = (e.clientY - r.top) / r.height - 0.5;
+        card.style.transform = 'rotateY(' + (x * 14) + 'deg) rotateX(' + (-y * 14) + 'deg)';
+    });
+    card.addEventListener('mouseleave', function () {
+        card.style.transform = '';
+    });
+
+    form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        errorBox.classList.add('d-none');
+        submitBtn.disabled = true;
+
+        try {
+            const res = await fetch(form.action, {
+                method: 'POST',
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                body: new FormData(form),
+                credentials: 'same-origin'
+            });
+
+            let data = {};
+            try { data = await res.json(); } catch (_) {}
+
+            if (res.ok && data.redirect) {
+                showSubmittedCard(data);
+                return; // the button stays disabled so it cannot be sent twice
+            }
+
+            if (res.status === 422 && data.errors) {
+                showErrors(Object.values(data.errors).flat());
+            } else if (res.status === 419) {
+                showErrors(['Your session has expired. Refresh the page and submit again.']);
+            } else {
+                showErrors([data.message || 'The purchase order could not be submitted. Please try again.']);
+            }
+        } catch (err) {
+            showErrors(['Could not reach the server. Check your connection and submit again.']);
+        }
+
+        submitBtn.disabled = false;
+    });
+@endunless
 });
 </script>
 @endsection

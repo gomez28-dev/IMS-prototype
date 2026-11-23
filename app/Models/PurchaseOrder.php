@@ -49,6 +49,8 @@ class PurchaseOrder extends Model
         'requested_products' => 'array',
         'approved_at' => 'datetime',
         'revised_at' => 'datetime',
+        'rejected_at' => 'datetime',
+        'rejection_seen_at' => 'datetime',
         'po_date' => 'date',
         'total_amount' => 'decimal:2',
         'vatable_sales_amount' => 'decimal:2',
@@ -85,6 +87,16 @@ class PurchaseOrder extends Model
     public function requester(): BelongsTo
     {
         return $this->belongsTo(Admin::class, 'requested_by');
+    }
+
+        public function rejecter(): BelongsTo
+    {
+        return $this->belongsTo(Admin::class, 'rejected_by');
+    }
+    
+        public function activities(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(PurchaseOrderActivity::class)->orderByDesc('created_at')->orderByDesc('id');
     }
 
     public function approver(): BelongsTo
@@ -158,6 +170,24 @@ public function scopeCreatedPos(Builder $query): Builder
         return $query
             ->createdPos()
             ->where('request_status', 'RECEIVED');
+    }
+    
+        /**
+     * The For Approval list: POs waiting on the VP, plus POs the VP sent back
+     * that Purchasing has not resubmitted yet. The sidebar badge keeps using
+     * pendingVpApproval(), so returned POs are listed but never counted.
+     */
+    public function scopeInApprovalList(Builder $query): Builder
+    {
+        return $query
+            ->createdPos()
+            ->where(function ($q) {
+                $q->where('request_status', 'RECEIVED')
+                    ->orWhere(function ($q2) {
+                        $q2->where('request_status', 'REQUESTED')
+                            ->whereNotNull('rejected_at');
+                    });
+            });
     }
 
 public function isFuelTrade(): bool

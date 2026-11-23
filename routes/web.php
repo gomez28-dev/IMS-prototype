@@ -221,6 +221,7 @@ Route::post('/warehouses/{warehouse}/tanks', [WetStock\StorageTankController::cl
         Route::prefix('purchase-orders')->name('purchase-orders.')->group(function () {
             Route::get('/', [WetStock\PurchaseOrderController::class, 'index'])->name('index');
             Route::get('/{purchaseOrder}', [WetStock\PurchaseOrderController::class, 'show'])->name('show');
+            Route::post('/{purchaseOrder}/rejection-seen', [WetStock\PurchaseOrderController::class, 'markRejectionSeen'])->name('rejection-seen');
         });
 
         Route::prefix('sales-orders')->name('sales-orders.')->group(function () {

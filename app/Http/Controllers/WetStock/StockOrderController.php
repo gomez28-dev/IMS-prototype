@@ -10,6 +10,7 @@ use App\Models\Client;
 use App\Models\Delivery;
 use App\Models\Order;
 use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderActivity;
 use App\Models\PurchaseOrderDelivery;
 use App\Models\PurchaseOrderItem;
 use App\Models\StockIn;
@@ -142,7 +143,7 @@ class StockOrderController extends Controller
         ]);
     }
 
-    public function storeSupplierPo(Request $request): RedirectResponse
+    public function storeSupplierPo(Request $request): RedirectResponse|\Illuminate\Http\JsonResponse
     {
         if (!Auth::user()->canEditStockOrders()) {
             abort(403);
@@ -198,7 +199,7 @@ class StockOrderController extends Controller
             'supplier_name' => $supplierName,
             'attention' => $validated['attention'] ?? $supplier?->attention,
             'terms' => $validated['terms'] ?? null,
-            'po_date' => $validated['po_date'] ?? now()->format('Y-m-d'),
+            'po_date' => now()->format('Y-m-d'),
             'warehouse_id' => $validated['warehouse_id'] ?? null,
             'qty_ordered' => $totalQty,
             'total_amount' => $lineTotal,
@@ -214,7 +215,7 @@ class StockOrderController extends Controller
             'status' => 'Pending',
             'requested_by' => Auth::id(),
             'request_date' => now(),
-            'date_needed' => $validated['date_needed'] ?? null,
+            'date_needed' => now()->format('Y-m-d'),
             'requested_products' => $validated['items'],
             'remarks' => $validated['remarks'] ?? null,
         ]);
@@ -235,6 +236,16 @@ class StockOrderController extends Controller
             'action' => 'created',
             'description' => "Purchasing created Bulk Supplier PO #{$po->po_number} ({$po->supplier_name}) for total " . number_format($totalQty) . " L",
         ]);
+
+        PurchaseOrderActivity::record($po->id, 'submitted');
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => true,
+                'po_number' => $po->po_number,
+                'redirect' => route('stock-orders.purchase-orders.index'),
+            ]);
+        }
 
         return redirect()->route('stock-orders.purchase-orders.index')
             ->with('success', "Supplier PO #{$po->po_number} created and submitted for VP approval with " . count($validated['items']) . " product line(s).");
@@ -330,6 +341,11 @@ class StockOrderController extends Controller
 
         $supplier = Supplier::find($validated['supplier_id']);
 
+        // A PO the VP sent back is waiting on Purchasing. Saving it here is the
+        // resubmission, so it goes back in front of the VP.
+        $wasReturned = $purchaseOrder->request_status === 'REQUESTED'
+            && filled($purchaseOrder->rejection_reason);
+
         $attributes = [
             'supplier_id' => $supplier?->id,
             'supplier_name' => $supplier?->company_name,
@@ -347,6 +363,10 @@ class StockOrderController extends Controller
             'remarks' => $validated['remarks'] ?? null,
         ];
 
+        if ($wasReturned) {
+            $attributes['request_status'] = 'RECEIVED';
+        }
+
         $attributes['po_number'] = $validated['po_number'];
 
         $purchaseOrder->update($attributes);
@@ -359,8 +379,12 @@ class StockOrderController extends Controller
             'description' => "Purchasing edited PO #{$purchaseOrder->po_number}.",
         ]);
 
+        PurchaseOrderActivity::record($purchaseOrder->id, $wasReturned ? 'resubmitted' : 'edited');
+
         return redirect()->route('stock-orders.purchase-orders.show', $purchaseOrder->id)
-            ->with('success', "Supplier PO #{$purchaseOrder->po_number} updated.");
+            ->with('success', $wasReturned
+                ? "Supplier PO #{$purchaseOrder->po_number} updated and resubmitted for VP approval."
+                : "Supplier PO #{$purchaseOrder->po_number} updated.");
     }
 
     /**
@@ -1591,9 +1615,9 @@ public function storeStockRequestPo(Request $request): RedirectResponse
             $tab = 'pos';
         }
 
-        $pendingOrders = PurchaseOrder::with(['warehouse', 'client', 'requester', 'deliveries'])
+        $pendingOrders = PurchaseOrder::with(['warehouse', 'client', 'requester', 'deliveries', 'supplier', 'items'])
             ->pendingVpApproval()
-            ->latest()
+            ->inApprovalList()
             ->paginate(15);
 
         // Every Doyen-issued ATL the VP has not yet ruled on: a draft still waiting
@@ -1712,6 +1736,10 @@ public function storeStockRequestPo(Request $request): RedirectResponse
             abort(403, 'Unauthorized to approve stock orders.');
         }
 
+        if ($purchaseOrder->request_status !== 'RECEIVED') {
+            return back()->with('info', 'Only orders pending VP approval can be approved.');
+        }
+
         $purchaseOrder->update([
             'request_status' => 'CONFIRMED',
             'approved_by' => Auth::id(),
@@ -1728,6 +1756,8 @@ public function storeStockRequestPo(Request $request): RedirectResponse
             'action' => 'approved',
             'description' => "Approved Stock Order {$purchaseOrder->po_number}",
         ]);
+
+        PurchaseOrderActivity::record($purchaseOrder->id, 'approved');
 
         return back()->with('success', "Stock Order {$purchaseOrder->po_number} has been approved successfully.");
     }
@@ -1748,11 +1778,16 @@ public function storeStockRequestPo(Request $request): RedirectResponse
 
         $reason = trim($validated['rejection_reason'] ?? '');
 
-        $purchaseOrder->update([
+        $purchaseOrder->forceFill([
             'request_status' => 'REQUESTED',
             'approved_by' => null,
             'approved_at' => null,
-        ]);
+            // Feedback for the requester. It stays on the PO until Purchasing resubmits it.
+            'rejection_reason' => $reason !== '' ? $reason : null,
+            'rejected_by' => Auth::id(),
+            'rejected_at' => now(),
+            'rejection_seen_at' => null,
+        ])->save();
 
         AuditLog::create([
             'admin_id' => Auth::id(),
@@ -1760,6 +1795,8 @@ public function storeStockRequestPo(Request $request): RedirectResponse
             'description' => "Rejected Stock Order {$purchaseOrder->po_number} back to purchasing"
                 . ($reason !== '' ? " — Reason: {$reason}" : ""),
         ]);
+
+        PurchaseOrderActivity::record($purchaseOrder->id, 'rejected', $reason !== '' ? $reason : null);
 
         return back()->with('success', "Stock Order {$purchaseOrder->po_number} rejected and returned to purchasing for rework.");
     }

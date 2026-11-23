@@ -146,6 +146,17 @@
                         </div>
                     </div>
 
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <label for="date_needed" class="form-label fw-medium text-secondary small">Date Needed (Delivery / Pick Up)</label>
+                            <input type="date" name="date_needed" id="date_needed" class="form-control @error('date_needed') is-invalid @enderror" value="{{ old('date_needed', $order && $order->date_needed ? $order->date_needed->format('Y-m-d') : '') }}">
+                            <div class="form-text extra-small">Optional. Leave blank if the date is not confirmed yet; you can add it later.</div>
+                            @error('date_needed')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
+
                     {{-- Products: one row per product (type, qty, price) --}}
                     <div class="mb-4">
                         <div class="d-flex justify-content-between align-items-center mb-2">
