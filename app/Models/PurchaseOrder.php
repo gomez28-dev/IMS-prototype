@@ -379,7 +379,7 @@ public function isFuelTrade(): bool
      *
      * @return array{ordered: array<string, int>, lifted: array<string, int>, unlifted: array<string, int>}
      */
-    public static function volumeTotals(?int $purchaseOrderId = null): array
+    public static function volumeTotals(int|array|null $purchaseOrderId = null): array
     {
         $ordered = PurchaseOrderItem::query()
             ->selectRaw('product, SUM(quantity_ordered) AS qty')
@@ -391,9 +391,9 @@ public function isFuelTrade(): bool
         $unlifted = self::allocationTotals(PurchaseOrderDelivery::LIFT_UNLIFTED);
 
         if ($purchaseOrderId !== null) {
-            $ordered->where('purchase_order_id', $purchaseOrderId);
-            $lifted->where('atl_allocations.purchase_order_id', $purchaseOrderId);
-            $unlifted->where('atl_allocations.purchase_order_id', $purchaseOrderId);
+            $ordered->whereIn('purchase_order_id', (array) $purchaseOrderId);
+            $lifted->whereIn('atl_allocations.purchase_order_id', (array) $purchaseOrderId);
+            $unlifted->whereIn('atl_allocations.purchase_order_id', (array) $purchaseOrderId);
         }
 
         return [

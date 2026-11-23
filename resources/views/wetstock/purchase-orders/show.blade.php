@@ -310,6 +310,62 @@
                         </tbody>
                     </table>
                 </div>
+                <style>
+                    .atl-pager { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: .75rem 1rem; border-top: 1px solid #e5e7eb; }
+                    .atl-pager[hidden] { display: none; }
+                    .atl-pg-btn { border: 1px solid #e5e7eb; background: #fff; border-radius: 999px; padding: .25rem .8rem; font-size: .8rem; color: #374151; }
+                    .atl-pg-btn:disabled { opacity: .4; }
+                    .atl-dots { display: flex; gap: .4rem; }
+                    .atl-dot { width: 8px; height: 8px; border-radius: 50%; background: #d1d5db; border: 0; padding: 0; }
+                    .atl-dot.on { background: #f04a1a; }
+                </style>
+                <div class="atl-pager" id="atlPager" hidden>
+                    <button type="button" class="atl-pg-btn" data-atl-prev aria-label="Previous page"><i class="bi bi-chevron-left"></i> Prev</button>
+                    <div class="atl-dots"></div>
+                    <button type="button" class="atl-pg-btn" data-atl-next aria-label="Next page">Next <i class="bi bi-chevron-right"></i></button>
+                </div>
+                <script>
+                (function () {
+                    var pager = document.getElementById('atlPager');
+                    if (!pager) return;
+                    var wrap = pager.previousElementSibling;
+                    var table = wrap && wrap.querySelector('table');
+                    if (!table || !table.tBodies.length) return;
+                    var rows = Array.prototype.filter.call(table.tBodies[0].rows, function (r) {
+                        return !r.querySelector('td[colspan]');
+                    });
+                    var per = 5, page = 0, pages = Math.ceil(rows.length / per);
+                    if (pages <= 1) return;
+                    var prev = pager.querySelector('[data-atl-prev]');
+                    var next = pager.querySelector('[data-atl-next]');
+                    var dots = pager.querySelector('.atl-dots');
+                    function show(p) {
+                        page = p;
+                        rows.forEach(function (r, i) {
+                            r.style.display = (i >= p * per && i < (p + 1) * per) ? '' : 'none';
+                        });
+                        Array.prototype.forEach.call(dots.children, function (d, i) {
+                            d.classList.toggle('on', i === p);
+                        });
+                        prev.disabled = p === 0;
+                        next.disabled = p === pages - 1;
+                    }
+                    for (var i = 0; i < pages; i++) {
+                        (function (i) {
+                            var d = document.createElement('button');
+                            d.type = 'button';
+                            d.className = 'atl-dot';
+                            d.setAttribute('aria-label', 'Page ' + (i + 1));
+                            d.addEventListener('click', function () { show(i); });
+                            dots.appendChild(d);
+                        })(i);
+                    }
+                    prev.addEventListener('click', function () { if (page > 0) show(page - 1); });
+                    next.addEventListener('click', function () { if (page < pages - 1) show(page + 1); });
+                    pager.hidden = false;
+                    show(0);
+                })();
+                </script>
             </div>
         </div>
     </div>

@@ -52,6 +52,9 @@ class PurchaseOrderController extends Controller
             });
         }
 
+        $hiddenIds = $this->rolledOffIds();
+        $query->whereNotIn('purchase_orders.id', $hiddenIds);
+
         $purchaseOrders = $query->latest()->paginate(15);
 
         // Lifted volume per PO and product, for the whole page in one query.
@@ -85,7 +88,7 @@ class PurchaseOrderController extends Controller
 
         // Recent created / approved / returned events (the history icon).
         // Reasons are deliberately left out of these.
-        $recentPos = PurchaseOrder::createdPos()
+        $recentPos = PurchaseOrder::createdPos()->whereNotIn('purchase_orders.id', $hiddenIds)
             ->with(['requester', 'approver'])
             ->orderByDesc('updated_at')
             ->limit(40)
@@ -174,13 +177,71 @@ class PurchaseOrderController extends Controller
             'liftedByPo' => $liftedByPo,
             'returnedPos' => $returnedPos,
             'historyEvents' => $historyEvents,
-            'stats' => $this->stats(),
+            'stats' => $this->stats($hiddenIds),
             'rejectionCount' => PurchaseOrder::where('requested_by', Auth::id())
                 ->where('request_status', 'REQUESTED')
                 ->whereNotNull('rejection_reason')
                 ->whereNull('rejection_seen_at')
                 ->count(),
         ]);
+    }
+
+    /**
+     * IDs of POs that have rolled off the list: fully lifted, with the last
+     * lift in an earlier month (Manila time). A PO that is pending, returned
+     * or has any unlifted quantity is never in here, so it carries over from
+     * month to month until it is fully lifted. Nothing is deleted: these POs
+     * stay on the Reports page and their detail pages still open.
+     *
+     * @return array<int, int>
+     */
+    protected function rolledOffIds(): array
+    {
+        $monthStart = Carbon::now('Asia/Manila')->startOfMonth()->setTimezone('UTC');
+
+        $ordered = [];
+        $itemRows = \App\Models\PurchaseOrderItem::query()
+            ->selectRaw('purchase_order_id, product, SUM(quantity_ordered) AS qty')
+            ->groupBy('purchase_order_id', 'product')
+            ->get();
+        foreach ($itemRows as $row) {
+            $ordered[$row->purchase_order_id][$row->product] = (int) $row->qty;
+        }
+
+        // lifted_at is stored in UTC. Legacy rows without it use updated_at.
+        $lifted = [];
+        $lastLift = [];
+        $liftRows = AtlAllocation::query()
+            ->join('purchase_order_deliveries', 'atl_allocations.purchase_order_delivery_id', '=', 'purchase_order_deliveries.id')
+            ->where('purchase_order_deliveries.lift_status', PurchaseOrderDelivery::LIFT_LIFTED)
+            ->where('purchase_order_deliveries.status', '!=', 'Cancelled')
+            ->selectRaw('atl_allocations.purchase_order_id AS po_id, atl_allocations.product, SUM(atl_allocations.quantity) AS qty, MAX(COALESCE(purchase_order_deliveries.lifted_at, purchase_order_deliveries.updated_at)) AS last_lift')
+            ->groupBy('atl_allocations.purchase_order_id', 'atl_allocations.product')
+            ->get();
+        foreach ($liftRows as $r) {
+            $lifted[$r->po_id][$r->product] = (int) $r->qty;
+            $at = Carbon::parse($r->last_lift, 'UTC');
+            if (!isset($lastLift[$r->po_id]) || $at->gt($lastLift[$r->po_id])) {
+                $lastLift[$r->po_id] = $at;
+            }
+        }
+
+        $hidden = [];
+        foreach ($ordered as $poId => $products) {
+            if (array_sum($products) <= 0 || !isset($lastLift[$poId])) {
+                continue;
+            }
+            foreach ($products as $product => $qty) {
+                if ($qty > 0 && ($lifted[$poId][$product] ?? 0) < $qty) {
+                    continue 2;
+                }
+            }
+            if ($lastLift[$poId]->lt($monthStart)) {
+                $hidden[] = (int) $poId;
+            }
+        }
+
+        return $hidden;
     }
 
     public function show(Request $request, PurchaseOrder $purchaseOrder): View
@@ -249,11 +310,11 @@ class PurchaseOrderController extends Controller
      *
      * @return array<string, mixed>
      */
-    protected function stats(): array
+    protected function stats(array $hiddenIds = []): array
     {
         return [
-            'total' => PurchaseOrder::createdPos()->count(),
-            'volumes' => PurchaseOrder::volumeTotals(),
+            'total' => PurchaseOrder::createdPos()->whereNotIn('purchase_orders.id', $hiddenIds)->count(),
+            'volumes' => PurchaseOrder::volumeTotals(PurchaseOrder::createdPos()->whereNotIn('purchase_orders.id', $hiddenIds)->pluck('id')->all()),
         ];
     }
 
