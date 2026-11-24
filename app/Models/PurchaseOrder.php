@@ -89,12 +89,12 @@ class PurchaseOrder extends Model
         return $this->belongsTo(Admin::class, 'requested_by');
     }
 
-        public function rejecter(): BelongsTo
+    public function rejecter(): BelongsTo
     {
         return $this->belongsTo(Admin::class, 'rejected_by');
     }
-    
-        public function activities(): \Illuminate\Database\Eloquent\Relations\HasMany
+
+    public function activities(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(PurchaseOrderActivity::class)->orderByDesc('created_at')->orderByDesc('id');
     }
@@ -125,34 +125,45 @@ class PurchaseOrder extends Model
     }
 
     /**
- * Purchase orders that were actually raised against a supplier.
- *
- * The table also holds two kinds of placeholder row that are not purchase
- * orders:
- *
- *  - Module 2 stock requests, created by StockRequestController with no PO
- *    number, no supplier and no value. They live on Wet Stock Requests until
- *    Purchasing turns one into a real PO, at which point it gains a PO number
- *    and this scope starts picking it up.
- *  - Module 1 Sales Order drawdown rows (SO-FT / SO-BB), created by
- *    storeFuelTradePo. They track fuel issued to a client order rather than a
- *    commitment to buy, and belong to the Sales Orders page.
- *
- * A created PO therefore has a PO number and is not a Fuel Trade drawdown.
- *
- * Named createdPos rather than created to avoid colliding with Eloquent's
- * created() model event.
- *
- * @param  Builder  $query
- * @return Builder
- */
-public function scopeCreatedPos(Builder $query): Builder
-{
-    return $query
-        ->whereNotNull('po_number')
-        ->where('po_number', '!=', '')
-        ->where('po_type', '!=', self::TYPE_FUEL_TRADE);
-}
+     * Leaves out cancelled POs. Either column can say so, and a PO whose
+     * status columns are empty is kept (a plain != would drop it).
+     */
+    public function scopeNotCancelled(Builder $query): Builder
+    {
+        return $query
+            ->where(fn ($q) => $q->whereNull('purchase_orders.status')->orWhere('purchase_orders.status', '!=', 'Cancelled'))
+            ->where(fn ($q) => $q->whereNull('purchase_orders.request_status')->orWhere('purchase_orders.request_status', '!=', 'CANCELLED'));
+    }
+
+    /**
+     * Purchase orders that were actually raised against a supplier.
+     *
+     * The table also holds two kinds of placeholder row that are not purchase
+     * orders:
+     *
+     *  - Module 2 stock requests, created by StockRequestController with no PO
+     *    number, no supplier and no value. They live on Wet Stock Requests until
+     *    Purchasing turns one into a real PO, at which point it gains a PO number
+     *    and this scope starts picking it up.
+     *  - Module 1 Sales Order drawdown rows (SO-FT / SO-BB), created by
+     *    storeFuelTradePo. They track fuel issued to a client order rather than a
+     *    commitment to buy, and belong to the Sales Orders page.
+     *
+     * A created PO therefore has a PO number and is not a Fuel Trade drawdown.
+     *
+     * Named createdPos rather than created to avoid colliding with Eloquent's
+     * created() model event.
+     *
+     * @param  Builder  $query
+     * @return Builder
+     */
+    public function scopeCreatedPos(Builder $query): Builder
+    {
+        return $query
+            ->whereNotNull('po_number')
+            ->where('po_number', '!=', '')
+            ->where('po_type', '!=', self::TYPE_FUEL_TRADE);
+    }
 
     /**
      * Purchase orders still waiting on the VP.
@@ -171,8 +182,8 @@ public function scopeCreatedPos(Builder $query): Builder
             ->createdPos()
             ->where('request_status', 'RECEIVED');
     }
-    
-        /**
+
+    /**
      * The For Approval list: POs waiting on the VP, plus POs the VP sent back
      * that Purchasing has not resubmitted yet. The sidebar badge keeps using
      * pendingVpApproval(), so returned POs are listed but never counted.
@@ -190,7 +201,7 @@ public function scopeCreatedPos(Builder $query): Builder
             });
     }
 
-public function isFuelTrade(): bool
+    public function isFuelTrade(): bool
     {
         return $this->po_type === 'FUEL_TRADE';
     }
@@ -336,6 +347,37 @@ public function isFuelTrade(): bool
     public function isVpApproved(): bool
     {
         return in_array($this->request_status, self::VP_APPROVED_STATUSES, true);
+    }
+
+    /** A PO is cancelled when either status column says so. */
+    public function isCancelled(): bool
+    {
+        return $this->status === 'Cancelled' || $this->request_status === 'CANCELLED';
+    }
+
+    /**
+     * An ATL is active when it is not cancelled and either has an ATL number
+     * or has volume allocated against this PO.
+     */
+    public function hasActiveAtl(): bool
+    {
+        $notCancelled = fn ($q) => $q->where(
+            fn ($w) => $w->whereNull('status')->orWhere('status', '!=', 'Cancelled')
+        );
+
+        $numbered = $this->deliveries()
+            ->where($notCancelled)
+            ->whereNotNull('atl_number')
+            ->where('atl_number', '!=', '')
+            ->exists();
+
+        if ($numbered) {
+            return true;
+        }
+
+        return $this->allocations()
+            ->whereHas('delivery', $notCancelled)
+            ->exists();
     }
 
     /**

@@ -104,6 +104,7 @@
 
             /* Top-right icons and the floating cards they open. */
             .pn-icon { width: 36px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0; color: #475569; }
+            .po-table th, .po-table td { text-align: center; }
             .pn-overlay { position: fixed; inset: 0; z-index: 2050; display: none; align-items: center; justify-content: center; padding: 1rem; background: rgba(15, 23, 42, .5); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
             .pn-overlay.show { display: flex; animation: pnFade .22s ease-out both; }
             .pn-scene { perspective: 1100px; max-height: 100%; }
@@ -224,7 +225,7 @@
         <div class="card card-custom border-0 shadow-sm">
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-custom table-hover align-middle mb-0">
+                    <table class="table table-custom table-hover align-middle mb-0 po-table">
                         <thead>
                             <tr>
                                 <th>PO #</th>
@@ -241,13 +242,18 @@
                             @forelse ($purchaseOrders as $po)
                                 @php
                                     $approved = $po->isVpApproved();
+                                    $cancelled = $po->isCancelled();
 
                                     // Status comes from the approver's side of the workflow:
                                     // a PO sent to the VP waits as "For Approval", becomes
                                     // "Approved" once the VP signs it, and is "Returned" if
                                     // the VP sent it back for changes. RECEIVED is this
-                                    // codebase's pending-VP-approval state.
-                                    if ($approved) {
+                                    // codebase's pending-VP-approval state. A cancelled PO
+                                    // is checked first so it never reads as approved.
+                                    if ($cancelled) {
+                                        $stLabel = 'Cancelled';
+                                        $stClass = $badgeNone;
+                                    } elseif ($approved) {
                                         $stLabel = 'Approved';
                                         $stClass = $badgeOk;
                                     } elseif ($po->request_status === 'REQUESTED' && ! empty($po->rejection_reason)) {
@@ -326,11 +332,13 @@
                                              depends on where the PO is in its life: Print is
                                              released only once the VP has approved, and an
                                              approved PO can no longer be edited. So each state
-                                             offers Print XOR Edit. The routes enforce the same
-                                             thing, so this is a convenience rather than the
-                                             gate. --}}
-                                        <div class="d-flex justify-content-center gap-1">
-                                            @if ($approved)
+                                             offers Print XOR Edit. A cancelled PO offers neither.
+                                             The routes enforce the same thing, so this is a
+                                             convenience rather than the gate. --}}
+                                        <div class="d-flex justify-content-center gap-1 flex-wrap">
+                                            @if ($cancelled)
+                                                {{-- cancelled: View Detailed only --}}
+                                            @elseif ($approved)
                                                 <a href="{{ route('stock-orders.po-pdf', $po->id) }}"
                                                    class="btn btn-sm btn-outline-danger rounded-3 px-2 py-1 text-nowrap" title="Print Purchase Order">
                                                     <i class="bi bi-printer me-1"></i> Print
@@ -346,6 +354,23 @@
                                                class="btn btn-sm btn-outline-primary rounded-3 px-2 py-1 text-nowrap" title="View detailed purchase order">
                                                 <i class="bi bi-eye me-1"></i> View Detailed
                                             </a>
+
+                                            @if (! $cancelled && Auth::user()->canApproveStockOrders())
+                                                @if ($po->hasActiveAtl())
+                                                    <span title="This purchase order has an active ATL. Cancel the ATL first.">
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-3 px-2 py-1 text-nowrap" disabled style="pointer-events:none;">
+                                                            <i class="bi bi-x-circle me-1"></i> Cancel
+                                                        </button>
+                                                    </span>
+                                                @else
+                                                    <button type="button" class="btn btn-sm btn-outline-danger rounded-3 px-2 py-1 text-nowrap" title="Cancel purchase order"
+                                                            data-action="{{ route('stock-orders.cancel', $po->id) }}"
+                                                            data-po="{{ $po->po_number ?: 'Pending PO#' }}"
+                                                            onclick="openCancelPn(this)">
+                                                        <i class="bi bi-x-circle me-1"></i> Cancel
+                                                    </button>
+                                                @endif
+                                            @endif
                                         </div>
                                     </td>
                                 </tr>
@@ -451,6 +476,31 @@
                     </div>
                     <button type="button" class="btn btn-light border rounded-pill px-4" data-pn-close>Close</button>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- Cancel confirmation. One shared card; the Cancel button that opens it supplies the PO and the action URL. --}}
+<div class="pn-overlay" id="pnCancel" role="dialog" aria-modal="true" aria-labelledby="pnCancelTitle" aria-hidden="true">
+    <div class="pn-scene">
+        <div class="pn-float">
+            <div class="pn-card">
+                <div class="pn-head">
+                    <h5 id="pnCancelTitle">Cancel purchase order?</h5>
+                    <button type="button" class="pn-x" data-pn-close aria-label="Close"><i class="bi bi-x-lg"></i></button>
+                </div>
+                <form method="POST" action="" id="pnCancelForm" onsubmit="this.querySelector('button[type=submit]').disabled = true;">
+                    @csrf
+                    <div class="pn-body">
+                        <p class="mb-2">You are about to cancel purchase order <strong id="pnCancelPo"></strong>.</p>
+                        <p class="text-muted small mb-0">It will no longer count as approved, it cannot be printed or edited, and it is left out of the totals.</p>
+                    </div>
+                    <div class="pn-foot">
+                        <button type="submit" class="btn btn-danger rounded-pill px-4">Yes, cancel PO</button>
+                        <button type="button" class="btn btn-light border rounded-pill px-4" data-pn-close>Keep PO</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -571,5 +621,12 @@
         }
     });
 })();
+</script>
+<script>
+window.openCancelPn = function (btn) {
+    document.getElementById('pnCancelForm').action = btn.dataset.action;
+    document.getElementById('pnCancelPo').textContent = btn.dataset.po;
+    window.openPn('pnCancel');
+};
 </script>
 @endsection

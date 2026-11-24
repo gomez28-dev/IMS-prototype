@@ -116,6 +116,7 @@ class PurchaseOrderController extends Controller
             'edited' => ['created', 'was edited'],
             'approved' => ['approved', 'was approved'],
             'rejected' => ['returned', 'was returned for changes'],
+            'cancelled' => ['cancelled', 'was cancelled'],
         ];
         $historyEvents = collect();
 
@@ -241,7 +242,21 @@ class PurchaseOrderController extends Controller
             }
         }
 
-        return $hidden;
+        // A cancelled PO rolls off at month end too, judged by when it was
+        // cancelled (the activity log's "cancelled" row).
+        $cancelRows = \App\Models\PurchaseOrderActivity::query()
+            ->where('action', 'cancelled')
+            ->whereIn('purchase_order_id', PurchaseOrder::query()->where('request_status', 'CANCELLED')->select('id'))
+            ->selectRaw('purchase_order_id, MAX(created_at) AS cancelled_at')
+            ->groupBy('purchase_order_id')
+            ->get();
+        foreach ($cancelRows as $c) {
+            if (Carbon::parse($c->cancelled_at, 'UTC')->lt($monthStart)) {
+                $hidden[] = (int) $c->purchase_order_id;
+            }
+        }
+
+        return array_values(array_unique($hidden));
     }
 
     public function show(Request $request, PurchaseOrder $purchaseOrder): View
@@ -313,8 +328,8 @@ class PurchaseOrderController extends Controller
     protected function stats(array $hiddenIds = []): array
     {
         return [
-            'total' => PurchaseOrder::createdPos()->whereNotIn('purchase_orders.id', $hiddenIds)->count(),
-            'volumes' => PurchaseOrder::volumeTotals(PurchaseOrder::createdPos()->whereNotIn('purchase_orders.id', $hiddenIds)->pluck('id')->all()),
+            'total' => PurchaseOrder::createdPos()->notCancelled()->whereNotIn('purchase_orders.id', $hiddenIds)->count(),
+            'volumes' => PurchaseOrder::volumeTotals(PurchaseOrder::createdPos()->notCancelled()->whereNotIn('purchase_orders.id', $hiddenIds)->pluck('id')->all()),
         ];
     }
 

@@ -114,6 +114,7 @@ class StockOrderController extends Controller
      */
     public function editSupplierPo(PurchaseOrder $purchaseOrder): View
     {
+        abort_if($purchaseOrder->isCancelled(), 403, 'A cancelled purchase order cannot be edited.');
         if (!Auth::user()->canEditStockOrders()) {
             abort(403);
         }
@@ -262,6 +263,7 @@ class StockOrderController extends Controller
      */
     public function updateSupplierPo(Request $request, PurchaseOrder $purchaseOrder): RedirectResponse
     {
+        abort_if($purchaseOrder->isCancelled(), 403, 'A cancelled purchase order cannot be edited.');
         if (!Auth::user()->canEditStockOrders()) {
             abort(403);
         }
@@ -1616,7 +1618,6 @@ public function storeStockRequestPo(Request $request): RedirectResponse
         }
 
         $pendingOrders = PurchaseOrder::with(['warehouse', 'client', 'requester', 'deliveries', 'supplier', 'items'])
-            ->pendingVpApproval()
             ->inApprovalList()
             ->paginate(15);
 
@@ -1728,6 +1729,39 @@ public function storeStockRequestPo(Request $request): RedirectResponse
         ]);
 
         return back()->with('success', 'ATL rejected and returned to Purchasing.');
+    }
+
+    public function cancel(\Illuminate\Http\Request $request, PurchaseOrder $purchaseOrder): RedirectResponse
+    {
+        if (!Auth::user()->canApproveStockOrders()) {
+            abort(403, 'Unauthorized to cancel stock orders.');
+        }
+
+        if ($purchaseOrder->isCancelled()) {
+            return back()->with('info', 'This purchase order is already cancelled.');
+        }
+
+        // Refused here as well as in the UI, in case someone posts directly.
+        if ($purchaseOrder->hasActiveAtl()) {
+            return back()->with('info', 'This purchase order has an active ATL. Cancel the ATL first.');
+        }
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($purchaseOrder) {
+            $purchaseOrder->update([
+                'status' => 'Cancelled',
+                'request_status' => 'CANCELLED',
+            ]);
+
+            AuditLog::create([
+                'admin_id' => Auth::id(),
+                'action' => 'cancelled',
+                'description' => "Cancelled Stock Order {$purchaseOrder->po_number}",
+            ]);
+
+            PurchaseOrderActivity::record($purchaseOrder->id, 'cancelled');
+        });
+
+        return back()->with('success', 'Purchase order cancelled.');
     }
 
     public function approve(PurchaseOrder $purchaseOrder): RedirectResponse

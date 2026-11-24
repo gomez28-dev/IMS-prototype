@@ -292,6 +292,7 @@ Route::post('/warehouses/{warehouse}/tanks', [WetStock\StorageTankController::cl
         });
         Route::post('/{purchaseOrder}/approve', [WetStock\StockOrderController::class, 'approve'])->name('approve');
         Route::post('/{purchaseOrder}/reject', [WetStock\StockOrderController::class, 'reject'])->name('reject');
+        Route::post('/{purchaseOrder}/cancel', [WetStock\StockOrderController::class, 'cancel'])->name('cancel');
         Route::get('/{purchaseOrder}/po-pdf', [WetStock\StockOrderController::class, 'downloadPoPdf'])->name('po-pdf');
         Route::post('/deliveries/{delivery}/dispatch', [WetStock\StockOrderController::class, 'dispatchDelivery'])->name('dispatch-delivery');
         Route::get('/deliveries/{delivery}/pdf', [WetStock\StockOrderController::class, 'downloadAtlPdf'])->name('pdf');

@@ -19,6 +19,7 @@
         'resubmitted' => ['Resubmitted for VP approval', 'bi-arrow-repeat', '#2563eb'],
         'rejected' => ['Rejected', 'bi-x-circle', '#dc2626'],
         'approved' => ['Approved by VP', 'bi-check-circle', '#16a34a'],
+        'cancelled' => ['Cancelled', 'bi-x-octagon', '#6b7280'],
     ];
 @endphp
 
@@ -26,7 +27,9 @@
     <div class="d-flex gap-2 flex-wrap">
         {{-- One action at a time. Editing an approved PO is not offered,
              so the figures the VP signed off cannot drift afterwards. --}}
-        @if ($purchaseOrder->isVpApproved())
+        @if ($purchaseOrder->isCancelled())
+            {{-- cancelled: no Print or Edit --}}
+        @elseif ($purchaseOrder->isVpApproved())
             <a href="{{ route('stock-orders.po-pdf', $purchaseOrder->id) }}"
                class="btn btn-sm btn-outline-danger" title="PO PDF" aria-label="Download PO PDF">
                 <i class="bi bi-file-earmark-pdf"></i>
