@@ -8,14 +8,14 @@ use App\Models\OrderItem;
 use Tests\TestCase;
 
 /**
- * Date Needed leaves the Sales Order entirely: the supervisor ruled it lives
- * with the delivery (the ATL form's Authorized Pick Up Date is the only
- * source for that date), so the SO form stops asking and nothing on the SO
- * flows reads a date from it anymore. The list also stops being a launchpad -
- * Create ATL moves behind ATL Details, which is where it already lives - and
- * the product lines stand alone without a cumulative Total row.
+ * Date Needed is back on the Sales Order: the client's required delivery or
+ * pick up date is captured on the SO, and the Sales Orders list falls back to
+ * it until an ATL records the actual Authorized Pick Up Date.
+ *
+ * The list is still not a launchpad - Create ATL lives behind ATL Details -
+ * and the product lines still stand alone without a cumulative Total row.
  */
-class SoDateNeededRemovedTest extends TestCase
+class SoDateNeededTest extends TestCase
 {
     protected Admin $admin;
 
@@ -61,30 +61,18 @@ class SoDateNeededRemovedTest extends TestCase
 
     // ---- The field itself ---------------------------------------------------
 
-    public function test_the_create_form_no_longer_asks_for_a_date_needed(): void
+    public function test_the_create_form_asks_for_a_date_needed(): void
     {
         $html = $this->actingAs($this->admin)
             ->get(route('order.create'))
             ->assertOk()
             ->getContent();
 
-        $this->assertStringNotContainsString('Date Needed', $html);
+        $this->assertStringContainsString('Date Needed', $html);
+        $this->assertStringContainsString('name="date_needed"', $html);
     }
 
-    public function test_the_edit_form_no_longer_prefills_a_date_needed(): void
-    {
-        $order = $this->order(['date_needed' => now()->addDays(7)->toDateString()]);
-
-        $html = $this->actingAs($this->admin)
-            ->get(route('order.edit', $order->id))
-            ->assertOk()
-            ->getContent();
-
-        $this->assertStringNotContainsString('Date Needed', $html);
-        $this->assertStringNotContainsString('name="date_needed"', $html);
-    }
-
-    public function test_a_saved_date_needed_does_not_resurface_on_the_edit_form(): void
+    public function test_the_edit_form_prefills_the_saved_date_needed(): void
     {
         $order = $this->order(['date_needed' => '2026-09-15']);
 
@@ -93,10 +81,44 @@ class SoDateNeededRemovedTest extends TestCase
             ->assertOk()
             ->getContent();
 
-        $this->assertStringNotContainsString('2026-09-15', $html);
+        $this->assertStringContainsString('Date Needed', $html);
+        $this->assertStringContainsString('name="date_needed"', $html);
+        $this->assertStringContainsString('value="2026-09-15"', $html);
+    }
+
+    public function test_date_needed_is_saved_with_a_new_order(): void
+    {
+        $soNumber = 'SO-'.uniqid();
+
+        $this->actingAs($this->admin)->post(route('order.store'), [
+            'account' => 'Apex Logistics Corp',
+            'location' => 'Valenzuela',
+            'so_number' => $soNumber,
+            'date' => now()->format('Y-m-d'),
+            'date_needed' => '2026-12-15',
+            'status' => 'Active',
+            'terms' => 'COD',
+            'vat_type' => 'VAT_EX',
+            'order_type' => 'FUEL_TRADE',
+            'items' => [['product_type' => 'D', 'qty' => 1000, 'price' => 50]],
+        ])->assertSessionHasNoErrors();
+
+        $order = Order::where('so_number', $soNumber)->firstOrFail();
+
+        $this->assertEquals('2026-12-15', $order->date_needed->format('Y-m-d'));
     }
 
     // ---- The list -----------------------------------------------------------
+
+    public function test_the_list_uses_date_needed_until_an_atl_has_a_pick_up_date(): void
+    {
+        $this->order(['date_needed' => '2026-12-20']);
+
+        $html = $this->listHtml();
+
+        $this->assertStringContainsString('Pick Up Date', $html);
+        $this->assertStringContainsString('Dec 20, 2026', $html);
+    }
 
     public function test_a_cleared_order_is_offered_atl_details_but_not_create_atl(): void
     {
@@ -122,7 +144,7 @@ class SoDateNeededRemovedTest extends TestCase
         $this->assertStringNotContainsString('1,500 L', $html);
     }
 
-    // ---- The decoupling -----------------------------------------------------
+    // ---- The ATL form -------------------------------------------------------
 
     public function test_the_atl_form_keeps_the_pick_up_date_and_names_nothing_date_needed(): void
     {

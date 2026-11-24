@@ -10,9 +10,9 @@ use App\Models\Warehouse;
 use Tests\TestCase;
 
 /**
- * The supervisor narrowed the Create Supplier Purchase Order form down to four
- * things: a typed Official PO Number, the Company, its Location, and the Target
- * Availability Date. PO Classification and Destination Depot come off.
+ * The Create Supplier Purchase Order form leads with the PO number, the vendor
+ * company, its address, and the date. The date is set by the server and shown
+ * read-only; PO Classification and Destination Depot stay off the form.
  */
 class CreateSupplierPoFormTest extends TestCase
 {
@@ -48,14 +48,16 @@ class CreateSupplierPoFormTest extends TestCase
 
     // ---- What stays --------------------------------------------------------
 
-    public function test_the_form_keeps_the_four_fields_the_supervisor_asked_for(): void
+    public function test_the_form_keeps_the_po_number_vendor_address_and_date(): void
     {
         $html = $this->createHtml();
 
-        $this->assertStringContainsString('Official PO Number', $html);
+        $this->assertStringContainsString('PO#', $html);
         $this->assertStringContainsString('name="supplier_id"', $html);
         $this->assertStringContainsString('id="supplier_location"', $html);
-        $this->assertStringContainsString('Target Availability Date', $html);
+        $this->assertStringContainsString('name="po_date"', $html);
+        // The date is display-only; a new PO is dated the day it is raised.
+        $this->assertMatchesRegularExpression('/id="po_date_display"[^>]*readonly/', $html);
     }
 
     public function test_the_po_number_is_typed_not_chosen(): void

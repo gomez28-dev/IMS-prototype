@@ -128,6 +128,17 @@ class PurchaseOrdersListPresentationTest extends TestCase
             ->getContent();
     }
 
+    /**
+     * The table body alone. The History card lists recent POs regardless of the
+     * search term, so a whole-page assertion would see them there.
+     */
+    protected function tableHtml(string $html): string
+    {
+        preg_match('/<tbody>(.*?)<\/tbody>/s', $html, $matches);
+
+        return $matches[1] ?? '';
+    }
+
     // ---- Task 4: the toolbar sits over the table it controls ----------------
 
     public function test_the_search_input_and_button_sit_above_the_table(): void
@@ -178,8 +189,8 @@ class PurchaseOrdersListPresentationTest extends TestCase
             ->assertOk()
             ->getContent();
 
-        $this->assertStringContainsString('DITC-KEEP-0001', $html);
-        $this->assertStringNotContainsString('DITC-KEEP-0002', $html);
+        $this->assertStringContainsString('DITC-KEEP-0001', $this->tableHtml($html));
+        $this->assertStringNotContainsString('DITC-KEEP-0002', $this->tableHtml($html));
     }
 
     // ---- Task 5: the badge is gone -----------------------------------------
@@ -191,9 +202,9 @@ class PurchaseOrdersListPresentationTest extends TestCase
 
     // ---- Task 6: the peso sign ---------------------------------------------
 
-    public function test_the_price_column_is_headed_with_a_peso_sign(): void
+    public function test_the_price_column_is_headed_price(): void
     {
-        $this->assertStringContainsString('Price / Liter (&#8369;)', $this->formHtml());
+        $this->assertStringContainsString('>Price</th>', $this->formHtml());
     }
 
     public function test_the_price_inputs_are_prefixed_with_a_peso_sign(): void
@@ -262,11 +273,16 @@ class PurchaseOrdersListPresentationTest extends TestCase
         $this->assertStringContainsString('Pending', $html);
     }
 
-    public function test_a_fulfilled_po_reads_fulfilled(): void
+    public function test_a_fully_drawn_po_reads_approved(): void
     {
         $this->drawnDownPo('DITC-FULL-0001');
 
-        $this->assertStringContainsString('Fulfilled', $this->listHtml());
+        // The Status column follows the approval workflow now, so an approved
+        // PO stays "Approved" even after its volume is fully drawn.
+        $table = $this->tableHtml($this->listHtml());
+
+        $this->assertStringContainsString('DITC-FULL-0001', $table);
+        $this->assertStringContainsString('Approved', $table);
     }
 
     public function test_the_list_no_longer_uses_a_monospace_font(): void

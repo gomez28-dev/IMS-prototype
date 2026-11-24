@@ -56,6 +56,17 @@ class PurchaseOrderListHeaderTest extends TestCase
             ->getContent();
     }
 
+    /**
+     * The table body alone. The History card lists recent POs regardless of the
+     * search term, so a whole-page assertion would see them there.
+     */
+    protected function tableHtml(string $html): string
+    {
+        preg_match('/<tbody>(.*?)<\/tbody>/s', $html, $matches);
+
+        return $matches[1] ?? '';
+    }
+
     // ---- What goes ---------------------------------------------------------
 
     public function test_the_approvals_queue_button_is_gone_from_the_list(): void
@@ -120,13 +131,13 @@ class PurchaseOrderListHeaderTest extends TestCase
             ->assertOk()
             ->getContent();
 
-        $this->assertStringContainsString($target->po_number, $html);
+        $this->assertStringContainsString($target->po_number, $this->tableHtml($html));
 
         $html = $this->actingAs($this->purchasing)
             ->get(route('stock-orders.purchase-orders.index', ['search' => 'ZZZ-NO-SUCH-PO']))
             ->assertOk()
             ->getContent();
 
-        $this->assertStringNotContainsString($target->po_number, $html);
+        $this->assertStringNotContainsString($target->po_number, $this->tableHtml($html));
     }
 }

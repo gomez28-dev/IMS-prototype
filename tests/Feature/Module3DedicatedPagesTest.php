@@ -157,7 +157,7 @@ class Module3DedicatedPagesTest extends TestCase
         $response->assertSee($order->account);
     }
 
-    public function test_sales_orders_page_includes_buy_back_pickup_orders(): void
+    public function test_sales_orders_page_excludes_buy_back_orders(): void
     {
         $buyBack = $this->fuelTradeOrder([
             'so_number' => 'SO-BB-' . rand(1000, 9999),
@@ -165,9 +165,11 @@ class Module3DedicatedPagesTest extends TestCase
             'order_category' => 'BUY_BACK',
         ]);
 
+        // The Sales Orders page is Fuel Trade only. Buy Backs keep their own
+        // list even when they were raised with an FT-style SO number.
         $this->actingAs($this->purchasing)
             ->get(route('stock-orders.sales-orders.index'))
-            ->assertSee($buyBack->formatted_so_number);
+            ->assertDontSee($buyBack->formatted_so_number);
     }
 
     /**

@@ -61,6 +61,7 @@ class SalesFuelTradeLinkageTest extends TestCase
             // fulfillment_type + order_category pair.
             'order_type' => 'FUEL_TRADE',
             'terms' => 'COD',
+            'vat_type' => 'VAT_EX',
         ];
 
         $response = $this->actingAs($this->salesUser)->post(route('order.store'), $payload);

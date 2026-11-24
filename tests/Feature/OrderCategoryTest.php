@@ -44,6 +44,7 @@ class OrderCategoryTest extends TestCase
             'date' => now()->format('Y-m-d'),
             'status' => 'Active',
             'terms' => 'COD',
+            'vat_type' => 'VAT_EX',
             'items' => [
                 ['product_type' => 'D', 'qty' => 1000, 'price' => 50.00],
             ],
@@ -187,6 +188,7 @@ class OrderCategoryTest extends TestCase
             'date' => now()->format('Y-m-d'),
             'status' => 'Active',
             'terms' => 'COD',
+            'vat_type' => 'VAT_EX',
             'order_type' => 'FUEL_TRADE',
             'items' => [['product_type' => 'D', 'qty' => 1000, 'price' => 50.00]],
         ])->assertSessionHasNoErrors();

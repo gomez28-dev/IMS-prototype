@@ -11,11 +11,9 @@ use Tests\TestCase;
  * happened to return them - index() had no ordering at all, so the ascending
  * sequence was just insertion order and would change as rows were touched.
  *
- * The supervisor wants the highest SO number first. The subtlety is that one
- * sequence is shared across formats: BB-3010, BB-3009, 2092, FT-2091, 2090,
- * FT-2089. Sorting the column as text puts 999 above 1363 and splits one
- * sequence into four, so the numeric part is what gets compared and the prefix
- * is ignored.
+ * The supervisor wants the highest SO number first. The list is Fuel Trade
+ * only, so every row renders with the FT- prefix; the numeric part is what
+ * gets compared, so "999" still trails "1363" rather than sorting above it.
  */
 class SalesOrderSortOrderTest extends TestCase
 {
@@ -46,7 +44,7 @@ class SalesOrderSortOrderTest extends TestCase
             'status' => 'Active',
             'qty_ordered' => 1000,
             'clearing_status' => 'Approved',
-            'fulfillment_type' => Order::FULFILLMENT_DELIVERY,
+            'fulfillment_type' => Order::FULFILLMENT_FUEL_TRADE,
             'order_category' => Order::CATEGORY_CLIENT_ORDER,
         ], $overrides));
     }
@@ -56,7 +54,7 @@ class SalesOrderSortOrderTest extends TestCase
      *
      * Anchored on the cell the view gives the SO number, rather than any <td>,
      * so the digit-free rows this file also tests are picked up: the column
-     * renders formatted_so_number, which carries the FT-/BB- prefix.
+     * renders formatted_so_number, which prefixes Fuel Trade rows with FT-.
      *
      * @return array<int, string>
      */
@@ -76,13 +74,18 @@ class SalesOrderSortOrderTest extends TestCase
         return array_values(array_map('trim', $matches[1]));
     }
 
+    protected function numberOf(string $formattedSoNumber): int
+    {
+        return (int) preg_replace('/\D+/', '', $formattedSoNumber);
+    }
+
     public function test_orders_are_listed_highest_so_number_first(): void
     {
         foreach (['1360', '1361', '1362', '1363'] as $so) {
             $this->order($so);
         }
 
-        $this->assertSame(['1363', '1362', '1361', '1360'], $this->listedOrder());
+        $this->assertSame(['FT-1363', 'FT-1362', 'FT-1361', 'FT-1360'], $this->listedOrder());
     }
 
     public function test_a_short_number_sorts_numerically_not_as_text(): void
@@ -93,34 +96,31 @@ class SalesOrderSortOrderTest extends TestCase
         $this->order('1000');
         $this->order('1363');
 
-        $this->assertSame(['1363', '1000', '999'], $this->listedOrder());
+        $this->assertSame(['FT-1363', 'FT-1000', 'FT-999'], $this->listedOrder());
     }
 
-    public function test_the_prefix_does_not_split_one_sequence(): void
+    public function test_a_stored_ft_prefix_does_not_change_the_sequence(): void
     {
-        // One shared sequence across four formats. The number decides, not the
-        // prefix, so these come out as a single descending run.
-        $this->order('2088', ['fulfillment_type' => Order::FULFILLMENT_DELIVERY, 'order_category' => Order::CATEGORY_CLIENT_ORDER]);
-        $this->order('FT-2089', ['fulfillment_type' => Order::FULFILLMENT_FUEL_TRADE]);
+        // Some rows were saved with the FT- prefix and some without. Both
+        // formats render the same way and sort as one run.
+        $this->order('FT-2089');
         $this->order('2090');
-        $this->order('FT-2091', ['fulfillment_type' => Order::FULFILLMENT_FUEL_TRADE]);
+        $this->order('FT-2091');
         $this->order('2092');
-        $this->order('BB-3009', ['order_category' => Order::CATEGORY_BUY_BACK]);
-        $this->order('BB-3010', ['order_category' => Order::CATEGORY_BUY_BACK]);
 
-        $this->assertSame(
-            ['BB-3010', 'BB-3009', '2092', 'FT-2091', '2090', 'FT-2089', '2088'],
-            $this->listedOrder()
-        );
+        $this->assertSame(['FT-2092', 'FT-2091', 'FT-2090', 'FT-2089'], $this->listedOrder());
     }
 
-    public function test_a_buy_back_outranks_a_higher_numbered_fuel_trade(): void
+    public function test_non_fuel_trade_orders_are_not_listed(): void
     {
-        // Prefixes carry no weight: BB-3010 beats FT-2999 on the number alone.
-        $this->order('FT-2999', ['fulfillment_type' => Order::FULFILLMENT_FUEL_TRADE]);
-        $this->order('BB-3010', ['order_category' => Order::CATEGORY_BUY_BACK]);
+        $this->order('1360');
+        $this->order('1361', ['fulfillment_type' => Order::FULFILLMENT_DELIVERY]);
+        $this->order('BB-3009', [
+            'fulfillment_type' => Order::FULFILLMENT_PICKUP,
+            'order_category' => Order::CATEGORY_BUY_BACK,
+        ]);
 
-        $this->assertSame(['BB-3010', 'FT-2999'], $this->listedOrder());
+        $this->assertSame(['FT-1360'], $this->listedOrder());
     }
 
     public function test_an_so_with_no_numeric_part_sorts_last(): void
@@ -135,9 +135,9 @@ class SalesOrderSortOrderTest extends TestCase
 
         $listed = $this->listedOrder();
 
-        $this->assertSame(['1363', '1360'], array_slice($listed, 0, 2));
+        $this->assertSame(['FT-1363', 'FT-1360'], array_slice($listed, 0, 2));
         $this->assertSame(
-            ['CANCEL ORDER', 'PENDING REISSUE'],
+            ['FT-CANCEL ORDER', 'FT-PENDING REISSUE'],
             array_slice($listed, 2),
             'Rows with no number trail, ordered among themselves.'
         );
@@ -150,7 +150,7 @@ class SalesOrderSortOrderTest extends TestCase
         $this->order('CANCEL ORDER 12');
         $this->order('1363');
 
-        $this->assertSame(['1363', 'CANCEL ORDER 12'], $this->listedOrder());
+        $this->assertSame(['FT-1363', 'FT-CANCEL ORDER 12'], $this->listedOrder());
     }
 
     public function test_cancelled_orders_stay_off_the_list(): void
@@ -158,7 +158,7 @@ class SalesOrderSortOrderTest extends TestCase
         $this->order('1362');
         $this->order('1363', ['status' => 'Cancelled']);
 
-        $this->assertSame(['1362'], $this->listedOrder());
+        $this->assertSame(['FT-1362'], $this->listedOrder());
     }
 
     public function test_the_order_holds_across_pages(): void
@@ -169,7 +169,7 @@ class SalesOrderSortOrderTest extends TestCase
         }
 
         $first = $this->listedOrder();
-        $this->assertSame('1400', $first[0], 'The newest is first.');
+        $this->assertSame('FT-1400', $first[0], 'The newest is first.');
 
         $secondPage = $this->actingAs($this->admin)
             ->get(route('stock-orders.sales-orders.index', ['page' => 2]))
@@ -185,8 +185,8 @@ class SalesOrderSortOrderTest extends TestCase
 
         $this->assertNotEmpty($second, 'There should be a second page.');
         $this->assertLessThan(
-            (int) end($first),
-            (int) $second[0],
+            $this->numberOf((string) end($first)),
+            $this->numberOf($second[0]),
             'Page 2 must continue below page 1, not restart.'
         );
     }

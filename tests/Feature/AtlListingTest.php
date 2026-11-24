@@ -25,13 +25,10 @@ class AtlListingTest extends TestCase
         ]);
     }
 
-    public function test_sales_orders_shows_every_category(): void
+    public function test_sales_orders_shows_only_fuel_trade_orders(): void
     {
         $fuelTrade = $this->order('FT-1', 'FUEL_TRADE', 'CLIENT_ORDER');
         $buyBack = $this->order('BB-1', 'DEPOT_PICKUP', 'BUY_BACK');
-        // Every category reaches Module 3, including a Buy Back that we
-        // deliver ourselves: it is assigned through Assign Delivery, not
-        // listed separately.
         $plainDelivery = $this->order('PLAIN-1', 'DELIVERY', 'CLIENT_ORDER');
         $consumo = $this->order('CONSUMO-1', 'DELIVERY', 'CONSUMO');
         $buyBackDelivery = $this->order('BB-DELIVERED', 'DELIVERY', 'BUY_BACK');
@@ -40,10 +37,12 @@ class AtlListingTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSee($fuelTrade->so_number);
-        $response->assertSee($buyBack->so_number);
-        $response->assertSee($plainDelivery->so_number);
-        $response->assertSee($consumo->so_number);
-        $response->assertSee($buyBackDelivery->so_number);
+
+        // The page is Fuel Trade only. Buy Backs, Consumo and plain deliveries
+        // keep their own workflows and do not appear on this list.
+        foreach ([$buyBack, $plainDelivery, $consumo, $buyBackDelivery] as $order) {
+            $response->assertDontSee($order->so_number);
+        }
     }
 
     public function test_atl_list_excludes_cancelled_orders(): void

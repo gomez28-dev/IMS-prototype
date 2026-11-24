@@ -37,7 +37,6 @@ class SupplierPurchaseOrderTest extends TestCase
             'supplier_id' => $supplier->id,
             'po_type' => 'STANDARD_REPLENISHMENT',
             'terms' => 'VAT EX CASH',
-            'po_date' => '2026-09-16',
             'items' => [
                 ['product' => 'Diesel', 'quantity' => 220000, 'unit_price' => 89.15],
             ],
@@ -54,7 +53,9 @@ class SupplierPurchaseOrderTest extends TestCase
         // Attention defaults to the supplier contact.
         $this->assertEquals('Mr. Aaron Uy', $po->attention);
         $this->assertEquals('VAT EX CASH', $po->terms);
-        $this->assertEquals('2026-09-16', $po->po_date->format('Y-m-d'));
+        // A new PO is always dated the day it is raised; the form shows the
+        // date read-only and the server sets it again on save.
+        $this->assertEquals(now()->toDateString(), $po->po_date->format('Y-m-d'));
         $this->assertEquals($this->purchasing->id, $po->prepared_by);
     }
 

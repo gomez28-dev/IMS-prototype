@@ -98,7 +98,7 @@ class SupplierPoApprovalQueueTest extends TestCase
             ->assertDontSee('PO-QUEUE-GONE');
     }
 
-    public function test_rejected_supplier_po_returns_to_purchasing(): void
+    public function test_rejected_supplier_po_stays_in_the_vp_queue_until_resubmitted(): void
     {
         $po = $this->createRequestedSupplierPo('PO-QUEUE-REJECT');
 
@@ -107,12 +107,17 @@ class SupplierPoApprovalQueueTest extends TestCase
         ])->assertSessionHas('success');
 
         $this->assertEquals('REQUESTED', $po->fresh()->request_status);
+        $this->assertNotNull($po->fresh()->rejected_at);
 
-        // The first GET burns the flash banner, which echoes the PO number.
+        // A returned PO stays on the VP's list, marked as returned, until
+        // Purchasing revises and resubmits it. The first GET burns the flash
+        // banner, which echoes the PO number.
         $this->actingAs($this->vp)->get(route('stock-orders.approvals'));
         $this->actingAs($this->vp)
             ->get(route('stock-orders.approvals'))
-            ->assertDontSee('PO-QUEUE-REJECT');
+            ->assertSee('PO-QUEUE-REJECT')
+            ->assertSee('Returned to Purchasing')
+            ->assertSee('Volume exceeds the approved allocation.');
     }
 
     public function test_purchasing_can_see_the_approval_queue_but_not_approve(): void

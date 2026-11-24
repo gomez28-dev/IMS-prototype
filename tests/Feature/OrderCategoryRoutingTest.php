@@ -47,6 +47,7 @@ class OrderCategoryRoutingTest extends TestCase
             'date' => now()->format('Y-m-d'),
             'status' => 'Active',
             'terms' => 'COD',
+            'vat_type' => 'VAT_EX',
             'items' => [['product_type' => 'D', 'qty' => 1000, 'price' => 50.00]],
         ], $overrides))->assertSessionHasNoErrors();
 
@@ -99,6 +100,7 @@ class OrderCategoryRoutingTest extends TestCase
             'date' => now()->format('Y-m-d'),
             'status' => 'Active',
             'terms' => 'COD',
+            'vat_type' => 'VAT_EX',
             'order_type' => 'BUY_BACK',
             'buy_back_fulfillment' => 'TELEPORT',
             'items' => [['product_type' => 'D', 'qty' => 1000, 'price' => 50.00]],
@@ -166,7 +168,7 @@ class OrderCategoryRoutingTest extends TestCase
         $this->assertTrue(Order::buyBackDelivery()->whereKey($order->id)->exists());
     }
 
-    public function test_the_sales_orders_page_follows_the_routing(): void
+    public function test_the_sales_orders_page_lists_only_fuel_trade_orders(): void
     {
         $m3 = $this->storeOrder(['order_type' => 'REGULAR']);
         $ft = $this->storeOrder(['order_type' => 'FUEL_TRADE']);
@@ -187,13 +189,12 @@ class OrderCategoryRoutingTest extends TestCase
 
         $response->assertStatus(200);
 
-        // Regular Order and Consumo now reach Module 3 for the first time.
-        foreach ([$m3, $ft, $cs, $bbPickup] as $order) {
-            $response->assertSee($order->formatted_so_number);
-        }
+        // The Sales Orders page is Fuel Trade only now.
+        $response->assertSee($ft->formatted_so_number);
 
-        // A delivered Buy Back is listed here too, so nothing hides from M3.
-        $response->assertSee($bbDelivery->formatted_so_number);
+        foreach ([$m3, $cs, $bbPickup, $bbDelivery] as $order) {
+            $response->assertDontSee($order->formatted_so_number);
+        }
     }
 
     public function test_the_module_two_page_no_longer_has_a_buy_back_section(): void
@@ -240,25 +241,25 @@ class OrderCategoryRoutingTest extends TestCase
 
     // ---- Date Needed -------------------------------------------------------
 
-    public function test_date_needed_posts_are_ignored_and_the_field_left_the_form(): void
+    public function test_date_needed_is_saved_with_the_order(): void
     {
-        // Date Needed was removed from the Sales Order (the delivery date is
-        // the ATL form's Authorized Pick Up Date), so a stale client that
-        // still posts the field must not be able to reappear with it.
+        // The Sales Orders list falls back to the order's Date Needed until
+        // an ATL records the actual pick up date.
         $order = $this->storeOrder([
             'order_type' => 'REGULAR',
             'date_needed' => '2026-11-15',
         ]);
 
-        $this->assertNull($order->fresh()->date_needed);
+        $this->assertEquals('2026-11-15', $order->fresh()->date_needed->format('Y-m-d'));
     }
 
-    public function test_the_form_no_longer_renders_a_date_needed_input(): void
+    public function test_the_form_renders_a_date_needed_input(): void
     {
         $response = $this->actingAs($this->sales)->get(route('order.create'));
 
         $response->assertStatus(200);
-        $response->assertDontSee('name="date_needed"', false);
+        $response->assertSee('name="date_needed"', false);
+        $response->assertSee('Date Needed', false);
     }
 
     // ---- Form ------------------------------------------------------------
