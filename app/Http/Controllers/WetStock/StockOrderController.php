@@ -554,6 +554,16 @@ class StockOrderController extends Controller
             abort(403);
         }
 
+        // One render, one ATL. The token is generated with the form, so a
+        // double-click or a refreshed POST arrives with a token that already
+        // has a record and is answered instead of writing a second ATL.
+        $submissionToken = $request->input('submission_token');
+
+        if (PurchaseOrderDelivery::alreadySubmitted($submissionToken)) {
+            return redirect()->route('stock-orders.sales-orders.show', $order->id)
+                ->with('info', 'This ATL was already saved. The duplicate submit was ignored.');
+        }
+
         $isClientProvided = $request->input('atl_source') === PurchaseOrderDelivery::SOURCE_CLIENT_PROVIDED;
 
         if (!$order->canPrepareAtl()) {
@@ -609,6 +619,7 @@ class StockOrderController extends Controller
                 'atl_number' => ['nullable', 'string', 'max:64'],
                 'client_atl_number' => ['required_if:atl_source,CLIENT_PROVIDED', 'nullable', 'string', 'max:64'],
                 'additional_remarks' => ['nullable', 'string', 'max:500'],
+                'submission_token' => ['nullable', 'string', 'max:64'],
                 'drawdowns' => ['required', 'array', 'min:1'],
                 'drawdowns.*.purchase_order_id' => ['required', 'exists:purchase_orders,id'],
                 'drawdowns.*.product' => ['nullable', 'string', 'in:Diesel,Premium,Unleaded'],
@@ -674,7 +685,7 @@ class StockOrderController extends Controller
             // Per-product quantities live on the allocations below.
             $productSummary = $drawdowns->pluck('product')->unique()->implode(' + ');
 
-            $delivery = PurchaseOrderDelivery::create([
+            $delivery = PurchaseOrderDelivery::createOnce([
                 'purchase_order_id' => $primaryPoId,
                 'order_id' => $order->id,
                 'storage_tank_id' => $validated['storage_tank_id'] ?? null,
@@ -711,7 +722,12 @@ class StockOrderController extends Controller
                 'additional_remarks' => $validated['additional_remarks'] ?? null,
                 'status' => 'Pending',
                 'prepared_by' => Auth::id(),
-            ]);
+            ], $validated['submission_token'] ?? null);
+
+            if (! $delivery) {
+                return redirect()->route('stock-orders.sales-orders.show', $order->id)
+                    ->with('info', 'This ATL was already saved. The duplicate submit was ignored.');
+            }
 
             foreach ($drawdowns as $dd) {
                 $targetPo = PurchaseOrder::find($dd['purchase_order_id']);
@@ -766,6 +782,7 @@ class StockOrderController extends Controller
             'atl_number' => ['nullable', 'string', 'max:64'],
             'client_atl_number' => ['required_if:atl_source,CLIENT_PROVIDED', 'nullable', 'string', 'max:64'],
             'additional_remarks' => ['nullable', 'string', 'max:500'],
+            'submission_token' => ['nullable', 'string', 'max:64'],
         ]);
 
         $po = PurchaseOrder::where('po_number', $validated['po_number'])->first();
@@ -818,7 +835,7 @@ class StockOrderController extends Controller
             ]);
         }
 
-        $delivery = PurchaseOrderDelivery::create([
+        $delivery = PurchaseOrderDelivery::createOnce([
             'purchase_order_id' => $po->id,
             'order_id' => $order->id,
             'storage_tank_id' => $validated['storage_tank_id'] ?? null,
@@ -852,7 +869,12 @@ class StockOrderController extends Controller
             'additional_remarks' => $validated['additional_remarks'] ?? null,
             'status' => 'Pending',
             'prepared_by' => Auth::id(),
-        ]);
+        ], $validated['submission_token'] ?? null);
+
+        if (! $delivery) {
+            return redirect()->route('stock-orders.purchase-orders.index')
+                ->with('info', 'This ATL was already saved. The duplicate submit was ignored.');
+        }
 
         AtlAllocation::create([
             'purchase_order_delivery_id' => $delivery->id,
@@ -1323,7 +1345,31 @@ class StockOrderController extends Controller
             'plate_number' => ['nullable', 'string', 'max:64'],
             'location' => ['nullable', 'string', 'max:128'],
             'additional_remarks' => ['nullable', 'string', 'max:500'],
+            'submission_token' => ['nullable', 'string', 'max:64'],
         ]);
+
+        // A save that would file the same ATL twice is refused before the PO is
+        // touched, so it cannot renumber or re-open the PO on its way out. A
+        // repeat of the same form submission is left to the token check below,
+        // which answers with its "already saved" notice instead of an error.
+        $tokenUsed = PurchaseOrderDelivery::alreadySubmitted($validated['submission_token'] ?? null);
+
+        if (! $tokenUsed && ($duplicate = PurchaseOrderDelivery::duplicateOf([
+            'purchase_order_id' => $purchaseOrder->id,
+            'order_type' => $validated['order_type'],
+            'delivery_channel' => $validated['delivery_channel'],
+            'product' => $validated['product'],
+            'qty_to_receive' => (int) $validated['qty_to_receive'],
+            'atl_number' => $validated['atl_number'] ?? null,
+            'client_atl_number' => $validated['client_atl_number'] ?? null,
+        ]))) {
+            return back()->withInput()
+                ->with('duplicate_atl_id', $duplicate->id)
+                ->withErrors([
+                    'atl' => 'An identical ATL is already on file: '.$duplicate->duplicateDescription()
+                        .' Correct that ATL instead of re-saving it, or record a separate load with its own ATL number.',
+                ]);
+        }
 
         $purchaseOrder->update([
             'po_number' => $validated['po_number'],
@@ -1331,11 +1377,33 @@ class StockOrderController extends Controller
             'request_status' => 'RECEIVED',
         ]);
 
-        PurchaseOrderDelivery::create([
+        // Same reason as the other ATL forms: this POST creates a record, so a
+        // re-submitted form must not create a second one. The form carries a
+        // token generated once per render, and a used token is answered with a
+        // notice rather than another identical ATL on the same PO.
+        $isClientProvided = filled($validated['client_atl_number'] ?? null);
+
+        $delivery = PurchaseOrderDelivery::createOnce([
             'purchase_order_id' => $purchaseOrder->id,
             'delivery_channel' => $validated['delivery_channel'],
             'order_type' => $validated['order_type'],
-            'atl_type' => !empty($validated['client_atl_number']) ? 'CLIENT_ATL' : ($validated['order_type'] === 'PICK_UP' ? 'DITC_ATL' : 'NONE'),
+            'atl_type' => $isClientProvided ? 'CLIENT_ATL' : ($validated['order_type'] === 'PICK_UP' ? 'DITC_ATL' : 'NONE'),
+            'atl_source' => $isClientProvided
+                ? PurchaseOrderDelivery::SOURCE_CLIENT_PROVIDED
+                : PurchaseOrderDelivery::SOURCE_DOYEN_ISSUED,
+            // Without these this path wrote a row the VP queue could not see and
+            // whose issued date was permanently blank - which is exactly how a
+            // real ATL ended up reading "Not yet issued".
+            'approval_status' => $isClientProvided
+                ? PurchaseOrderDelivery::APPROVAL_DRAFT
+                : PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL,
+            'atl_category' => match ($purchaseOrder->po_type) {
+                'FUEL_TRADE' => PurchaseOrderDelivery::CATEGORY_FUEL_TRADE,
+                'BUY_BACK' => PurchaseOrderDelivery::CATEGORY_BUY_BACK,
+                default => PurchaseOrderDelivery::CATEGORY_DOYEN_STOCKS,
+            },
+            'lift_status' => PurchaseOrderDelivery::LIFT_UNLIFTED,
+            'issued_at' => now(),
             'dr_number' => $validated['dr_number'] ?? null,
             'atl_number' => $validated['atl_number'] ?? null,
             'client_atl_number' => $validated['client_atl_number'] ?? null,
@@ -1350,7 +1418,12 @@ class StockOrderController extends Controller
             'additional_remarks' => $validated['additional_remarks'] ?? null,
             'status' => 'Pending',
             'prepared_by' => Auth::id(),
-        ]);
+        ], $validated['submission_token'] ?? null);
+
+        if (! $delivery) {
+            return redirect()->route('stock-orders.purchase-orders.index')
+                ->with('info', 'This ATL was already saved. The duplicate submit was ignored.');
+        }
 
         AuditLog::create([
             'admin_id' => Auth::id(),
@@ -1504,6 +1577,9 @@ public function storeStockRequestPo(Request $request): RedirectResponse
             'mode' => 'add_atl',
             'purchaseOrder' => $purchaseOrder,
             'order' => null,
+            // What is already on this PO, so the date or driver of a saved ATL
+            // can be corrected from here rather than re-saved as a new one.
+            'existingAtls' => $purchaseOrder->deliveries()->orderByDesc('id')->get(),
             'clients' => Client::orderBy('name')->get(),
             'warehouses' => Warehouse::orderBy('name')->get(),
         ]);
@@ -1533,7 +1609,15 @@ public function storeStockRequestPo(Request $request): RedirectResponse
             'plate_number' => ['nullable', 'string', 'max:64'],
             'location' => ['nullable', 'string', 'max:128'],
             'additional_remarks' => ['nullable', 'string', 'max:500'],
+            'submission_token' => ['nullable', 'string', 'max:64'],
         ]);
+
+        // A used token means this exact form was already saved; answer it rather
+        // than inserting another ATL on the same PO.
+        if (PurchaseOrderDelivery::alreadySubmitted($validated['submission_token'] ?? null)) {
+            return redirect()->route('stock-orders.purchase-orders.show', $purchaseOrder->id)
+                ->with('info', 'This ATL was already saved. The duplicate submit was ignored.');
+        }
 
         // The ATL cannot ask for more than the PO still owes.
         $remaining = $purchaseOrder->getAvailableBalanceForProduct($validated['product']);
@@ -1543,13 +1627,36 @@ public function storeStockRequestPo(Request $request): RedirectResponse
             ])->with('error', 'That ATL would draw more than the PO has remaining.');
         }
 
+        // A save that would file an ATL already on this PO is refused before
+        // anything is written, and the refusal names the row to correct: a date
+        // or a driver fixed on an ATL already saved is a correction, not a new
+        // load, and the user would otherwise be left with nothing to do.
+        $duplicate = PurchaseOrderDelivery::duplicateOf([
+            'purchase_order_id' => $purchaseOrder->id,
+            'order_type' => $validated['order_type'],
+            'delivery_channel' => $validated['delivery_channel'],
+            'product' => $validated['product'],
+            'qty_to_receive' => (int) $validated['qty_to_receive'],
+            'atl_number' => $validated['atl_number'] ?? null,
+            'client_atl_number' => $validated['client_atl_number'] ?? null,
+        ]);
+
+        if ($duplicate) {
+            return back()->withInput()
+                ->with('duplicate_atl_id', $duplicate->id)
+                ->withErrors([
+                    'atl' => 'An identical ATL is already on file: '.$duplicate->duplicateDescription()
+                        .' Use "Correct the saved ATL" to change its date or driver instead of filing a new one.',
+                ]);
+        }
+
         // The form decides client-provided by whether a client ATL number was
         // typed, which is also what sets atl_type below. Recording the same
         // decision in atl_source is what keeps this ATL out of, or in, the VP's
         // queue on the same terms as every other ATL path.
         $isClientProvided = filled($validated['client_atl_number'] ?? null);
 
-        $delivery = PurchaseOrderDelivery::create([
+        $delivery = PurchaseOrderDelivery::createOnce([
             'purchase_order_id' => $purchaseOrder->id,
             'delivery_channel' => $validated['delivery_channel'],
             'order_type' => $validated['order_type'],
@@ -1577,7 +1684,12 @@ public function storeStockRequestPo(Request $request): RedirectResponse
             'additional_remarks' => $validated['additional_remarks'] ?? null,
             'status' => 'Pending',
             'prepared_by' => Auth::id(),
-        ]);
+        ], $validated['submission_token'] ?? null);
+
+        if (! $delivery) {
+            return redirect()->route('stock-orders.purchase-orders.show', $purchaseOrder->id)
+                ->with('info', 'This ATL was already saved. The duplicate submit was ignored.');
+        }
 
         // Record which PO line this ATL drew from, so the detail page can
         // report the ATL'd volume per product.
@@ -1599,6 +1711,151 @@ public function storeStockRequestPo(Request $request): RedirectResponse
 
         return redirect()->route('stock-orders.purchase-orders.show', $purchaseOrder->id)
             ->with('success', "ATL added to PO #{$purchaseOrder->po_number}.");
+    }
+
+    /**
+     * Correct an ATL that is already on file, instead of filing it again.
+     *
+     * A date or a driver name is corrected after the ATL has been saved, so
+     * saving the form a second time is the same ATL, not a new load - and the
+     * duplicate guard rightly refused it. Refusing left the user with nothing
+     * to do, so the refusal now points here: this page edits the row itself.
+     *
+     * Only the details that can legitimately change on the same load are
+     * offered. The PO, product, volume, order type and channel are what the
+     * ATL was filed against, so changing any of them is a different ATL, not a
+     * correction of this one.
+     */
+    public function editAtl(PurchaseOrderDelivery $delivery): View
+    {
+        abort_unless(Auth::user()->canEditStockOrders(), 403);
+
+        abort_unless(
+            $delivery->purchaseOrder,
+            404,
+            'This ATL is not linked to a purchase order, so it has no PO form to correct it from.'
+        );
+
+        return view('wetstock.stock-orders.form', [
+            'mode' => 'edit_atl',
+            'purchaseOrder' => $delivery->purchaseOrder,
+            'order' => null,
+            'atl' => $delivery,
+            'clients' => Client::orderBy('name')->get(),
+            'warehouses' => Warehouse::orderBy('name')->get(),
+        ]);
+    }
+
+    /**
+     * Save corrections to an ATL already on file.
+     *
+     * Never creates a row: the ATL being corrected is the one in the route, so
+     * fixing a date or a driver cannot become the duplicate the create path
+     * refuses.
+     */
+    public function updateAtl(Request $request, PurchaseOrderDelivery $delivery): RedirectResponse
+    {
+        abort_unless(Auth::user()->canEditStockOrders(), 403);
+
+        $purchaseOrder = $delivery->purchaseOrder;
+
+        abort_unless($purchaseOrder, 404, 'This ATL is not linked to a purchase order.');
+
+        // Order type and channel are deliberately absent: they are part of what
+        // this ATL was filed against, so they cannot change under a correction.
+        $validated = $request->validate([
+            'dr_number' => ['nullable', 'string', 'max:64'],
+            'atl_number' => ['nullable', 'string', 'max:64'],
+            'client_atl_number' => ['nullable', 'string', 'max:64'],
+            'reference_no' => ['nullable', 'string', 'max:64'],
+            'so_number' => ['nullable', 'string', 'max:64'],
+            'receiving_date' => ['required', 'date'],
+            'driver_name' => ['nullable', 'string', 'max:128'],
+            'plate_number' => ['nullable', 'string', 'max:64'],
+            'location' => ['nullable', 'string', 'max:128'],
+            'additional_remarks' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        // Once the load has physically moved, the date and driver on the row are
+        // part of that record - stock was received or the truck left on them.
+        // Those corrections go through the lift/receipt controls, not this form.
+        if ($delivery->status === 'Cancelled' || $delivery->lift_status === PurchaseOrderDelivery::LIFT_CANCELLED) {
+            return back()->withInput()->with('error', 'A cancelled ATL cannot be corrected.');
+        }
+
+        if ($delivery->isLifted() || $delivery->received_at || $delivery->stockIns()->exists()) {
+            return back()->withInput()->with(
+                'error',
+                'This ATL has already been lifted or received, so its date and driver are part of that record. '
+                .'Unlift it first if the details really need changing.'
+            );
+        }
+
+        // Correcting an ATL must not hand it a number another ATL already uses
+        // on the same PO. The row being corrected is excluded from its own check.
+        $duplicate = PurchaseOrderDelivery::duplicateOf([
+            'purchase_order_id' => $delivery->purchase_order_id,
+            'order_type' => $delivery->order_type,
+            'delivery_channel' => $delivery->delivery_channel,
+            'product' => $delivery->product,
+            'qty_to_receive' => (int) $delivery->qty_to_receive,
+            'atl_number' => $validated['atl_number'] ?? null,
+            'client_atl_number' => $validated['client_atl_number'] ?? null,
+        ], $delivery->id);
+
+        if ($duplicate) {
+            return back()->withInput()->withErrors([
+                'atl' => 'Another ATL already uses that number on this PO: '.$duplicate->duplicateDescription(),
+            ]);
+        }
+
+        $isClientProvided = filled($validated['client_atl_number'] ?? null);
+
+        // An approved ATL that changes detail is no longer the ATL the VP signed
+        // off, so it goes back to the queue rather than staying approved on
+        // wording it never carried.
+        $reopensApproval = $delivery->isApproved();
+
+        $delivery->update(array_merge([
+            // Whichever party issues the ATL is decided by the client number, the
+            // same rule the create paths use; clearing it hands the ATL back to
+            // DITC rather than leaving it labelled with a number it no longer has.
+            'atl_type' => $isClientProvided
+                ? 'CLIENT_ATL'
+                : ($delivery->isClientAtl()
+                    ? ($delivery->order_type === 'PICK_UP' ? 'DITC_ATL' : 'NONE')
+                    : $delivery->atl_type),
+            'atl_source' => $isClientProvided
+                ? PurchaseOrderDelivery::SOURCE_CLIENT_PROVIDED
+                : PurchaseOrderDelivery::SOURCE_DOYEN_ISSUED,
+            'dr_number' => $validated['dr_number'] ?? null,
+            'atl_number' => $validated['atl_number'] ?? null,
+            'client_atl_number' => $validated['client_atl_number'] ?? null,
+            'reference_no' => $validated['reference_no'] ?? null,
+            'so_number' => $validated['so_number'] ?? null,
+            'receiving_date' => $validated['receiving_date'],
+            'driver_name' => $validated['driver_name'] ?? null,
+            'plate_number' => $validated['plate_number'] ?? null,
+            'location' => $validated['location'] ?? null,
+            'additional_remarks' => $validated['additional_remarks'] ?? null,
+            'revised_at' => now(),
+        ], $reopensApproval ? [
+            'approval_status' => PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL,
+            'approved_by' => null,
+            'approved_at' => null,
+        ] : []));
+
+        AuditLog::create([
+            'admin_id' => Auth::id(),
+            'action' => 'updated',
+            'description' => "Corrected ATL ".($delivery->atl_number ?: $delivery->client_atl_number ?: '#'.$delivery->id)
+                ." on PO #{$purchaseOrder->po_number}.",
+        ]);
+
+        return redirect()->route('stock-orders.purchase-orders.show', $purchaseOrder->id)
+            ->with('success', $reopensApproval
+                ? 'ATL corrected. Its details changed, so it goes back to the VP for approval.'
+                : 'ATL corrected on PO #'.$purchaseOrder->po_number.'.');
     }
 
     public function approvals(Request $request): View
@@ -1630,7 +1887,7 @@ public function storeStockRequestPo(Request $request): RedirectResponse
         // on the badge is exactly what this page lists.
         $pendingAtls = PurchaseOrderDelivery::query()
             ->pendingVpApproval()
-            ->with(['order', 'purchaseOrder', 'stockRequest', 'allocations'])
+            ->with(['order', 'purchaseOrder', 'stockRequest', 'allocations', 'preparer'])
             ->latest()
             ->paginate(15);
 

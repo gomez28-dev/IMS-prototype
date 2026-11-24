@@ -1,8 +1,12 @@
 @extends('layouts.app')
 
-@section('title', $mode === 'fuel_trade' ? 'Authority to Load (ATL) Issuance' : ($mode === 'add_atl' ? 'Add ATL to Purchase Order' : 'Process Stock Order & ATL'))
+@section('title', $mode === 'fuel_trade' ? 'Authority to Load (ATL) Issuance' : ($mode === 'add_atl' ? 'Add ATL to Purchase Order' : ($mode === 'edit_atl' ? 'Correct Authority to Load (ATL)' : 'Process Stock Order & ATL')))
 
-@php $isAddAtl = $mode === 'add_atl'; @endphp
+@php
+    $isAddAtl = $mode === 'add_atl';
+    // Correcting an ATL that is already on file, rather than filing a new one.
+    $isEditAtl = $mode === 'edit_atl';
+@endphp
 
 @section('content')
 <div class="row justify-content-center">
@@ -23,6 +27,13 @@
                 ], fn ($value) => $value !== null && $value !== ''))
                 : route('stock-orders.index');
             $backLabel = $isSalesOrderAtl ? 'Back to Sales Orders' : 'Back to Stock Orders';
+
+            // A correction belongs to one PO, so leaving goes back to that PO
+            // rather than to the module index.
+            if ($isEditAtl) {
+                $backUrl = route('stock-orders.purchase-orders.show', $purchaseOrder->id);
+                $backLabel = 'Back to PO '.$purchaseOrder->po_number;
+            }
         @endphp
         <div class="mb-3">
             <a href="{{ $backUrl }}" class="text-decoration-none text-secondary small">
@@ -38,6 +49,8 @@
                             <i class="bi bi-patch-check-fill text-warning me-2"></i>Issue Authority to Load (ATL)
                         @elseif ($isAddAtl)
                             <i class="bi bi-plus-circle text-primary me-2"></i>Add ATL to PO {{ $purchaseOrder->po_number }}
+                        @elseif ($isEditAtl)
+                            <i class="bi bi-pencil-square text-primary me-2"></i>Correct ATL {{ $atl->atl_number ?: ($atl->client_atl_number ?: '#'.$atl->id) }}
                         @else
                             <i class="bi bi-card-checklist text-primary me-2"></i>Assign PO Number & Prepare ATL / DR
                         @endif
@@ -48,6 +61,10 @@
                         @elseif ($isAddAtl)
                             Approved purchase order for <strong>{{ $purchaseOrder->supplier_name ?: ($purchaseOrder->client->name ?? '—') }}</strong>
                             ({{ number_format($purchaseOrder->remaining_balance) }} L remaining)
+                        @elseif ($isEditAtl)
+                            Saving this ATL again would file the same load twice, so its date, driver and
+                            documents are corrected here instead. The volume is fixed at
+                            <strong>{{ number_format((int) $atl->qty_to_receive) }} L of {{ $atl->product }}</strong>.
                         @else
                             Stock Request for <strong>{{ optional($purchaseOrder->warehouse)->name }}</strong> (Requested: {{ number_format($purchaseOrder->qty_ordered) }} L)
                         @endif
@@ -79,8 +96,16 @@
                         ? ($order && $order->clearing_status === 'Approved')
                         : true;
                 @endphp
-                <form method="POST" action="{{ $mode === 'fuel_trade' ? route('stock-orders.store-fuel-trade-po', $order->id) : ($isAddAtl ? route('stock-orders.store-atl', $purchaseOrder->id) : route('stock-orders.update-request', $purchaseOrder->id)) }}" id="atlForm">
+                <form method="POST" action="{{ $isEditAtl ? route('stock-orders.atls.update', $atl->id) : ($mode === 'fuel_trade' ? route('stock-orders.store-fuel-trade-po', $order->id) : ($isAddAtl ? route('stock-orders.store-atl', $purchaseOrder->id) : route('stock-orders.update-request', $purchaseOrder->id))) }}" id="atlForm">
                     @csrf
+
+                    {{-- One render, one ATL. The server refuses a token it has
+                         already saved, so a double-click or a refreshed POST
+                         cannot file the same ATL twice. Kept through a failed
+                         validation so re-submitting the corrected form still
+                         counts as the same attempt. --}}
+                    <input type="hidden" name="submission_token"
+                           value="{{ old('submission_token', (string) \Illuminate\Support\Str::uuid()) }}">
 
                     @if ($errors->any())
                         <div class="alert alert-danger border-0 rounded-3 shadow-sm mb-4">
@@ -89,6 +114,64 @@
                                     <li>{{ $err }}</li>
                                 @endforeach
                             </ul>
+
+                            {{-- A refused duplicate is not a dead end: the row it
+                                 collided with is right here, so a date or driver
+                                 can be corrected on it instead of being saved as a
+                                 second ATL. --}}
+                            @if (session('duplicate_atl_id'))
+                                <a href="{{ route('stock-orders.atls.edit', session('duplicate_atl_id')) }}"
+                                   class="btn btn-sm btn-dark rounded-pill px-3 mt-2">
+                                    <i class="bi bi-pencil-square me-1"></i> Correct the saved ATL instead
+                                </a>
+                            @endif
+                        </div>
+                    @endif
+
+                    {{-- What this PO already carries. On the Add ATL form this is how
+                         a saved ATL's date or driver gets fixed: the create path
+                         refuses the second save, and this points at the row to
+                         correct instead. --}}
+                    @if ($isAddAtl && ! empty($existingAtls) && $existingAtls->isNotEmpty())
+                        <div class="card border-0 bg-light rounded-3 mb-4">
+                            <div class="card-body p-3">
+                                <h6 class="fw-bold small text-dark mb-1">
+                                    <i class="bi bi-pencil-square text-primary me-1"></i> Already on this PO
+                                </h6>
+                                <p class="extra-small text-muted mb-2">
+                                    To change the pick-up date, driver or documents of a saved ATL,
+                                    correct it here. Saving it again as a new ATL is refused as a duplicate.
+                                </p>
+                                <div class="table-responsive">
+                                    <table class="table table-sm align-middle mb-0 small">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>ATL</th>
+                                                <th>Volume</th>
+                                                <th>Pick Up</th>
+                                                <th>Driver / Plate</th>
+                                                <th class="text-end">Correction</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach ($existingAtls as $saved)
+                                                <tr>
+                                                    <td>{{ $saved->atl_number ?: ($saved->client_atl_number ?: 'Not yet issued') }}</td>
+                                                    <td>{{ number_format((int) $saved->qty_to_receive) }} L {{ $saved->product }}</td>
+                                                    <td>{{ optional($saved->receiving_date)->format('d M Y') ?? '—' }}</td>
+                                                    <td>
+                                                        {{ $saved->driver_name ?: '—' }}@if ($saved->plate_number) · {{ $saved->plate_number }}@endif
+                                                    </td>
+                                                    <td class="text-end">
+                                                        <a href="{{ route('stock-orders.atls.edit', $saved->id) }}"
+                                                           class="btn btn-sm btn-outline-primary rounded-pill px-3">Correct</a>
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     @endif
 
@@ -499,6 +582,69 @@
                             </div>
                         </div>
 
+                    @elseif ($isEditAtl)
+                        {{-- Correcting a saved ATL. The PO and the volume are the ATL's
+                             identity on its PO, so they are shown as fixed; everything
+                             a person can legitimately correct is editable. --}}
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold small">Purchase Order</label>
+                                <input type="text" class="form-control bg-light" value="{{ $purchaseOrder->po_number }}" readonly>
+                                <div class="form-text extra-small">
+                                    The PO, volume, order type and channel identify this ATL. A separate load is its own ATL, not a correction.
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-semibold small">Product</label>
+                                <input type="text" class="form-control bg-light" value="{{ $atl->product }}" readonly>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-semibold small">Volume</label>
+                                <input type="text" class="form-control bg-light" value="{{ number_format((int) $atl->qty_to_receive) }} L" readonly>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold small">Fulfillment Channel</label>
+                                <input type="text" class="form-control bg-light" value="{{ $atl->deliveryChannelLabel() }}" readonly>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold small">Order Type</label>
+                                <input type="text" class="form-control bg-light" value="{{ $atl->order_type }}" readonly>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4">
+                                <label for="atl_number" class="form-label fw-semibold small">ATL Number</label>
+                                <input type="text" class="form-control" id="atl_number" name="atl_number"
+                                       placeholder="e.g. ATL-2026-0099" value="{{ old('atl_number', $atl->atl_number) }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="client_atl_number" class="form-label fw-semibold small">Client ATL Number</label>
+                                <input type="text" class="form-control" id="client_atl_number" name="client_atl_number"
+                                       placeholder="When the client issues the ATL" value="{{ old('client_atl_number', $atl->client_atl_number) }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="dr_number" class="form-label fw-semibold small">DR Number</label>
+                                <input type="text" class="form-control" id="dr_number" name="dr_number"
+                                       placeholder="e.g. DR-99014" value="{{ old('dr_number', $atl->dr_number) }}">
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label for="reference_no" class="form-label fw-semibold small">Reference No</label>
+                                <input type="text" class="form-control" id="reference_no" name="reference_no"
+                                       value="{{ old('reference_no', $atl->reference_no) }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="so_number" class="form-label fw-semibold small">Sales Order / Contract #</label>
+                                <input type="text" class="form-control" id="so_number" name="so_number"
+                                       value="{{ old('so_number', $atl->so_number) }}">
+                            </div>
+                        </div>
                     @else
                         {{-- Standard Depot Replenishment Mode --}}
                         <div class="row g-3 mb-3">
@@ -529,11 +675,15 @@
                             <div class="col-md-6">
                                 <label for="delivery_channel" class="form-label fw-semibold small">Fulfillment Channel <span class="text-danger">*</span></label>
                                 <select class="form-select" id="delivery_channel" name="delivery_channel" required>
-                                    <option value="SUPPLIER_DOYEN_PICKUP" selected>Supplier - DITC Tanker Pick-up (Issue DITC ATL)</option>
-                                    <option value="SUPPLIER_STOCKS_DELIVERY">Supplier - Direct Stocks Delivery to Depot (DR)</option>
-                                    <option value="BUY_BACK_DOYEN_PICKUP">Buy Back - DITC Pick-up from Client (Issue DITC ATL)</option>
-                                    <option value="BUY_BACK_CLIENT_PICKUP">Buy Back - Client Pick-up (Client / DITC ATL)</option>
-                                    <option value="BUY_BACK_STOCKS_DELIVERY">Buy Back - Direct Delivery to Depot (DR)</option>
+                                    {{-- The channel list itself lives on the model, so the
+                                         correction page reads the same labels rather than
+                                         keeping a second copy of them here. --}}
+                                    @foreach (\App\Models\PurchaseOrderDelivery::DELIVERY_CHANNEL_LABELS as $channelValue => $channelLabel)
+                                        <option value="{{ $channelValue }}"
+                                            @selected(old('delivery_channel', $atl->delivery_channel ?? 'SUPPLIER_DOYEN_PICKUP') === $channelValue)>
+                                            {{ $channelLabel }}
+                                        </option>
+                                    @endforeach
                                 </select>
                             </div>
                             <div class="col-md-6">
@@ -566,12 +716,12 @@
                         <div class="col-md-6">
                             <label for="receiving_date" class="form-label fw-semibold small">Authorized Pick Up Date <span class="text-danger">*</span></label>
                             <input type="date" class="form-control" id="receiving_date" name="receiving_date"
-                                   value="{{ old('receiving_date', date('Y-m-d')) }}" required>
+                                   value="{{ old('receiving_date', $isEditAtl ? optional($atl->receiving_date)->format('Y-m-d') : date('Y-m-d')) }}" required>
                         </div>
                         <div class="col-md-6">
                             <label for="location" class="form-label fw-semibold small">Refinery Rack / Terminal Location</label>
                             <input type="text" class="form-control" id="location" name="location"
-                                   placeholder="e.g. Petron Limay Terminal, Bataan" value="{{ old('location') }}">
+                                   placeholder="e.g. Petron Limay Terminal, Bataan" value="{{ old('location', $isEditAtl ? $atl->location : null) }}">
                         </div>
                     </div>
 
@@ -579,19 +729,19 @@
                         <div class="col-md-6">
                             <label for="driver_name" class="form-label fw-semibold small">Authorized Driver Name</label>
                             <input type="text" class="form-control" id="driver_name" name="driver_name"
-                                   placeholder="e.g. Juan Dela Cruz" value="{{ old('driver_name') }}">
+                                   placeholder="e.g. Juan Dela Cruz" value="{{ old('driver_name', $isEditAtl ? $atl->driver_name : null) }}">
                         </div>
                         <div class="col-md-6">
                             <label for="plate_number" class="form-label fw-semibold small">Hauler Truck Plate Number</label>
                             <input type="text" class="form-control" id="plate_number" name="plate_number"
-                                   placeholder="e.g. NBD-8899" value="{{ old('plate_number') }}">
+                                   placeholder="e.g. NBD-8899" value="{{ old('plate_number', $isEditAtl ? $atl->plate_number : null) }}">
                         </div>
                     </div>
 
                     <div class="mb-4">
                         <label for="additional_remarks" class="form-label fw-semibold small">Special Instructions / Remarks</label>
                         <textarea class="form-control" id="additional_remarks" name="additional_remarks" rows="2"
-                                  placeholder="Dip requirements, refinery safety passes, calibration notes... ">{{ old('additional_remarks') }}</textarea>
+                                  placeholder="Dip requirements, refinery safety passes, calibration notes... ">{{ old('additional_remarks', $isEditAtl ? $atl->additional_remarks : null) }}</textarea>
                     </div>
 
                     {{-- One submit button serves three forms, so the label has to say
@@ -602,11 +752,12 @@
                         $submitLabel = match ($mode) {
                             'fuel_trade' => 'Create ATL & Send for Approval',
                             'add_atl' => 'Create ATL',
+                            'edit_atl' => 'Save Corrections',
                             default => 'Submit for Approval',
                         };
                     @endphp
                     <div class="d-flex justify-content-end gap-2 flex-wrap">
-                        <a href="{{ route('stock-orders.atls.index') }}" class="btn btn-light border rounded-pill px-4">Cancel</a>
+                        <a href="{{ $isEditAtl ? route('stock-orders.purchase-orders.show', $purchaseOrder->id) : route('stock-orders.atls.index') }}" class="btn btn-light border rounded-pill px-4">Cancel</a>
                         <button type="submit"
                                 class="btn btn-primary-custom rounded-pill px-4 shadow-sm {{ $isCleared ? '' : 'disabled' }}"
                                 id="submitBtn"
@@ -1071,6 +1222,30 @@ document.addEventListener('DOMContentLoaded', function() {
     const sourceInputs = document.querySelectorAll('.atl-source-input');
     const clientFields = document.getElementById('clientAtlFields');
     const submitBtn = document.getElementById('submitBtn');
+    const atlForm = document.getElementById('atlForm');
+
+    // Second guard, in the browser: the button reports that the save is under
+    // way and cannot be clicked again. The token above is what the server
+    // relies on; this just spares the user a pointless second round trip.
+    if (atlForm) {
+        atlForm.addEventListener('submit', function (event) {
+            if (atlForm.dataset.submitting === '1') {
+                event.preventDefault();
+                return;
+            }
+
+            if (!atlForm.checkValidity()) {
+                return;
+            }
+
+            atlForm.dataset.submitting = '1';
+
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Saving\u2026';
+            }
+        });
+    }
 
     function applySourceVisibility() {
         const clientRadio = document.getElementById('atlSourceClient');

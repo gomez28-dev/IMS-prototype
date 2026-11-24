@@ -104,10 +104,56 @@
                         </thead>
                         <tbody>
                             @forelse ($pendingAtls as $atl)
-                                <tr>
+                                @php
+                                    // Everything the review card shows, formatted here so the
+                                    // browser only has to display it. Same shape the PO rows
+                                    // use (a data-* payload read by the shared card), plus a
+                                    // kind so one card can render either document.
+                                    $atlPoNumbers = $atl->allocations->pluck('purchaseOrder')->filter()
+                                        ->pluck('po_number')->unique();
+
+                                    $atlBreakdown = collect($atl->productBreakdown());
+                                    if ($atlBreakdown->isEmpty() && $atl->product) {
+                                        $atlBreakdown = collect([$atl->product => (int) $atl->qty_to_receive]);
+                                    }
+
+                                    $atlPayload = [
+                                        'kind' => 'atl',
+                                        'id' => $atl->id,
+                                        'atlNumber' => $atl->atl_number ?: ($atl->client_atl_number ?: null),
+                                        'salesOrder' => $atl->order?->formatted_so_number ?? $atl->refNumber(),
+                                        'account' => $atl->order?->account ?? ($atl->stockRequest->warehouse->name ?? null),
+                                        'poNumbers' => $atlPoNumbers->isNotEmpty()
+                                            ? $atlPoNumbers->join(', ')
+                                            : ($atl->purchaseOrder->po_number ?? null),
+                                        'pickUpDate' => $atl->receiving_date?->format('M d, Y'),
+                                        'volume' => number_format((int) $atl->qty_to_receive),
+                                        'preparedBy' => $atl->preparer->name ?? 'Purchasing',
+                                        'driver' => $atl->driver_name,
+                                        'plate' => $atl->plate_number,
+                                        'products' => $atlBreakdown->map(fn ($qty, $product) => [
+                                            'product' => $product,
+                                            'qty' => number_format((int) $qty),
+                                        ])->values(),
+                                        'remarks' => $atl->additional_remarks,
+                                    ];
+                                @endphp
+                                <tr data-atl="{{ json_encode($atlPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}">
                                     <td class="fw-bold text-dark">
                                         {{ $atl->atl_number ?: '—' }}
-                                        <div class="small text-muted">{{ $atl->issued_at ? 'Issued '.$atl->issued_at->format('M d, Y') : 'Not yet issued' }}</div>
+                                        <div class="small text-muted">
+                                            {{-- A row that exists was issued, whether or not the
+                                                 legacy path stamped a date on it. Saying "Not yet
+                                                 issued" on an ATL with a number was reading as a
+                                                 duplicate of the record beside it. --}}
+                                            @if ($atl->issued_at)
+                                                Issued {{ $atl->issued_at->format('M d, Y') }}
+                                            @elseif ($atl->atl_number)
+                                                Issued {{ ($atl->created_at ?? now())->format('M d, Y') }}
+                                            @else
+                                                Not yet issued
+                                            @endif
+                                        </div>
                                     </td>
                                     <td>
                                         @if ($atl->order)
@@ -129,9 +175,6 @@
                                         @endif
                                     </td>
                                     <td class="small">
-                                        @php
-                                            $atlPoNumbers = $atl->allocations->pluck('purchaseOrder')->filter()->pluck('po_number')->unique();
-                                        @endphp
                                         {{ $atlPoNumbers->isNotEmpty() ? $atlPoNumbers->join(', ') : ($atl->purchaseOrder->po_number ?? '—') }}
                                     </td>
                                     <td class="small">{{ $atl->receiving_date ? $atl->receiving_date->format('M d, Y') : '—' }}</td>
@@ -144,30 +187,22 @@
                                         @endif
                                     </td>
                                     <td class="table-actions">
+                                        {{-- The row offers View only. Approving and rejecting happen
+                                             inside the review card, which drives the hidden forms
+                                             below, so the VP reads the whole ATL first. The forms
+                                             are not drawn for roles that can only get a 403. --}}
+                                        <button type="button" class="btn btn-sm btn-action btn-outline-secondary rounded-pill px-3 shadow-sm" onclick="openAtlCard(this.closest('tr'))">
+                                            <i class="bi bi-eye me-1"></i> View
+                                        </button>
                                         @if (Auth::user()->canApproveStockOrders())
-                                            <div class="d-inline-flex gap-1 justify-content-center">
-                                                <form method="POST" action="{{ route('stock-orders.atl-reject', $atl->id) }}" class="d-inline"
-                                                      onsubmit="return confirm('Reject this ATL and return it to Purchasing?');">
-                                                    @csrf
-                                                    <input type="hidden" name="rejection_reason" value="">
-                                                    <button type="submit" class="btn btn-sm btn-action btn-outline-danger rounded-pill px-3 py-1">
-                                                        <i class="bi bi-x-lg me-1"></i> Reject
-                                                    </button>
-                                                </form>
-                                                <form method="POST" action="{{ route('stock-orders.atl-approve', $atl->id) }}" class="d-inline"
-                                                      onsubmit="return confirm('Approve this ATL?');">
-                                                    @csrf
-                                                    <button type="submit" class="btn btn-sm btn-action btn-success rounded-pill px-3 py-1">
-                                                        <i class="bi bi-check-lg me-1"></i> Approve
-                                                    </button>
-                                                </form>
-                                            </div>
-                                        @else
-                                            {{-- The queue is open to every Module 2 and 3
-                                                 role so they can see what is waiting, but
-                                                 ruling on it is the VP's. Drawing buttons
-                                                 that can only 403 is worse than none. --}}
-                                            <span class="text-muted small">Awaiting VP</span>
+                                            <form method="POST" id="atl-approve-{{ $atl->id }}" action="{{ route('stock-orders.atl-approve', $atl->id) }}" class="d-none">
+                                                @csrf
+                                                <button type="submit">Approve</button>
+                                            </form>
+                                            <form method="POST" id="atl-reject-{{ $atl->id }}" action="{{ route('stock-orders.atl-reject', $atl->id) }}" class="d-none">
+                                                @csrf
+                                                <input type="hidden" name="rejection_reason" value="">
+                                            </form>
                                         @endif
                                     </td>
                                 </tr>
@@ -342,8 +377,10 @@
     </div>
 </div>
 
-@if ($tab !== 'atls')
-{{-- Review card. Filled from the clicked row's data, so it never needs a page load. --}}
+{{-- Review card, shared by both queues. The row's data-* payload says whether it is
+     a PO or an ATL, and the card renders the fields that document needs while
+     keeping one set of styles, one footer and one set of handlers. Filled from
+     the clicked row, so it never needs a page load. --}}
 <div class="apv-overlay" id="apvOverlay" role="dialog" aria-modal="true" aria-labelledby="apvTitle" aria-hidden="true">
     <div class="apv-scene">
         <div class="apv-float">
@@ -373,7 +410,7 @@
                 <div class="apv-head">
                     <div>
                         <h5 id="apvRejectTitle">Reject PO</h5>
-                        <div class="text-muted small mt-1">Tell Purchasing what needs to change. Only the person who raised this PO will see your note.</div>
+                        <div class="text-muted small mt-1" id="apvRejectNote">Tell Purchasing what needs to change. Only the person who raised this PO will see your note.</div>
                     </div>
                 </div>
                 <div class="apv-body">
@@ -398,7 +435,7 @@
                 <div class="apv-head">
                     <div>
                         <h5 id="apvApproveTitle">Approve PO</h5>
-                        <div class="text-muted small mt-1">Once approved, this purchase order can no longer be edited.</div>
+                        <div class="text-muted small mt-1" id="apvApproveNote">Once approved, this purchase order can no longer be edited.</div>
                     </div>
                 </div>
                 <div class="apv-body">
@@ -444,8 +481,10 @@
         });
     }
 
+    // A row carries either a PO payload or an ATL payload; both are shown by the
+    // same card, which asks the payload which document it is holding.
     function readRow(row) {
-        try { return JSON.parse(row.dataset.po); } catch (e) { return null; }
+        try { return JSON.parse(row.dataset.po || row.dataset.atl); } catch (e) { return null; }
     }
 
     // The page does not scroll behind an open popup.
@@ -455,12 +494,25 @@
     }
 
     function render(d) {
+        const isAtl = d.kind === 'atl';
         const typeChip = document.getElementById('apvType');
-        typeChip.textContent = d.type || '';
-        typeChip.style.display = d.type ? '' : 'none';
-        document.getElementById('apvTitle').textContent = d.po || '';
+        typeChip.textContent = isAtl ? '' : (d.type || '');
+        typeChip.style.display = (!isAtl && d.type) ? '' : 'none';
+        document.getElementById('apvTitle').textContent = isAtl
+            ? (d.atlNumber || 'Not yet issued')
+            : (d.po || '');
 
-        const fields = [
+        const fields = (isAtl ? [
+            ['ATL Number', d.atlNumber || 'Not yet issued'],
+            ['Sales Order', d.salesOrder],
+            ['Account / Depot', d.account],
+            ['PO #', d.poNumbers],
+            ['Pick Up Date', d.pickUpDate],
+            ['Volume', d.volume ? d.volume + ' L' : null],
+            ['Prepared by', d.preparedBy],
+            ['Driver', d.driver],
+            ['Plate Number', d.plate]
+        ] : [
             [d.vendorLabel, d.vendor],
             ['Address', d.address],
             ['Attention', d.attention],
@@ -468,7 +520,7 @@
             ['Date', d.date],
             ['Site / Channel', d.site],
             ['Prepared by', d.preparedBy]
-        ].filter(function (f) { return f[1]; });
+        ]).filter(function (f) { return f[1]; });
 
         let html = '';
 
@@ -484,7 +536,26 @@
             return '<div><div class="apv-l">' + esc(f[0]) + '</div><div class="apv-v">' + esc(f[1]) + '</div></div>';
         }).join('') + '</div>';
 
-        if (d.items.length) {
+        if (isAtl) {
+            // The ATL card carries no prices: an ATL authorises a lift, it does not
+            // commit an amount. Products and quantities are the whole table.
+            if (d.products.length) {
+                html += '<div class="apv-sec">Products</div>'
+                    + '<table class="apv-tbl"><thead><tr><th>Product</th><th class="r">Quantity</th></tr></thead><tbody>'
+                    + d.products.map(function (p) {
+                        return '<tr><td>' + esc(p.product) + '</td>'
+                            + '<td class="r">' + esc(p.qty) + ' L</td></tr>';
+                    }).join('')
+                    + '</tbody><tfoot><tr><td>Total Quantity</td><td class="r">' + esc(d.volume) + ' L</td></tr></tfoot></table>';
+            } else {
+                html += '<div class="apv-sec">Total Quantity</div><div class="apv-v">' + esc(d.volume) + ' L</div>';
+            }
+
+            if (!d.atlNumber) {
+                html += '<div class="apv-rem returned mt-3"><i class="bi bi-info-circle me-1"></i>'
+                    + 'DITC has not issued an ATL number yet. Record it on the ATL before approving.</div>';
+            }
+        } else if (d.items.length) {
             html += '<div class="apv-sec">Products</div>'
                 + '<table class="apv-tbl"><thead><tr><th>Product</th><th class="r">Quantity</th><th class="r">Price</th><th class="r">Amount</th></tr></thead><tbody>'
                 + d.items.map(function (i) {
@@ -498,6 +569,7 @@
             html += '<div class="apv-sec">Total Quantity</div><div class="apv-v">' + esc(d.totalQty) + ' L</div>';
         }
 
+        if (!isAtl) {
         if (d.hasAmounts) {
             html += '<div class="apv-tot"><div><span>Total Amount</span><span>' + peso + esc(d.total) + '</span></div>';
             if (d.vatable !== '0.00') html += '<div><span>Vatable Sales Amount</span><span>' + peso + esc(d.vatable) + '</span></div>';
@@ -512,6 +584,7 @@
                     return '<div><i class="bi bi-truck me-1"></i>' + esc(x.product) + ': ' + esc(x.qty) + ' L' + (x.ref ? ' (' + esc(x.ref) + ')' : '') + '</div>';
                 }).join('') + '</div>';
         }
+        }
 
         if (d.remarks) {
             html += '<div class="apv-sec">Additional Remarks</div><div class="apv-rem">' + esc(d.remarks) + '</div>';
@@ -524,33 +597,42 @@
         // and permissions stay exactly the same. Reject opens the reason popup.
         // A returned PO has no forms, so it can never be ruled on from here.
         actions.innerHTML = '';
-        const approveForm = document.getElementById('po-approve-' + d.id);
-        const rejectForm = document.getElementById('po-reject-' + d.id);
+        // Both queues drive the hidden forms already on the row, so permissions
+        // and the confirmation prompts stay exactly where they were.
+        const prefix = isAtl ? 'atl' : 'po';
+        const approveForm = document.getElementById(prefix + '-approve-' + d.id);
+        const rejectForm = document.getElementById(prefix + '-reject-' + d.id);
         const canRule = !!(approveForm && rejectForm);
         const wait = document.getElementById('apvWait');
-        const revised = d.state === 'revised' ? 'Revised \u00B7 ' : '';
 
-        wait.classList.toggle('returned', d.state === 'returned');
-        if (d.state === 'returned') {
-            wait.textContent = 'Returned to Purchasing';
+        if (isAtl) {
+            wait.classList.remove('returned');
+            wait.textContent = canRule ? 'Waiting for your approval' : 'Waiting for VP approval';
         } else {
-            wait.textContent = revised + (canRule ? 'Waiting for your approval' : 'Waiting for VP approval');
+            const revised = d.state === 'revised' ? 'Revised \u00B7 ' : '';
+
+            wait.classList.toggle('returned', d.state === 'returned');
+            if (d.state === 'returned') {
+                wait.textContent = 'Returned to Purchasing';
+            } else {
+                wait.textContent = revised + (canRule ? 'Waiting for your approval' : 'Waiting for VP approval');
+            }
         }
 
-        if (d.state === 'returned') {
+        if (!isAtl && d.state === 'returned') {
             actions.innerHTML = '<span class="text-muted small">Waiting for Purchasing to revise and resubmit</span>';
         } else if (canRule) {
             const reject = document.createElement('button');
             reject.type = 'button';
             reject.className = 'btn btn-outline-danger rounded-pill px-4';
-            reject.innerHTML = '<i class="bi bi-x-lg me-1"></i> Reject';
-            reject.onclick = function () { window.openPoReject(currentRow); };
+            reject.innerHTML = '<i class="bi bi-x-lg me-1"></i> Reject' + (isAtl ? ' ATL' : '');
+            reject.onclick = function () { window.openReject(currentRow); };
 
             const approve = document.createElement('button');
             approve.type = 'button';
             approve.className = 'btn btn-success rounded-pill px-4';
-            approve.innerHTML = '<i class="bi bi-check-lg me-1"></i> Approve PO';
-            approve.onclick = function () { window.openPoApprove(currentRow); };
+            approve.innerHTML = '<i class="bi bi-check-lg me-1"></i> Approve ' + (isAtl ? 'ATL' : 'PO');
+            approve.onclick = function () { window.openApprove(currentRow); };
 
             actions.appendChild(reject);
             actions.appendChild(approve);
@@ -559,7 +641,7 @@
         }
     }
 
-    window.openPoCard = function (row) {
+    function openCard(row) {
         const data = readRow(row);
         if (!data) return;
 
@@ -570,7 +652,11 @@
         overlay.setAttribute('aria-hidden', 'false');
         syncScroll();
         document.getElementById('apvClose').focus();
-    };
+    }
+
+    // Named per queue so each table keeps the onclick it already had.
+    window.openPoCard = openCard;
+    window.openAtlCard = openCard;
 
     function closePoCard() {
         overlay.classList.remove('show');
@@ -580,13 +666,19 @@
         if (lastFocus && lastFocus.focus) lastFocus.focus();
     }
 
-    window.openPoReject = function (row) {
+    window.openReject = function (row) {
         const data = row ? readRow(row) : null;
         if (!data) return;
 
+        const isAtl = data.kind === 'atl';
         rejectData = data;
         rejectLastFocus = document.activeElement;
-        document.getElementById('apvRejectTitle').textContent = 'Reject ' + data.po;
+        document.getElementById('apvRejectTitle').textContent = isAtl
+            ? 'Reject ATL ' + (data.atlNumber || '#' + data.id)
+            : 'Reject ' + data.po;
+        document.getElementById('apvRejectNote').textContent = isAtl
+            ? 'Tell Purchasing what needs to change on this ATL. The reason is kept in the audit log.'
+            : 'Tell Purchasing what needs to change. Only the person who raised this PO will see your note.';
         reasonBox.value = '';
         reasonCount.textContent = '0';
         rejectConfirm.disabled = true;
@@ -605,18 +697,34 @@
         if (rejectLastFocus && rejectLastFocus.focus) rejectLastFocus.focus();
     }
 
-    window.openPoApprove = function (row) {
+    window.openApprove = function (row) {
         const data = row ? readRow(row) : null;
         if (!data) return;
 
+        const isAtl = data.kind === 'atl';
         approveData = data;
         approveLastFocus = document.activeElement;
-        document.getElementById('apvApproveTitle').textContent = 'Approve ' + data.po;
+        document.getElementById('apvApproveTitle').textContent = isAtl
+            ? 'Approve ATL ' + (data.atlNumber || '#' + data.id)
+            : 'Approve ' + data.po;
+        document.getElementById('apvApproveNote').textContent = isAtl
+            ? 'Once approved, this ATL can be lifted and its PDF downloaded.'
+            : 'Once approved, this purchase order can no longer be edited.';
 
-        let sum = '<div><span>PO Number</span><span>' + esc(data.po) + '</span></div>';
-        if (data.vendor) sum += '<div><span>' + esc(data.vendorLabel) + '</span><span>' + esc(data.vendor) + '</span></div>';
-        sum += '<div><span>Total Quantity</span><span>' + esc(data.totalQty) + ' L</span></div>';
-        if (data.hasAmounts) sum += '<div><span>Net Payable Amount</span><span>' + peso + esc(data.net) + '</span></div>';
+        let sum;
+
+        if (isAtl) {
+            sum = '<div><span>ATL Number</span><span>' + esc(data.atlNumber || 'Not yet issued') + '</span></div>';
+            if (data.salesOrder) sum += '<div><span>Sales Order</span><span>' + esc(data.salesOrder) + '</span></div>';
+            if (data.poNumbers) sum += '<div><span>PO #</span><span>' + esc(data.poNumbers) + '</span></div>';
+            sum += '<div><span>Total Quantity</span><span>' + esc(data.volume) + ' L</span></div>';
+        } else {
+            sum = '<div><span>PO Number</span><span>' + esc(data.po) + '</span></div>';
+            if (data.vendor) sum += '<div><span>' + esc(data.vendorLabel) + '</span><span>' + esc(data.vendor) + '</span></div>';
+            sum += '<div><span>Total Quantity</span><span>' + esc(data.totalQty) + ' L</span></div>';
+            if (data.hasAmounts) sum += '<div><span>Net Payable Amount</span><span>' + peso + esc(data.net) + '</span></div>';
+        }
+
         document.getElementById('apvApproveSummary').innerHTML = sum;
 
         approveConfirm.disabled = false;
@@ -638,7 +746,8 @@
     approveConfirm.addEventListener('click', function () {
         if (!approveData) return;
 
-        const form = document.getElementById('po-approve-' + approveData.id);
+        const prefix = approveData.kind === 'atl' ? 'atl' : 'po';
+        const form = document.getElementById(prefix + '-approve-' + approveData.id);
         if (!form) return;
 
         approveConfirm.disabled = true;
@@ -657,7 +766,8 @@
         const reason = reasonBox.value.trim();
         if (!reason || !rejectData) return;
 
-        const form = document.getElementById('po-reject-' + rejectData.id);
+        const prefix = rejectData.kind === 'atl' ? 'atl' : 'po';
+        const form = document.getElementById(prefix + '-reject-' + rejectData.id);
         if (!form) return;
 
         form.querySelector('input[name="rejection_reason"]').value = reason;
@@ -698,5 +808,4 @@
     tilt(approveCard, 5);
 })();
 </script>
-@endif
 @endsection

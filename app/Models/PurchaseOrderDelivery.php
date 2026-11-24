@@ -4,8 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\QueryException;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Validation\ValidationException;
 
 class PurchaseOrderDelivery extends Model
 {
@@ -25,6 +27,20 @@ class PurchaseOrderDelivery extends Model
     public const LIFT_LIFTED = 'LIFTED';
     public const LIFT_CANCELLED = 'CANCELLED';
 
+    /**
+     * The fulfillment channels a stock-order ATL can be filed under.
+     *
+     * One list, read by the create form and by the correction page, so the two
+     * can never offer or describe a channel differently.
+     */
+    public const DELIVERY_CHANNEL_LABELS = [
+        'SUPPLIER_DOYEN_PICKUP' => 'Supplier - DITC Tanker Pick-up (Issue DITC ATL)',
+        'SUPPLIER_STOCKS_DELIVERY' => 'Supplier - Direct Stocks Delivery to Depot (DR)',
+        'BUY_BACK_DOYEN_PICKUP' => 'Buy Back - DITC Pick-up from Client (Issue DITC ATL)',
+        'BUY_BACK_CLIENT_PICKUP' => 'Buy Back - Client Pick-up (Client / DITC ATL)',
+        'BUY_BACK_STOCKS_DELIVERY' => 'Buy Back - Direct Delivery to Depot (DR)',
+    ];
+
     protected $table = 'purchase_order_deliveries';
 
     protected $fillable = [
@@ -39,6 +55,7 @@ class PurchaseOrderDelivery extends Model
         'atl_number',
         'client_atl_number',
         'reference_no',
+        'submission_token',
         'so_number',
         'supplier_so_number',
         'supplier_dr_number',
@@ -131,6 +148,158 @@ class PurchaseOrderDelivery extends Model
     public function receiver(): BelongsTo
     {
         return $this->belongsTo(Admin::class, 'received_by');
+    }
+
+    /**
+     * Has this exact form submission already produced an ATL?
+     *
+     * The ATL forms carry a token generated once per render, so a double-click,
+     * a refreshed POST or a Back-then-Save all reuse the same token. The second
+     * request is answered from the record the first one wrote.
+     */
+    public static function alreadySubmitted(?string $token): bool
+    {
+        return filled($token)
+            && static::query()->where('submission_token', $token)->exists();
+    }
+
+    /**
+     * Create the ATL once for the given form submission.
+     *
+     * Returns null when this token has already been used, so the caller can
+     * answer with an "already saved" notice instead of writing a duplicate.
+     * The unique index on submission_token settles the race between two
+     * requests that both passed alreadySubmitted().
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    public static function createOnce(array $attributes, ?string $token = null): ?self
+    {
+        if (blank($token)) {
+            static::refuseDuplicate($attributes);
+
+            return static::create($attributes);
+        }
+
+        if (static::alreadySubmitted($token)) {
+            return null;
+        }
+
+        // The token only ties one form render to one record, so it cannot catch
+        // the other way an ATL was filed twice: a fresh render of the same PO's
+        // form, saved again with a new token. That is a separate save, and it is
+        // refused here - the one place every ATL save path goes through - rather
+        // than in each controller, so no path can file the same ATL twice.
+        static::refuseDuplicate($attributes);
+
+        try {
+            return static::create(array_merge($attributes, ['submission_token' => $token]));
+        } catch (QueryException $e) {
+            if (static::alreadySubmitted($token)) {
+                return null;
+            }
+
+            throw $e;
+        }
+    }
+
+    /**
+     * The ATL already on file that a save with these attributes would duplicate.
+     *
+     * A numbered ATL is identified by its number: the same number on the same PO
+     * is the same document, whatever else the second save changed. A blank ATL
+     * (DITC has not issued the number yet) has no identity of its own, so its
+     * shape does the identifying - the PO, whatever order or request it serves,
+     * the product, the volume and the channel. Those are exactly the rows the VP
+     * queue showed twice as "Not yet issued".
+     *
+     * Cancelled and sent-back ATLs hold no volume, so they never block the
+     * corrected save that replaces them.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    public static function duplicateOf(array $attributes, ?int $ignoreId = null): ?self
+    {
+        if (blank($attributes['purchase_order_id'] ?? null)) {
+            return null;
+        }
+
+        $query = static::query()
+            ->where('purchase_order_id', $attributes['purchase_order_id'])
+            ->where('status', '!=', 'Cancelled')
+            ->where(function ($q) {
+                $q->whereNull('approval_status')
+                    ->orWhere('approval_status', '!=', self::APPROVAL_REJECTED);
+            })
+            ->when($ignoreId, fn ($q) => $q->whereKeyNot($ignoreId));
+
+        $atlNumber = trim((string) ($attributes['atl_number'] ?? ''));
+        $clientNumber = trim((string) ($attributes['client_atl_number'] ?? ''));
+
+        if ($atlNumber !== '' || $clientNumber !== '') {
+            $query->where(function ($q) use ($atlNumber, $clientNumber) {
+                if ($atlNumber !== '') {
+                    $q->orWhere('atl_number', $atlNumber);
+                }
+
+                if ($clientNumber !== '') {
+                    $q->orWhere('client_atl_number', $clientNumber);
+                }
+            });
+        } else {
+            $query
+                ->where(function ($q) {
+                    $q->whereNull('atl_number')->orWhere('atl_number', '');
+                })
+                ->where(function ($q) {
+                    $q->whereNull('client_atl_number')->orWhere('client_atl_number', '');
+                })
+                ->where('order_id', $attributes['order_id'] ?? null)
+                ->where('request_id', $attributes['request_id'] ?? null)
+                ->where('order_type', $attributes['order_type'] ?? null)
+                ->where('delivery_channel', $attributes['delivery_channel'] ?? null)
+                ->where('product', $attributes['product'] ?? null)
+                ->where('qty_to_receive', (int) ($attributes['qty_to_receive'] ?? 0));
+        }
+
+        return $query->orderBy('id')->first();
+    }
+
+    /**
+     * Refuse a save that would file the same ATL twice.
+     *
+     * Thrown as a validation failure so every caller redirects back with the
+     * submitted form and shows why, instead of writing a second row.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    protected static function refuseDuplicate(array $attributes): void
+    {
+        $duplicate = static::duplicateOf($attributes);
+
+        if (! $duplicate) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'atl' => 'An identical ATL is already on file: '.$duplicate->duplicateDescription()
+                .' If this is a separate load, record it with its own ATL number.',
+        ]);
+    }
+
+    /**
+     * One line describing the existing row, for the refusal message and the
+     * duplicate report.
+     */
+    public function duplicateDescription(): string
+    {
+        $number = $this->atl_number ?: $this->client_atl_number;
+
+        return 'ATL #'.$this->id
+            .($number ? " ({$number})" : ' (no ATL number yet)')
+            .' already covers '.number_format((int) $this->qty_to_receive).' L of '.$this->product
+            .' on PO '.($this->purchaseOrder?->po_number ?? '#'.$this->purchase_order_id)
+            .', saved '.($this->created_at?->format('d M Y g:i A') ?? 'earlier').'.';
     }
 
     /**
@@ -290,6 +459,15 @@ class PurchaseOrderDelivery extends Model
     public function bypassesDepotTanks(): bool
     {
         return $this->delivery_channel === 'SUPPLIER_CLIENT_PICKUP';
+    }
+
+    /**
+     * The channel as the forms word it, falling back to the stored value for a
+     * legacy row outside the current list.
+     */
+    public function deliveryChannelLabel(): string
+    {
+        return self::DELIVERY_CHANNEL_LABELS[$this->delivery_channel] ?? (string) $this->delivery_channel;
     }
 
     public function requiresAtl(): bool

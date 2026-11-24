@@ -10,8 +10,37 @@
         remaining stock has to be created or approved first.
     </div>
 @else
-    <form method="POST" action="{{ route('stock-orders.wet-stock-requests.atls.store', $request->id) }}">
+    <form method="POST" action="{{ route('stock-orders.wet-stock-requests.atls.store', $request->id) }}" id="createAtlForm">
         @csrf
+
+        {{-- A refused save comes back here, because this form is embedded on the
+             request's ATL page; without this the refusal would be silent. --}}
+        @if ($errors->any())
+            <div class="alert alert-danger rounded-3 border-0 shadow-sm">
+                <strong class="d-block mb-1">That ATL was not saved:</strong>
+                <ul class="mb-0 ps-3 small">
+                    @foreach ($errors->all() as $message)
+                        <li>{{ $message }}</li>
+                    @endforeach
+                </ul>
+
+                {{-- A refused duplicate is not a dead end: the row it collided
+                     with can be corrected, so a date or driver is fixed on the
+                     ATL already on file instead of being filed again. --}}
+                @if (session('duplicate_atl_id'))
+                    <a href="{{ route('stock-orders.atls.edit', session('duplicate_atl_id')) }}"
+                       class="btn btn-sm btn-dark rounded-pill px-3 mt-2">
+                        <i class="bi bi-pencil-square me-1"></i> Correct the saved ATL instead
+                    </a>
+                @endif
+            </div>
+        @endif
+
+        {{-- One render, one ATL. A double-click or a refreshed POST sends the
+             same token, and the server answers it instead of filing a second
+             identical ATL against the same request and PO. --}}
+        <input type="hidden" name="submission_token"
+               value="{{ old('submission_token', (string) \Illuminate\Support\Str::uuid()) }}">
 
         <div class="card card-custom border-0 shadow-sm mb-4">
             <div class="card-body p-4">
@@ -215,8 +244,32 @@
 document.addEventListener('DOMContentLoaded', function () {
     const container = document.getElementById('drawdownRows');
     const addButton = document.getElementById('addPoRow');
+    const form = document.getElementById('createAtlForm');
 
     if (!container) return;
+
+    // The browser-side half of the duplicate guard: the save button reports that
+    // it is working and cannot fire again.
+    if (form) {
+        form.addEventListener('submit', function (event) {
+            if (form.dataset.submitting === '1') {
+                event.preventDefault();
+                return;
+            }
+
+            if (!form.checkValidity()) {
+                return;
+            }
+
+            form.dataset.submitting = '1';
+
+            const button = form.querySelector('button[type="submit"]');
+            if (button) {
+                button.disabled = true;
+                button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Saving\u2026';
+            }
+        });
+    }
 
     // What each PO still holds, per product. The server checks the same thing on
     // save; this is so the user is not told only after submitting.

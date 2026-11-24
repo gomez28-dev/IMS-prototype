@@ -306,6 +306,11 @@ Route::post('/warehouses/{warehouse}/tanks', [WetStock\StorageTankController::cl
         Route::redirect('/atls/{order}', '/stock-orders/sales-orders/{order}')->name('atls.show');
         Route::post('/atls/{delivery}/approve', [WetStock\StockOrderController::class, 'approveAtl'])->name('atl-approve');
         Route::post('/atls/{delivery}/reject', [WetStock\StockOrderController::class, 'rejectAtl'])->name('atl-reject');
+        // Correcting an ATL that is already on file. Separate from the create
+        // form: the same load saved twice is a duplicate, and this is where its
+        // date or driver is actually fixed.
+        Route::get('/atls/{delivery}/edit', [WetStock\StockOrderController::class, 'editAtl'])->name('atls.edit');
+        Route::post('/atls/{delivery}/edit', [WetStock\StockOrderController::class, 'updateAtl'])->name('atls.update');
 
         Route::redirect('/deliveries', '/stock-orders/wet-stock-requests')->name('deliveries');
 

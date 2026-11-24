@@ -221,7 +221,16 @@ class WetStockRequestController extends Controller
             'plate_number' => ['nullable', 'string', 'max:32'],
             'storage_tank_id' => ['nullable', 'exists:storage_tanks,id'],
             'additional_remarks' => ['nullable', 'string', 'max:500'],
+            'submission_token' => ['nullable', 'string', 'max:64'],
         ]);
+
+        // The form renders its token once, so a double-click or a refreshed POST
+        // reuses it. Answering a used token here is what stops the same ATL being
+        // written twice against the same request and PO.
+        if (PurchaseOrderDelivery::alreadySubmitted($validated['submission_token'] ?? null)) {
+            return redirect()->route('stock-orders.wet-stock-requests.atls', $stockRequest)
+                ->with('info', 'This ATL was already saved. The duplicate submit was ignored.');
+        }
 
         $drawdowns = collect($validated['drawdowns'])->map(fn (array $dd): array => [
             'purchase_order_id' => (int) $dd['purchase_order_id'],
@@ -304,7 +313,7 @@ class WetStockRequestController extends Controller
         $totalDrawn = (int) $drawdowns->sum('quantity');
         $productSummary = $drawdowns->pluck('product')->unique()->implode(' + ');
 
-        $delivery = PurchaseOrderDelivery::create([
+        $attributes = [
             'purchase_order_id' => $primaryPoId,
             'request_id' => $stockRequest->id,
             'storage_tank_id' => $validated['storage_tank_id'] ?? null,
@@ -331,7 +340,30 @@ class WetStockRequestController extends Controller
             'status' => 'Pending',
             'lift_status' => PurchaseOrderDelivery::LIFT_UNLIFTED,
             'issued_at' => now(),
-        ]);
+        ];
+
+        // Same refusal as every other ATL path, checked here as well so it can
+        // name the row to correct. A date or driver fixed on an ATL already
+        // saved is a correction, not a new load, and this form would otherwise
+        // dead-end on the refusal. createOnce() still refuses it as the backstop
+        // should two saves race each other.
+        $duplicate = PurchaseOrderDelivery::duplicateOf($attributes);
+
+        if ($duplicate) {
+            return back()->withInput()
+                ->with('duplicate_atl_id', $duplicate->id)
+                ->withErrors([
+                    'atl' => 'An identical ATL is already on file: '.$duplicate->duplicateDescription()
+                        .' Use "Correct the saved ATL" to change its date or driver instead of filing a new one.',
+                ]);
+        }
+
+        $delivery = PurchaseOrderDelivery::createOnce($attributes, $validated['submission_token'] ?? null);
+
+        if (! $delivery) {
+            return redirect()->route('stock-orders.wet-stock-requests.atls', $stockRequest)
+                ->with('info', 'This ATL was already saved. The duplicate submit was ignored.');
+        }
 
         // One allocation per drawdown row, each linked to its own PO line.
         //
