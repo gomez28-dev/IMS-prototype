@@ -13,18 +13,38 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('purchase_orders', function (Blueprint $table) {
-            $table->text('rejection_reason')->nullable()->after('remarks');
-            $table->foreignId('rejected_by')->nullable()->after('rejection_reason')->constrained('admins')->nullOnDelete();
-            $table->timestamp('rejected_at')->nullable()->after('rejected_by');
-            $table->timestamp('rejection_seen_at')->nullable()->after('rejected_at');
+            if (! Schema::hasColumn('purchase_orders', 'rejection_reason')) {
+                $table->text('rejection_reason')->nullable()->after('remarks');
+            }
+
+            if (! Schema::hasColumn('purchase_orders', 'rejected_by')) {
+                $table->foreignId('rejected_by')->nullable()->after('remarks')->constrained('admins')->nullOnDelete();
+            }
+
+            if (! Schema::hasColumn('purchase_orders', 'rejected_at')) {
+                $table->timestamp('rejected_at')->nullable()->after('remarks');
+            }
+
+            if (! Schema::hasColumn('purchase_orders', 'rejection_seen_at')) {
+                $table->timestamp('rejection_seen_at')->nullable()->after('remarks');
+            }
         });
     }
 
     public function down(): void
     {
-        Schema::table('purchase_orders', function (Blueprint $table) {
-            $table->dropForeign(['rejected_by']);
-            $table->dropColumn(['rejection_seen_at', 'rejected_at', 'rejected_by', 'rejection_reason']);
-        });
+        if (Schema::hasColumn('purchase_orders', 'rejected_by')) {
+            Schema::table('purchase_orders', function (Blueprint $table) {
+                $table->dropForeign(['rejected_by']);
+            });
+        }
+
+        foreach (['rejection_seen_at', 'rejected_at', 'rejected_by', 'rejection_reason'] as $column) {
+            if (Schema::hasColumn('purchase_orders', $column)) {
+                Schema::table('purchase_orders', function (Blueprint $table) use ($column) {
+                    $table->dropColumn($column);
+                });
+            }
+        }
     }
 };
