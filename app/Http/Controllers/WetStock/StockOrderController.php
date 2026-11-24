@@ -1779,14 +1779,10 @@ public function storeStockRequestPo(Request $request): RedirectResponse
         // Once the load has physically moved, the date and driver on the row are
         // part of that record - stock was received or the truck left on them.
         // Those corrections go through the lift/receipt controls, not this form.
-        if ($delivery->status === 'Cancelled' || $delivery->lift_status === PurchaseOrderDelivery::LIFT_CANCELLED) {
-            return back()->withInput()->with('error', 'A cancelled ATL cannot be corrected.');
-        }
-
-        if ($delivery->isLifted() || $delivery->received_at || $delivery->stockIns()->exists()) {
+        if (! $delivery->canBeCorrected() || $delivery->stockIns()->exists()) {
             return back()->withInput()->with(
                 'error',
-                'This ATL has already been lifted or received, so its date and driver are part of that record. '
+                'This ATL has been lifted, received or cancelled, so its date and driver are part of that record. '
                 .'Unlift it first if the details really need changing.'
             );
         }

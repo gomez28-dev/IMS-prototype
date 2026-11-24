@@ -462,6 +462,22 @@ class PurchaseOrderDelivery extends Model
     }
 
     /**
+     * Whether this ATL can still be corrected in place.
+     *
+     * Once it is lifted, received or cancelled, its date and driver are part of
+     * that record: correcting them would rewrite history rather than fix a
+     * typo. The correction routes and the lists that offer the action all read
+     * this one rule.
+     */
+    public function canBeCorrected(): bool
+    {
+        return $this->status !== 'Cancelled'
+            && ! in_array($this->lift_status, [self::LIFT_LIFTED, self::LIFT_CANCELLED], true)
+            && ! $this->lifted_at
+            && ! $this->received_at;
+    }
+
+    /**
      * The channel as the forms word it, falling back to the stored value for a
      * legacy row outside the current list.
      */

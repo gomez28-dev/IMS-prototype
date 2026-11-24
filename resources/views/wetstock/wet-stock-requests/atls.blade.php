@@ -264,6 +264,9 @@
                                  $canEditLift = Auth::user()->canMarkAtlLifted();
                                  $canEditReceived = Auth::user()->canReceiveStockIntoDepot();
                                  $canUnlift = $lifted && ! $atl->received_at;
+                                 // A saved ATL's date, driver or documents are fixed on the
+                                 // row itself; saving the form again would be a duplicate.
+                                 $canCorrect = Auth::user()->canEditStockOrders() && $atl->canBeCorrected();
                                  $canLift = $approved
                                      && in_array($atl->status, ['Pending', 'Active', 'Cancelled'], true)
                                      && ! $lifted
@@ -346,7 +349,14 @@
                                                 <i class="bi bi-file-earmark-pdf"></i>
                                             </a>
                                         @endif
-                                         @unless ($approved)
+                                        @if ($canCorrect)
+                                            <a href="{{ route('stock-orders.atls.edit', $atl->id) }}"
+                                               class="btn btn-sm btn-outline-primary action-icon"
+                                               title="Correct this ATL's date, driver or documents">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </a>
+                                        @endif
+                                         @unless ($approved || $canCorrect)
                                              <span class="small text-muted">—</span>
                                          @endunless
                                     </div>

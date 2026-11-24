@@ -427,6 +427,37 @@ class AtlDuplicateSubmissionTest extends TestCase
         $this->assertNotNull(PurchaseOrderDelivery::find($duplicate));
     }
 
+    public function test_the_atl_lists_offer_a_correct_action(): void
+    {
+        $po = $this->po();
+        $request = $this->request(20000);
+        $atl = $this->savedAtl($po, ['request_id' => $request->id]);
+
+        // The request's own ATL page.
+        $this->actingAs($this->purchasing)
+            ->get(route('stock-orders.wet-stock-requests.atls', $request->id))
+            ->assertOk()
+            ->assertSee(route('stock-orders.atls.edit', $atl->id), false);
+
+        // The PO's Deliveries & ATL Records list.
+        $this->actingAs($this->purchasing)
+            ->get(route('stock-orders.purchase-orders.show', $po->id))
+            ->assertOk()
+            ->assertSee(route('stock-orders.atls.edit', $atl->id), false);
+
+        // Once lifted, its date and driver are part of that record, so no
+        // correction is offered - the route refuses it either way.
+        $atl->update([
+            'lift_status' => PurchaseOrderDelivery::LIFT_LIFTED,
+            'lifted_at' => now(),
+        ]);
+
+        $this->actingAs($this->purchasing)
+            ->get(route('stock-orders.purchase-orders.show', $po->id))
+            ->assertOk()
+            ->assertDontSee(route('stock-orders.atls.edit', $atl->id), false);
+    }
+
     public function test_the_form_carries_a_submission_token(): void
     {
         $request = $this->request();

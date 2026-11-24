@@ -299,6 +299,17 @@
                                             @else
                                                 <span class="badge bg-light text-muted border rounded-pill px-2 py-1" title="Awaiting ATL issuance">Pending Issuance</span>
                                             @endif
+
+                                            {{-- A date or driver fixed after this ATL was saved
+                                                 belongs to this row: correct it rather than
+                                                 filing the same load again. --}}
+                                            @if (Auth::user()->canEditStockOrders() && $delivery->canBeCorrected())
+                                                <a href="{{ route('stock-orders.atls.edit', $delivery->id) }}"
+                                                   class="btn btn-sm btn-outline-primary rounded-pill px-2 py-1"
+                                                   title="Correct this ATL's date, driver or documents">
+                                                    <i class="bi bi-pencil-square me-1"></i> Correct
+                                                </a>
+                                            @endif
                                         </div>
                                     </td>
                                 </tr>

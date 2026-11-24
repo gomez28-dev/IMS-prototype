@@ -208,6 +208,17 @@
                                             <span class="text-muted" title="Awaiting ATL issuance">—</span>
                                             <span class="badge bg-light text-muted border rounded-pill px-2 py-1 ms-1">Pending Issuance</span>
                                         @endif
+
+                                        {{-- A date or driver fixed after this ATL was saved
+                                             belongs to this row, so it is corrected here
+                                             rather than filed again as a second ATL. --}}
+                                        @if (Auth::user()->canEditStockOrders() && $del->canBeCorrected())
+                                            <a href="{{ route('stock-orders.atls.edit', $del->id) }}"
+                                               class="btn btn-sm btn-outline-primary rounded-pill px-2 py-1 ms-1"
+                                               title="Correct this ATL's date, driver or documents">
+                                                <i class="bi bi-pencil-square me-1"></i> Correct
+                                            </a>
+                                        @endif
                                     </td>
                                 </tr>
                             @empty
