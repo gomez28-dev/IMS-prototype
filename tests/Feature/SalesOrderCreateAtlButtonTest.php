@@ -152,6 +152,43 @@ class SalesOrderCreateAtlButtonTest extends TestCase
         $this->assertGreaterThan($atlRecordsAt, $buttonAt);
     }
 
+    public function test_an_atl_on_the_order_offers_a_correct_action(): void
+    {
+        $order = $this->order('Approved');
+        $po = $this->po('PO-CORRECT-'.rand(1000, 9999), ['Diesel' => 100000]);
+
+        $atl = PurchaseOrderDelivery::create([
+            'purchase_order_id' => $po->id,
+            'order_id' => $order->id,
+            'delivery_channel' => 'SUPPLIER_CLIENT_PICKUP',
+            'order_type' => 'PICK_UP',
+            'atl_type' => 'DITC_ATL',
+            'atl_number' => 'ATL-SO-'.rand(1000, 9999),
+            'product' => 'Diesel',
+            'qty_to_receive' => 20000,
+            'receiving_date' => now()->addDays(2),
+            'status' => 'Pending',
+            'approval_status' => PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL,
+            'atl_source' => PurchaseOrderDelivery::SOURCE_DOYEN_ISSUED,
+            'lift_status' => PurchaseOrderDelivery::LIFT_UNLIFTED,
+            'atl_category' => PurchaseOrderDelivery::CATEGORY_FUEL_TRADE,
+        ]);
+
+        $this->assertStringContainsString(
+            route('stock-orders.atls.edit', $atl->id),
+            $this->detail($order),
+            'The ATL Records table must offer the correction of the row it lists.'
+        );
+
+        // Lifted: its date and driver now belong to that record.
+        $atl->update(['lift_status' => PurchaseOrderDelivery::LIFT_LIFTED, 'lifted_at' => now()]);
+
+        $this->assertStringNotContainsString(
+            route('stock-orders.atls.edit', $atl->id),
+            $this->detail($order)
+        );
+    }
+
     // ---- More than one ATL per order ---------------------------------------
 
     public function test_a_second_atl_can_be_raised_against_the_same_order(): void

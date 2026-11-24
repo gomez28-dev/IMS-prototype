@@ -280,6 +280,17 @@
                                                     </a>
                                                 @endif
                                             @endif
+
+                                            {{-- Pen opens the Add ATL form, which is how a new
+                                                 load is raised. Fixing the date or driver on the
+                                                 ATL already here is a correction of this row. --}}
+                                            @if (Auth::user()->canEditStockOrders() && $atl->canBeCorrected())
+                                                <a href="{{ route('stock-orders.atls.edit', $atl->id) }}"
+                                                   class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary"
+                                                   title="Correct this ATL's date, driver or documents">
+                                                    <i class="bi bi-pencil-square me-1"></i> Correct
+                                                </a>
+                                            @endif
                                         </div>
                                     </td>
                                 </tr>
