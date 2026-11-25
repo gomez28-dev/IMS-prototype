@@ -190,41 +190,7 @@
                                     <td class="fw-bold">{{ number_format($atl->qty_to_receive) }} L</td>
                                     <td class="small">{{ $atl->preparer->name ?? 'Purchasing' }}</td>
                                     <td class="small">
-                                        @if ($atl->corrections->isEmpty())
-                                            <span class="text-muted">—</span>
-                                        @else
-                                            @php $latestCorrection = $atl->corrections->first(); @endphp
-                                            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill">
-                                                Corrected{{ $atl->corrections->count() > 1 ? ' '.$atl->corrections->count().'×' : '' }}
-                                            </span>
-                                            <div class="text-muted">
-                                                {{ $latestCorrection->admin->name ?? 'Unknown' }} · {{ $latestCorrection->created_at?->format('M d, Y g:i A') }}
-                                            </div>
-                                            {{-- The diff is already loaded; the details element
-                                                 keeps it behind one click in a table that
-                                                 otherwise only needs the badge. --}}
-                                            <details class="mt-1">
-                                                <summary class="text-primary" style="cursor: pointer;">What changed</summary>
-                                                <table class="table table-sm mb-0 mt-1">
-                                                    <thead>
-                                                        <tr>
-                                                            <th class="small fw-semibold">Field</th>
-                                                            <th class="small fw-semibold">Before</th>
-                                                            <th class="small fw-semibold">After</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        @foreach ($latestCorrection->changesForDisplay() as $change)
-                                                            <tr>
-                                                                <td class="small">{{ $change['label'] }}</td>
-                                                                <td class="small text-muted">{{ $change['before'] }}</td>
-                                                                <td class="small fw-semibold">{{ $change['after'] }}</td>
-                                                            </tr>
-                                                        @endforeach
-                                                    </tbody>
-                                                </table>
-                                            </details>
-                                        @endif
+                                        @include('wetstock.partials.atl-corrections', ['atl' => $atl])
                                     </td>
                                     <td class="small">
                                         {{ $atl->driver_name ?: '—' }}

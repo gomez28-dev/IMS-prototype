@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Admin;
+use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderDelivery;
 use App\Models\PurchaseOrderItem;
@@ -505,6 +507,75 @@ class AtlDuplicateSubmissionTest extends TestCase
             ->assertSee('Rica Esaga')
             ->assertSee('Pick Up Date')
             // Before then after, in that order: the VP can see what moved.
+            ->assertSeeInOrder(['What changed', 'Juan Dela Cruz', 'Pedro Reyes']);
+    }
+
+    public function test_the_correction_history_survives_approval_on_the_atl_and_po_pages(): void
+    {
+        $order = Order::create([
+            'so_number' => 'SO-ATLH-'.rand(1000, 9999),
+            'account' => 'Venture Commercial & Industrial Corp.',
+            'date' => now()->toDateString(),
+            'location' => 'Valenzuela',
+            'status' => 'Active',
+            'terms' => '30 Days',
+            'qty_ordered' => 50000,
+            'clearing_status' => 'Approved',
+            'fulfillment_type' => Order::FULFILLMENT_FUEL_TRADE,
+            'order_category' => Order::CATEGORY_CLIENT_ORDER,
+        ]);
+
+        OrderItem::create([
+            'order_id' => $order->id,
+            'product_type' => 'D',
+            'qty' => 50000,
+        ]);
+
+        $po = $this->po();
+        $atl = $this->savedAtl($po, [
+            'order_id' => $order->id,
+            'so_number' => $order->so_number,
+            'driver_name' => 'Juan Dela Cruz',
+        ]);
+
+        $this->actingAs($this->purchasing)
+            ->post(route('stock-orders.atls.update', $atl->id), [
+                'atl_number' => $atl->atl_number,
+                'receiving_date' => $atl->receiving_date->format('Y-m-d'),
+                'driver_name' => 'Pedro Reyes',
+            ])
+            ->assertSessionHas('success');
+
+        $vp = Admin::create([
+            'username' => 'vp_'.uniqid(),
+            'password' => bcrypt('secret'),
+            'name' => 'Lorraine Bamba',
+            'role' => 'vp',
+        ]);
+
+        $this->actingAs($vp)
+            ->post(route('stock-orders.atl-approve', $atl->id))
+            ->assertSessionHas('success');
+
+        $atl->refresh();
+
+        $this->assertSame(PurchaseOrderDelivery::APPROVAL_APPROVED, $atl->approval_status);
+        $this->assertSame(1, $atl->corrections()->count(), 'Approving the ATL does not clear its history.');
+
+        // The order's ATL details page.
+        $this->actingAs($this->purchasing)
+            ->get(route('stock-orders.sales-orders.show', $order->id))
+            ->assertOk()
+            ->assertSee('What changed')
+            ->assertSee('Rica Esaga')
+            ->assertSeeInOrder(['What changed', 'Juan Dela Cruz', 'Pedro Reyes']);
+
+        // The PO's ATL Records table.
+        $this->actingAs($this->purchasing)
+            ->get(route('stock-orders.purchase-orders.show', $po->id))
+            ->assertOk()
+            ->assertSee('What changed')
+            ->assertSee('Rica Esaga')
             ->assertSeeInOrder(['What changed', 'Juan Dela Cruz', 'Pedro Reyes']);
     }
 

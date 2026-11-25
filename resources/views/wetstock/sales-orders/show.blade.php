@@ -155,6 +155,7 @@
                                 <th class="py-3">Product / Qty</th>
                                 <th class="py-3">Status</th>
                                 <th class="py-3 text-center">Approval</th>
+                                <th class="py-3">Corrections</th>
                                 <th class="pe-3 py-3 text-end">Action</th>
                             </tr>
                         </thead>
@@ -253,6 +254,9 @@
                                             <span class="badge bg-light text-muted border rounded-pill px-2 py-1">Draft</span>
                                         @endif
                                     </td>
+                                    <td class="small">
+                                        @include('wetstock.partials.atl-corrections', ['atl' => $atl])
+                                    </td>
                                     <td class="pe-3 text-end">
                                         {{-- Three actions, each labelled for what it does:
                                              View opens the ATL pop-up, Add ATL raises another
@@ -299,7 +303,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="text-center py-5 text-muted">
+                                    <td colspan="8" class="text-center py-5 text-muted">
                                         <i class="bi bi-file-earmark-x fs-1 d-block mb-3 text-secondary"></i>
                                         No ATLs issued for this order yet.
                                     </td>

@@ -219,6 +219,7 @@
                                 <th class="py-3 text-end">Price</th>
                                 <th class="py-3 text-end">Amount</th>
                                 <th class="py-3 text-center">Status</th>
+                                <th class="py-3">Corrections</th>
                                 <th class="pe-3 py-3 text-end">Actions</th>
                             </tr>
                         </thead>
@@ -275,6 +276,9 @@
                                             <div class="extra-small text-muted mt-1">{{ $delivery->driver_name }} @if ($delivery->plate_number)({{ $delivery->plate_number }})@endif</div>
                                         @endif
                                     </td>
+                                    <td class="small">
+                                        @include('wetstock.partials.atl-corrections', ['atl' => $delivery])
+                                    </td>
                                     <td class="pe-3 text-end">
                                         <div class="d-inline-flex gap-1 justify-content-end">
                                             @if ($delivery->hasScannedDocs())
@@ -315,7 +319,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" class="text-center py-5 text-muted">
+                                    <td colspan="9" class="text-center py-5 text-muted">
                                         <i class="bi bi-file-earmark-x fs-1 d-block mb-3 text-secondary"></i>
                                         {{ $atlSearch ? 'No ATLs match your search.' : 'No ATLs issued for this PO yet.' }}
                                     </td>

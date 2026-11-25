@@ -279,7 +279,7 @@ class PurchaseOrderController extends Controller
 
         // The ATL table is filtered independently of the PO itself.
         $atlQuery = $purchaseOrder->deliveries()
-            ->with(['order', 'lifter', 'receiver', 'allocations']);
+            ->with(['order', 'lifter', 'receiver', 'allocations', 'corrections.admin']);
 
         if ($request->filled('atl_search')) {
             $term = '%'.$request->atl_search.'%';

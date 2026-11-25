@@ -92,7 +92,7 @@ class SalesOrderController extends Controller
                           ->whereHas('purchaseOrder', fn ($p) => $p->where('linked_order_id', $order->id));
               });
         })
-            ->with(['purchaseOrder', 'allocations.purchaseOrder', 'lifter', 'receiver'])
+            ->with(['purchaseOrder', 'allocations.purchaseOrder', 'lifter', 'receiver', 'corrections.admin'])
             ->orderByDesc('id')
             ->get();
 
