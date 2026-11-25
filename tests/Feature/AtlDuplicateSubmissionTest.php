@@ -579,6 +579,31 @@ class AtlDuplicateSubmissionTest extends TestCase
             ->assertSeeInOrder(['What changed', 'Juan Dela Cruz', 'Pedro Reyes']);
     }
 
+    public function test_the_request_atl_page_shows_the_correction_history(): void
+    {
+        $request = $this->request();
+        $po = $this->po();
+        $atl = $this->savedAtl($po, [
+            'request_id' => $request->id,
+            'driver_name' => 'Juan Dela Cruz',
+        ]);
+
+        $this->actingAs($this->purchasing)
+            ->post(route('stock-orders.atls.update', $atl->id), [
+                'atl_number' => $atl->atl_number,
+                'receiving_date' => $atl->receiving_date->format('Y-m-d'),
+                'driver_name' => 'Pedro Reyes',
+            ])
+            ->assertSessionHas('success');
+
+        $this->actingAs($this->purchasing)
+            ->get(route('stock-orders.wet-stock-requests.atls', $request->id))
+            ->assertOk()
+            ->assertSee('What changed')
+            ->assertSee('Rica Esaga')
+            ->assertSeeInOrder(['What changed', 'Juan Dela Cruz', 'Pedro Reyes']);
+    }
+
     public function test_saving_a_correction_without_changes_keeps_an_approved_atl_approved(): void
     {
         $po = $this->po();

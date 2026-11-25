@@ -81,7 +81,7 @@ class WetStockRequestController extends Controller
         $stockRequest->load(['lines', 'warehouse', 'requester']);
 
         $atls = $stockRequest->deliveries()
-            ->with(['purchaseOrder', 'allocations.purchaseOrder', 'lifter', 'receiver'])
+            ->with(['purchaseOrder', 'allocations.purchaseOrder', 'lifter', 'receiver', 'corrections.admin'])
             ->orderByDesc('id')
             ->get();
 

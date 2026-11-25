@@ -238,6 +238,7 @@
                             <th>{{ $isPickup ? 'Pick Up Date' : 'Delivery Date' }}</th>
                             <th>Qty Out</th>
                             <th>Approval</th>
+                            <th>Corrections</th>
                             <th>Lift Status</th>
                             <th>Received</th>
                             <th>Type</th>
@@ -294,6 +295,9 @@
                                             : 'bg-warning-subtle text-warning-emphasis border') }}">
                                         {{ $approved ? 'APPROVED' : strtoupper(str_replace('_', ' ', $atl->approval_status ?? 'DRAFT')) }}
                                     </span>
+                                </td>
+                                <td class="small">
+                                    @include('wetstock.partials.atl-corrections', ['atl' => $atl])
                                 </td>
                                 <td>
                                     @if ($canEditLift)
@@ -364,7 +368,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="10" class="text-center text-muted">
+                                <td colspan="11" class="text-center text-muted">
                                     <i class="bi bi-file-earmark-x fs-1 d-block mb-3 text-warning"></i>
                                     No ATLs issued for this request yet.
                                 </td>
