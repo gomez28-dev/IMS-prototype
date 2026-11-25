@@ -839,6 +839,9 @@
                             @endif
                         </a>
                     @endif
+                    <a class="nav-link d-flex align-items-center {{ request()->routeIs('stock-orders.atl-aging') ? 'active' : '' }}" href="{{ route('stock-orders.atl-aging') }}">
+                        <i class="bi bi-hourglass-split me-2"></i> ATL Aging
+                    </a>
                     @if (Auth::user()->canManageSuppliers())
                         <a class="nav-link d-flex align-items-center {{ request()->routeIs('stock-orders.suppliers.*') ? 'active' : '' }}" href="{{ route('stock-orders.suppliers.index') }}">
                             <i class="bi bi-building me-2"></i> Suppliers
@@ -1045,6 +1048,10 @@
                     @endif
                 </a>
                 @endif
+                <a href="{{ route('stock-orders.atl-aging') }}" class="sidebar-nav-link {{ request()->routeIs('stock-orders.atl-aging') ? 'active' : '' }}" title="ATL Aging">
+                    <i class="bi bi-hourglass-split"></i>
+                    <span class="nav-label">ATL Aging</span>
+                </a>
                 @if (Auth::user()->canManageSuppliers())
                 <a href="{{ route('stock-orders.suppliers.index') }}" class="sidebar-nav-link {{ request()->routeIs('stock-orders.suppliers.*') ? 'active' : '' }}" title="Suppliers">
                     <i class="bi bi-building"></i>

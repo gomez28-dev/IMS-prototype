@@ -1980,6 +1980,116 @@ public function storeStockRequestPo(Request $request): RedirectResponse
     /**
      * VP approval for a Doyen-issued ATL.
      */
+    /**
+     * Approved ATLs past their pick-up date that were never lifted.
+     *
+     * An unlifted ATL still holds the volume it drew: the order reads short
+     * while the fuel has not moved, and nothing else can be raised against a
+     * PO that looks spent. This is that list - the stuck volume - filterable
+     * by the client it serves, the PO it draws from and its pick-up date.
+     */
+    public function atlAging(Request $request): View
+    {
+        abort_unless(Auth::user()->canAccessStockOrders(), 403);
+
+        $validated = $request->validate([
+            'client' => ['nullable', 'string', 'max:255'],
+            'po' => ['nullable', 'integer'],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date'],
+        ]);
+
+        $filters = [
+            'client' => $validated['client'] ?? null,
+            'po' => isset($validated['po']) ? (int) $validated['po'] : null,
+            'from' => $validated['from'] ?? null,
+            'to' => $validated['to'] ?? null,
+        ];
+
+        // The aging scope: approved, dated before today, and still on the books
+        // as unlifted. A cancelled lift is not stuck volume - it was released -
+        // and a received ATL has already arrived at the depot.
+        $base = PurchaseOrderDelivery::query()
+            ->where('approval_status', PurchaseOrderDelivery::APPROVAL_APPROVED)
+            ->whereNotNull('receiving_date')
+            ->whereDate('receiving_date', '<', today())
+            ->whereNull('lifted_at')
+            ->whereNull('received_at')
+            ->where(fn ($q) => $q->whereNull('lift_status')->orWhereNotIn('lift_status', [
+                PurchaseOrderDelivery::LIFT_LIFTED,
+                PurchaseOrderDelivery::LIFT_CANCELLED,
+            ]))
+            ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'Cancelled'));
+
+        $query = (clone $base);
+
+        if ($filters['client']) {
+            $query->whereHas('order', fn ($q) => $q->where('account', $filters['client']));
+        }
+
+        if ($filters['po']) {
+            // An ATL may draw from several POs; matching any of them is what
+            // the reader means by "this PO's ATLs".
+            $query->where(function ($q) use ($filters) {
+                $q->where('purchase_order_id', $filters['po'])
+                    ->orWhereHas('allocations', fn ($allocation) => $allocation->where('purchase_order_id', $filters['po']));
+            });
+        }
+
+        if ($filters['from']) {
+            $query->whereDate('receiving_date', '>=', $filters['from']);
+        }
+
+        if ($filters['to']) {
+            $query->whereDate('receiving_date', '<=', $filters['to']);
+        }
+
+        // The cards describe every ATL the filter matches, not the page.
+        $all = (clone $query)->with(['order', 'allocations'])->get();
+
+        $summary = [
+            'count' => $all->count(),
+            'volume' => (int) $all->sum('qty_to_receive'),
+            'oldest' => (int) ($all
+                ->map(fn ($atl) => $atl->receiving_date->startOfDay()->diffInDays(today()->startOfDay()))
+                ->max() ?? 0),
+        ];
+
+        $atls = (clone $query)
+            ->with(['order', 'stockRequest.warehouse', 'purchaseOrder', 'allocations.purchaseOrder'])
+            ->orderBy('receiving_date')
+            ->orderBy('id')
+            ->paginate(15)
+            ->withQueryString();
+
+        // Filter options come from the ATLs that are actually stuck, so the
+        // two pickers never offer a client or PO with nothing to show.
+        $clients = $all
+            ->map(fn ($atl) => $atl->order->account ?? null)
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values();
+
+        $poIds = $all->pluck('purchase_order_id')
+            ->merge($all->flatMap(fn ($atl) => $atl->allocations->pluck('purchase_order_id')))
+            ->filter()
+            ->unique();
+
+        $purchaseOrders = PurchaseOrder::query()
+            ->whereIn('id', $poIds)
+            ->orderBy('po_number')
+            ->get(['id', 'po_number']);
+
+        return view('wetstock.stock-orders.atl-aging', compact(
+            'atls',
+            'summary',
+            'filters',
+            'clients',
+            'purchaseOrders'
+        ));
+    }
+
     public function approveAtl(PurchaseOrderDelivery $delivery): RedirectResponse
     {
         if (!Auth::user()->canApproveStockOrders()) {
