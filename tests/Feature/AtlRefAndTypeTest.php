@@ -273,7 +273,7 @@ class AtlRefAndTypeTest extends TestCase
         $response->assertSee('>FT<', false);
     }
 
-    public function test_the_atl_row_offers_exactly_view_and_pen(): void
+    public function test_the_atl_row_labels_each_action_for_what_it_does(): void
     {
         $order = $this->fuelTradeOrder();
         $atl = $this->atlFor($order, 'CONFIRMED', PurchaseOrderDelivery::CATEGORY_FUEL_TRADE);
@@ -283,7 +283,9 @@ class AtlRefAndTypeTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSee('> View', false);
-        $response->assertSee('> Pen', false);
+        // The ATL form link raises another load; it never edited this row.
+        $response->assertSee('> Add ATL', false);
+        $response->assertDontSee('Edit ATL', false);
         // The PDF download moved into the pop-up, not the row.
         $response->assertDontSee('ATL PDF</a>', false);
     }

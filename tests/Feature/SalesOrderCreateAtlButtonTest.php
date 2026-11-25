@@ -174,11 +174,19 @@ class SalesOrderCreateAtlButtonTest extends TestCase
             'atl_category' => PurchaseOrderDelivery::CATEGORY_FUEL_TRADE,
         ]);
 
+        $html = $this->detail($order);
+
         $this->assertStringContainsString(
             route('stock-orders.atls.edit', $atl->id),
-            $this->detail($order),
+            $html,
             'The ATL Records table must offer the correction of the row it lists.'
         );
+
+        // The two links beside each other must not be confused: one raises a
+        // new load, the other fixes this saved one.
+        $this->assertStringContainsString('> Add ATL', $html);
+        $this->assertStringContainsString('> Correct', $html);
+        $this->assertStringNotContainsString('Edit ATL', $html);
 
         // Lifted: its date and driver now belong to that record.
         $atl->update(['lift_status' => PurchaseOrderDelivery::LIFT_LIFTED, 'lifted_at' => now()]);

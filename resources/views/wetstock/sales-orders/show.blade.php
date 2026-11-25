@@ -254,9 +254,11 @@
                                         @endif
                                     </td>
                                     <td class="pe-3 text-end">
-                                        {{-- Two actions: View opens the ATL pop-up, Pen opens
-                                             the ATL form. The lift state lives in the Status
-                                             column's control, not here. --}}
+                                        {{-- Three actions, each labelled for what it does:
+                                             View opens the ATL pop-up, Add ATL raises another
+                                             load against the row's PO, Correct fixes this
+                                             saved ATL's date, driver or documents. The lift
+                                             state lives in the Status column's control. --}}
                                         <div class="d-inline-flex gap-1 justify-content-end">
                                             <button type="button" class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary"
                                                     data-bs-toggle="modal" data-bs-target="#atlDetailModal{{ $atl->id }}"
@@ -275,15 +277,16 @@
                                                 @php $atlPo = $atl->allocations->first()?->purchaseOrder ?? $atl->purchaseOrder; @endphp
                                                 @if ($atlPo?->isVpApproved())
                                                     <a href="{{ route('stock-orders.add-atl', $atlPoId) }}"
-                                                       class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary" title="Edit ATL">
-                                                        <i class="bi bi-pencil me-1"></i> Pen
+                                                       class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary"
+                                                       title="Add an ATL against PO #{{ $atlPo->po_number }}">
+                                                        <i class="bi bi-plus-lg me-1"></i> Add ATL
                                                     </a>
                                                 @endif
                                             @endif
 
-                                            {{-- Pen opens the Add ATL form, which is how a new
-                                                 load is raised. Fixing the date or driver on the
-                                                 ATL already here is a correction of this row. --}}
+                                            {{-- Fixing the date or driver on the ATL already
+                                                 here is a correction of this row, not a new load;
+                                                 the Add ATL link above is the new load. --}}
                                             @if (Auth::user()->canEditStockOrders() && $atl->canBeCorrected())
                                                 <a href="{{ route('stock-orders.atls.edit', $atl->id) }}"
                                                    class="btn btn-sm btn-light border rounded-pill px-2 py-1 text-secondary"

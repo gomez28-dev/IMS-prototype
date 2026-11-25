@@ -23,7 +23,8 @@ use Tests\TestCase;
  * to a single lift-status endpoint. Choosing Lifted runs the same lift
  * pipeline the old route ran, choosing Unlifted runs the same reversal, and
  * a record the depot will never lift can be marked Cancelled, which releases
- * the volume it drew back to the order. View and Pen stay the only actions.
+ * the volume it drew back to the order. View, Add ATL and Correct are the
+ * row's actions.
  *
  * The records table itself drops the REF # and Type columns (both repeat what
  * the modal and the page title already say) and shows the products as their
@@ -152,14 +153,15 @@ class AtlStatusControlTest extends TestCase
         $this->assertStringContainsString('data-current="', $html);
     }
 
-    public function test_the_action_column_keeps_only_view_and_pen(): void
+    public function test_the_action_column_keeps_only_view_add_and_correct(): void
     {
         [$order] = $this->atlOrder();
 
         $html = $this->showHtml($order);
 
         $this->assertStringContainsString('> View', $html);
-        $this->assertStringContainsString('> Pen', $html);
+        $this->assertStringContainsString('> Add ATL', $html);
+        $this->assertStringContainsString('> Correct', $html);
         $this->assertStringNotContainsString('Mark Picked Up', $html);
         $this->assertStringNotContainsString('Mark Unlifted', $html);
         // The reversal modal left with its button: Unlifted posts straight
