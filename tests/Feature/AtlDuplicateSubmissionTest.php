@@ -458,6 +458,77 @@ class AtlDuplicateSubmissionTest extends TestCase
             ->assertDontSee(route('stock-orders.atls.edit', $atl->id), false);
     }
 
+    public function test_the_approval_queue_shows_what_a_correction_changed_and_who_made_it(): void
+    {
+        $po = $this->po();
+        $atl = $this->savedAtl($po, [
+            'driver_name' => 'Juan Dela Cruz',
+            'receiving_date' => now()->addDays(3),
+        ]);
+        $newDate = now()->addDays(9);
+
+        $this->actingAs($this->purchasing)
+            ->post(route('stock-orders.atls.update', $atl->id), [
+                'atl_number' => $atl->atl_number,
+                'receiving_date' => $newDate->format('Y-m-d'),
+                'driver_name' => 'Pedro Reyes',
+            ])
+            ->assertSessionHas('success');
+
+        $correction = $atl->corrections()->first();
+
+        $this->assertNotNull($correction, 'A correction that changes a field is recorded.');
+        $this->assertSame($this->purchasing->id, $correction->admin_id, 'The record says who corrected it.');
+        // The database's JSON column returns the keys in its own order, so the
+        // pairs are compared by content rather than by position.
+        $this->assertEquals(
+            ['from' => 'Juan Dela Cruz', 'to' => 'Pedro Reyes'],
+            $correction->field_changes['driver_name']
+        );
+        $this->assertEquals(
+            ['from' => now()->addDays(3)->format('Y-m-d'), 'to' => $newDate->format('Y-m-d')],
+            $correction->field_changes['receiving_date']
+        );
+
+        $vp = Admin::create([
+            'username' => 'vp_'.uniqid(),
+            'password' => bcrypt('secret'),
+            'name' => 'Lorraine Bamba',
+            'role' => 'vp',
+        ]);
+
+        $this->actingAs($vp)
+            ->get(route('stock-orders.approvals', ['tab' => 'atls']))
+            ->assertOk()
+            ->assertSee('Corrected')
+            ->assertSee('What changed')
+            ->assertSee('Rica Esaga')
+            ->assertSee('Pick Up Date')
+            // Before then after, in that order: the VP can see what moved.
+            ->assertSeeInOrder(['What changed', 'Juan Dela Cruz', 'Pedro Reyes']);
+    }
+
+    public function test_saving_a_correction_without_changes_keeps_an_approved_atl_approved(): void
+    {
+        $po = $this->po();
+        $atl = $this->savedAtl($po, ['approval_status' => PurchaseOrderDelivery::APPROVAL_APPROVED]);
+
+        $this->actingAs($this->purchasing)
+            ->post(route('stock-orders.atls.update', $atl->id), [
+                'atl_number' => $atl->atl_number,
+                'receiving_date' => $atl->receiving_date->format('Y-m-d'),
+                'driver_name' => $atl->driver_name,
+                'plate_number' => $atl->plate_number,
+            ])
+            ->assertSessionHas('success');
+
+        $atl->refresh();
+
+        $this->assertSame(PurchaseOrderDelivery::APPROVAL_APPROVED, $atl->approval_status);
+        $this->assertSame(0, $atl->corrections()->count(), 'Re-saving the same values is not a correction.');
+        $this->assertNull($atl->revised_at);
+    }
+
     public function test_the_form_carries_a_submission_token(): void
     {
         $request = $this->request();

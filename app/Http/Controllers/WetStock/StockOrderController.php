@@ -1807,10 +1807,30 @@ public function storeStockRequestPo(Request $request): RedirectResponse
 
         $isClientProvided = filled($validated['client_atl_number'] ?? null);
 
+        // What the ATL says now, captured before it changes, so the queue can
+        // show old and new side by side instead of only the corrected wording.
+        $before = $this->correctionSnapshot($delivery);
+
+        $correction = [
+            'dr_number' => $validated['dr_number'] ?? null,
+            'atl_number' => $validated['atl_number'] ?? null,
+            'client_atl_number' => $validated['client_atl_number'] ?? null,
+            'reference_no' => $validated['reference_no'] ?? null,
+            'so_number' => $validated['so_number'] ?? null,
+            'receiving_date' => $validated['receiving_date'],
+            'driver_name' => $validated['driver_name'] ?? null,
+            'plate_number' => $validated['plate_number'] ?? null,
+            'location' => $validated['location'] ?? null,
+            'additional_remarks' => $validated['additional_remarks'] ?? null,
+        ];
+
+        $changes = $this->correctionChanges($before, $correction);
+
         // An approved ATL that changes detail is no longer the ATL the VP signed
         // off, so it goes back to the queue rather than staying approved on
-        // wording it never carried.
-        $reopensApproval = $delivery->isApproved();
+        // wording it never carried. A save that changes nothing is not a
+        // correction: it neither reopens the ATL nor records a revision.
+        $reopensApproval = $delivery->isApproved() && $changes !== [];
 
         $delivery->update(array_merge([
             // Whichever party issues the ATL is decided by the client number, the
@@ -1824,22 +1844,22 @@ public function storeStockRequestPo(Request $request): RedirectResponse
             'atl_source' => $isClientProvided
                 ? PurchaseOrderDelivery::SOURCE_CLIENT_PROVIDED
                 : PurchaseOrderDelivery::SOURCE_DOYEN_ISSUED,
-            'dr_number' => $validated['dr_number'] ?? null,
-            'atl_number' => $validated['atl_number'] ?? null,
-            'client_atl_number' => $validated['client_atl_number'] ?? null,
-            'reference_no' => $validated['reference_no'] ?? null,
-            'so_number' => $validated['so_number'] ?? null,
-            'receiving_date' => $validated['receiving_date'],
-            'driver_name' => $validated['driver_name'] ?? null,
-            'plate_number' => $validated['plate_number'] ?? null,
-            'location' => $validated['location'] ?? null,
-            'additional_remarks' => $validated['additional_remarks'] ?? null,
+        ], $correction, $changes !== [] ? [
             'revised_at' => now(),
-        ], $reopensApproval ? [
+        ] : [], $reopensApproval ? [
             'approval_status' => PurchaseOrderDelivery::APPROVAL_FOR_APPROVAL,
             'approved_by' => null,
             'approved_at' => null,
         ] : []));
+
+        // The diff is what the VP queue reads, so it is written next to the
+        // change it describes rather than left to be reconstructed later.
+        if ($changes !== []) {
+            $delivery->corrections()->create([
+                'admin_id' => Auth::id(),
+                'field_changes' => $changes,
+            ]);
+        }
 
         AuditLog::create([
             'admin_id' => Auth::id(),
@@ -1852,6 +1872,66 @@ public function storeStockRequestPo(Request $request): RedirectResponse
             ->with('success', $reopensApproval
                 ? 'ATL corrected. Its details changed, so it goes back to the VP for approval.'
                 : 'ATL corrected on PO #'.$purchaseOrder->po_number.'.');
+    }
+
+    /**
+     * The correction-visible values of an ATL, normalised so a date that did
+     * not move is not reported as a change.
+     *
+     * @return array<string, string|null>
+     */
+    private function correctionSnapshot(PurchaseOrderDelivery $delivery): array
+    {
+        $snapshot = [];
+
+        foreach (array_keys(\App\Models\AtlCorrection::FIELD_LABELS) as $field) {
+            $snapshot[$field] = $this->correctionValue($field, $delivery->getAttribute($field));
+        }
+
+        return $snapshot;
+    }
+
+    /**
+     * Which fields a correction moved, as {field: {from, to}}.
+     *
+     * @param  array<string, string|null>  $before
+     * @param  array<string, mixed>  $after
+     * @return array<string, array{from: string|null, to: string|null}>
+     */
+    private function correctionChanges(array $before, array $after): array
+    {
+        $changes = [];
+
+        foreach (array_keys(\App\Models\AtlCorrection::FIELD_LABELS) as $field) {
+            $new = $this->correctionValue($field, $after[$field] ?? null);
+
+            if ($before[$field] !== $new) {
+                $changes[$field] = ['from' => $before[$field], 'to' => $new];
+            }
+        }
+
+        return $changes;
+    }
+
+    /**
+     * Empty and null read the same on the form, and a date compares as the
+     * plain Y-m-d the input holds, not as a timestamp.
+     */
+    private function correctionValue(string $field, mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('Y-m-d');
+        }
+
+        if ($field === 'receiving_date') {
+            return \Illuminate\Support\Carbon::parse($value)->format('Y-m-d');
+        }
+
+        return (string) $value;
     }
 
     public function approvals(Request $request): View
@@ -1883,7 +1963,7 @@ public function storeStockRequestPo(Request $request): RedirectResponse
         // on the badge is exactly what this page lists.
         $pendingAtls = PurchaseOrderDelivery::query()
             ->pendingVpApproval()
-            ->with(['order', 'purchaseOrder', 'stockRequest', 'allocations', 'preparer'])
+            ->with(['order', 'purchaseOrder', 'stockRequest', 'allocations', 'preparer', 'corrections.admin'])
             ->latest()
             ->paginate(15);
 

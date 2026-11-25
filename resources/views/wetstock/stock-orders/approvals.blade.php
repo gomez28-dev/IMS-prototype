@@ -98,6 +98,7 @@
                                 <th class="py-3">Pick Up Date</th>
                                 <th class="py-3">Volume</th>
                                 <th class="py-3">Prepared By</th>
+                                <th class="py-3">Corrections</th>
                                 <th class="py-3">Driver / Plate</th>
                                 <th class="py-3 table-actions">Action</th>
                             </tr>
@@ -129,6 +130,14 @@
                                         'pickUpDate' => $atl->receiving_date?->format('M d, Y'),
                                         'volume' => number_format((int) $atl->qty_to_receive),
                                         'preparedBy' => $atl->preparer->name ?? 'Purchasing',
+                                        // A corrected ATL comes back to the VP with the
+                                        // before/after it was reopened for, so the
+                                        // ruling is made on the change.
+                                        'corrections' => $atl->corrections->map(fn ($correction) => [
+                                            'by' => $correction->admin->name ?? 'Unknown',
+                                            'at' => $correction->created_at?->format('M d, Y g:i A'),
+                                            'changes' => $correction->changesForDisplay(),
+                                        ])->values(),
                                         'driver' => $atl->driver_name,
                                         'plate' => $atl->plate_number,
                                         'products' => $atlBreakdown->map(fn ($qty, $product) => [
@@ -181,6 +190,43 @@
                                     <td class="fw-bold">{{ number_format($atl->qty_to_receive) }} L</td>
                                     <td class="small">{{ $atl->preparer->name ?? 'Purchasing' }}</td>
                                     <td class="small">
+                                        @if ($atl->corrections->isEmpty())
+                                            <span class="text-muted">—</span>
+                                        @else
+                                            @php $latestCorrection = $atl->corrections->first(); @endphp
+                                            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill">
+                                                Corrected{{ $atl->corrections->count() > 1 ? ' '.$atl->corrections->count().'×' : '' }}
+                                            </span>
+                                            <div class="text-muted">
+                                                {{ $latestCorrection->admin->name ?? 'Unknown' }} · {{ $latestCorrection->created_at?->format('M d, Y g:i A') }}
+                                            </div>
+                                            {{-- The diff is already loaded; the details element
+                                                 keeps it behind one click in a table that
+                                                 otherwise only needs the badge. --}}
+                                            <details class="mt-1">
+                                                <summary class="text-primary" style="cursor: pointer;">What changed</summary>
+                                                <table class="table table-sm mb-0 mt-1">
+                                                    <thead>
+                                                        <tr>
+                                                            <th class="small fw-semibold">Field</th>
+                                                            <th class="small fw-semibold">Before</th>
+                                                            <th class="small fw-semibold">After</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach ($latestCorrection->changesForDisplay() as $change)
+                                                            <tr>
+                                                                <td class="small">{{ $change['label'] }}</td>
+                                                                <td class="small text-muted">{{ $change['before'] }}</td>
+                                                                <td class="small fw-semibold">{{ $change['after'] }}</td>
+                                                            </tr>
+                                                        @endforeach
+                                                    </tbody>
+                                                </table>
+                                            </details>
+                                        @endif
+                                    </td>
+                                    <td class="small">
                                         {{ $atl->driver_name ?: '—' }}
                                         @if ($atl->plate_number)
                                             <div class="text-muted">{{ $atl->plate_number }}</div>
@@ -208,7 +254,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" class="text-center py-5 text-muted">
+                                    <td colspan="9" class="text-center py-5 text-muted">
                                         <i class="bi bi-check2-circle fs-1 d-block mb-2 text-success"></i>
                                         No ATLs are waiting for approval.
                                     </td>
@@ -535,6 +581,22 @@
         html += '<div class="apv-grid">' + fields.map(function (f) {
             return '<div><div class="apv-l">' + esc(f[0]) + '</div><div class="apv-v">' + esc(f[1]) + '</div></div>';
         }).join('') + '</div>';
+
+        // A corrected ATL is reopened with the values that changed, so the VP
+        // reads the change here, where the ruling is actually made.
+        if (isAtl && d.corrections && d.corrections.length) {
+            html += '<div class="apv-sec">Corrected since it was filed</div>';
+            d.corrections.forEach(function (c) {
+                html += '<div class="apv-l">' + esc(c.by) + (c.at ? ' · ' + esc(c.at) : '') + '</div>'
+                    + '<table class="apv-tbl mb-2"><thead><tr><th>Field</th><th>Before</th><th>After</th></tr></thead><tbody>'
+                    + c.changes.map(function (ch) {
+                        return '<tr><td>' + esc(ch.label) + '</td>'
+                            + '<td class="text-muted">' + esc(ch.before) + '</td>'
+                            + '<td class="fw-semibold">' + esc(ch.after) + '</td></tr>';
+                    }).join('')
+                    + '</tbody></table>';
+            });
+        }
 
         if (isAtl) {
             // The ATL card carries no prices: an ATL authorises a lift, it does not

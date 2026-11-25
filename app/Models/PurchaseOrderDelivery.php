@@ -151,6 +151,18 @@ class PurchaseOrderDelivery extends Model
     }
 
     /**
+     * Every correction made to this ATL, newest first.
+     *
+     * The VP queue reads these to show what a reopened ATL changed, so the
+     * ruling is made on the change rather than on a record that silently
+     * differs from the one approved.
+     */
+    public function corrections(): HasMany
+    {
+        return $this->hasMany(AtlCorrection::class, 'purchase_order_delivery_id')->latest();
+    }
+
+    /**
      * Has this exact form submission already produced an ATL?
      *
      * The ATL forms carry a token generated once per render, so a double-click,
