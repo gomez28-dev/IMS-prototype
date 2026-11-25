@@ -228,7 +228,7 @@
 
     <div class="card card-custom border-0 shadow-sm">
         <div class="card-body p-0">
-            <div class="table-responsive">
+            <div class="table-responsive d-none d-md-block">
                 <table id="atlsTable" class="table table-custom table-hover align-middle mb-0">
                     <thead>
                         <tr>
@@ -376,6 +376,127 @@
                         @endforelse
                     </tbody>
                 </table>
+            </div>
+            {{-- Phones: one card per ATL, with the same lift/received
+                 selects and forms as the row. --}}
+            <div class="rec-cards">
+                @foreach ($atls as $atl)
+                    @php
+                        $poNumbers = $atl->allocations->pluck('purchaseOrder')->filter()
+                            ->pluck('po_number')->unique()->join(', ');
+                        $poNumbers = $poNumbers !== '' ? $poNumbers : ($atl->purchaseOrder->po_number ?? '—');
+                        $breakdown = $atl->productBreakdown() ?: [$atl->product => (int) $atl->qty_to_receive];
+                        $codes = ['Diesel' => 'D', 'Unleaded' => 'U', 'Premium' => 'P'];
+                        $approved = $atl->isApproved();
+                        $lifted = $atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_LIFTED;
+                        $canEditLift = Auth::user()->canMarkAtlLifted();
+                        $canEditReceived = Auth::user()->canReceiveStockIntoDepot();
+                        $canUnlift = $lifted && ! $atl->received_at;
+                        $canCorrect = Auth::user()->canEditStockOrders() && $atl->canBeCorrected();
+                        $canLift = $approved
+                            && in_array($atl->status, ['Pending', 'Active', 'Cancelled'], true)
+                            && ! $lifted
+                            && ! $atl->received_at;
+                    @endphp
+                    <div class="rec-card">
+                        <div class="rec-card-head">
+                            <div class="rec-card-title">{{ $atl->dr_number ?: '—' }}</div>
+                            <span class="badge rounded-pill px-2 py-1 {{ $approved
+                                ? 'bg-success-subtle text-success border'
+                                : ($atl->approval_status === \App\Models\PurchaseOrderDelivery::APPROVAL_REJECTED
+                                    ? 'bg-danger-subtle text-danger border'
+                                    : 'bg-warning-subtle text-warning-emphasis border') }}">
+                                {{ $approved ? 'APPROVED' : strtoupper(str_replace('_', ' ', $atl->approval_status ?? 'DRAFT')) }}
+                            </span>
+                        </div>
+
+                        <div class="rec-meta">
+                            <div><span class="rec-k">ATL#:</span> <span class="rec-v">{{ $atl->atl_number ?: ($atl->client_atl_number ?: 'Pending') }}</span></div>
+                            <div class="rec-r"><span class="rec-k">PO#:</span> <span class="rec-v">{{ $poNumbers }}</span></div>
+                            <div><span class="rec-k">{{ $isPickup ? 'Pick Up' : 'Delivery' }}:</span> <span class="rec-v">{{ $atl->receiving_date?->format('Y-m-d') ?? '—' }}</span></div>
+                            <div class="rec-r"><span class="rec-k">Type:</span> <span class="rec-v">{{ $atl->typeLabel() }}</span></div>
+                        </div>
+
+                        <div class="rec-block">
+                            @foreach ($breakdown as $product => $qty)
+                                <div class="rec-line">
+                                    <span>{!! $chip($codes[$product] ?? '', $product) !!} <span class="ms-1">{{ $product ?: 'Unspecified' }}</span></span>
+                                    <span class="fw-bold text-nowrap">{{ number_format($qty) }}</span>
+                                </div>
+                            @endforeach
+                        </div>
+
+                        <div class="rec-meta">
+                            <div class="rec-span"><span class="rec-k">Corrections:</span> <span class="rec-v fw-normal">@include('wetstock.partials.atl-corrections', ['atl' => $atl])</span></div>
+                        </div>
+
+                        <div class="rec-kv">
+                            <span class="rec-k">Lift</span>
+                            @if ($canEditLift)
+                                <form method="POST" action="{{ route('stock-orders.lift-status', $atl->id) }}" class="lift-status-form">
+                                    @csrf
+                                    <select name="lift_status" class="form-select form-select-sm lift-status-select"
+                                            data-current="{{ $atl->lift_status }}"
+                                            aria-label="Lift status of ATL {{ $atl->atl_number ?: $atl->id }}">
+                                        <option value="{{ \App\Models\PurchaseOrderDelivery::LIFT_UNLIFTED }}"
+                                                @selected($atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_UNLIFTED)
+                                                @disabled(! $canUnlift && $atl->lift_status !== \App\Models\PurchaseOrderDelivery::LIFT_UNLIFTED && $atl->lift_status !== \App\Models\PurchaseOrderDelivery::LIFT_CANCELLED)>Unlifted</option>
+                                        <option value="{{ \App\Models\PurchaseOrderDelivery::LIFT_LIFTED }}"
+                                                @selected($lifted)
+                                                @disabled(! $canLift && ! $lifted)>Lifted</option>
+                                        <option value="{{ \App\Models\PurchaseOrderDelivery::LIFT_CANCELLED }}"
+                                                @selected($atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_CANCELLED)
+                                                @disabled($atl->lift_status !== \App\Models\PurchaseOrderDelivery::LIFT_UNLIFTED && $atl->lift_status !== \App\Models\PurchaseOrderDelivery::LIFT_CANCELLED)>Cancelled</option>
+                                    </select>
+                                </form>
+                            @elseif ($lifted)
+                                <span class="badge bg-success-subtle text-success border rounded-pill">Lifted</span>
+                            @elseif ($atl->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_CANCELLED)
+                                <span class="badge bg-danger-subtle text-danger border rounded-pill">Cancelled</span>
+                            @else
+                                <span class="badge bg-light text-dark border rounded-pill">Unlifted</span>
+                            @endif
+                        </div>
+
+                        <div class="rec-kv">
+                            <span class="rec-k">Received</span>
+                            @if ($canEditReceived)
+                                <form method="POST" action="{{ route('stock-orders.received-status', $atl->id) }}" class="received-status-form">
+                                    @csrf
+                                    <select name="received_status" class="form-select form-select-sm received-status-select"
+                                            aria-label="Received status of ATL {{ $atl->atl_number ?: $atl->id }}">
+                                        <option value="NOT_RECEIVED" @selected(! $atl->received_at)>Not yet received</option>
+                                        <option value="RECEIVED" @selected((bool) $atl->received_at)>Received</option>
+                                    </select>
+                                </form>
+                            @elseif ($atl->received_at)
+                                <span class="badge bg-success-subtle text-success border rounded-pill">Received</span>
+                            @else
+                                <span class="badge bg-light text-dark border rounded-pill">Not yet received</span>
+                            @endif
+                        </div>
+
+                        <div class="rec-actions">
+                            @if ($approved)
+                                <a href="{{ route('stock-orders.atl-pdf', $atl->id) }}"
+                                   class="btn btn-sm btn-outline-secondary action-icon" target="_blank"
+                                   title="Download ATL PDF">
+                                    <i class="bi bi-file-earmark-pdf"></i>
+                                </a>
+                            @endif
+                            @if ($canCorrect)
+                                <a href="{{ route('stock-orders.atls.edit', $atl->id) }}"
+                                   class="btn btn-sm btn-outline-primary action-icon"
+                                   title="Correct this ATL's date, driver or documents">
+                                    <i class="bi bi-pencil-square"></i>
+                                </a>
+                            @endif
+                            @unless ($approved || $canCorrect)
+                                <span class="small text-muted">—</span>
+                            @endunless
+                        </div>
+                    </div>
+                @endforeach
             </div>
         </div>
     </div>

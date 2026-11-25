@@ -464,3 +464,339 @@ body .action-icon:hover {
         transform: none !important;
     }
 }
+
+/* --------------------------------------------------------------------------
+   9. Responsive — phone, tablet, desktop
+   --------------------------------------------------------------------------
+   The shell (sidebar, mobile drawer, topbar) already switches at 992px in the
+   layout. This section is about the content *inside* it. Three rules govern
+   everything below:
+
+   1. Nothing keeps a fixed width it cannot give back. Fluid width with a max,
+      never a bare `width: 320px`.
+   2. Wide content scrolls inside its own box (.table-responsive), never by
+      pushing the whole page sideways.
+   3. Controls get bigger on phones, not smaller: they are hit with a thumb.
+   -------------------------------------------------------------------------- */
+
+/* iOS and Android inflate text in landscape unless this is pinned. Inflated
+   text is what used to push cards past the edge when a phone was turned
+   sideways. */
+html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
+/* Grid and flex children default to `min-width: auto`, so a single long id or
+   one fixed-width control widens its entire row past the viewport. Zeroing it
+   lets the child shrink and its own scroll box take over. */
+.app-content-wrapper,
+.app-content-wrapper .row > [class*="col"] {
+    min-width: 0;
+}
+
+/* Search field in a list toolbar. 320px on desktop is the shared convention
+   across the order lists; on a phone it becomes fluid (see below). */
+.filter-search {
+    width: 320px;
+    flex: 0 0 320px;
+    max-width: 100%;
+}
+
+/* ===== Phone ===== */
+@media (max-width: 767.98px) {
+    /* Table chrome: the 16px/20px cells were drawn for a 1440px monitor and
+       eat half a phone screen. */
+    body .table-custom thead th,
+    body .table-custom tbody td {
+        padding: 0.65rem 0.6rem;
+    }
+
+    body .table-custom thead th {
+        font-size: 0.66rem;
+        letter-spacing: 0.04em;
+    }
+
+    body .table-custom tbody td {
+        font-size: 0.78rem;
+    }
+
+    /* Row actions stop reserving 5.5rem each. */
+    .btn-action {
+        min-width: 0;
+    }
+
+    body .table-custom .btn-sm {
+        min-height: 40px;
+        min-width: 40px;
+    }
+
+    /* Long document numbers (PO-2026-000123) are the usual reason a card
+       punches through the viewport. Break them instead of widening. */
+    body .table-custom tbody td:not(.text-nowrap) {
+        overflow-wrap: anywhere;
+    }
+
+    .table-responsive {
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* iOS Safari zooms the page whenever a control smaller than 16px takes
+       focus. That zoom is the most common reason a phone "isn't responsive":
+       the layout is momentarily a third wider than the screen. */
+    .form-control,
+    .form-select,
+    .input-group-text {
+        font-size: 16px;
+    }
+
+    .input-group-text {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+    }
+
+    /* List toolbars: stack the search row instead of holding one line that is
+       wider than the phone. */
+    .toolbar-row {
+        flex-wrap: wrap;
+    }
+
+    .toolbar-row > form {
+        flex: 1 1 100%;
+        flex-wrap: wrap;
+        min-width: 0;
+    }
+
+    .filter-search {
+        flex: 1 1 100%;
+        width: 100%;
+    }
+
+    /* Status tab strips (Pending / Hold / Approved / Declined / Cancelled).
+       `nav-fill` split the strip into five equal columns, so on a phone each
+       tab had about 70px and the last two were clipped by the card edge.
+       Wrapping turns the five into chips two to a row (the odd one out spans
+       the row), so every status is on screen and none hides behind a swipe. */
+    .nav.nav-tabs.tabs-scroll {
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        border-bottom: 0 !important;
+    }
+
+    .nav.nav-tabs.tabs-scroll > .nav-item {
+        flex: 1 1 45%;
+        min-width: 0;
+    }
+
+    .nav.nav-tabs.tabs-scroll .nav-link {
+        height: 100%;
+        gap: 0.35rem !important;
+        min-height: 42px;
+        padding: 0.55rem 0.5rem !important;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.6rem;
+        font-size: 0.75rem;
+        line-height: 1.2;
+        white-space: nowrap;
+    }
+
+    /* Bootstrap paints the active tab with the page background, which reads
+       as nothing once the strip is no longer a strip. */
+    .nav.nav-tabs.tabs-scroll .nav-link.active {
+        border-color: var(--brand);
+        background: #fff5f1;
+        box-shadow: inset 0 0 0 1px var(--brand);
+    }
+
+    /* Dashboard hero figures were sized for a desktop card. `body` prefix so
+       the value beats the page-local copy that still says 3.6rem. */
+    body .stat-big {
+        font-size: 2.6rem;
+    }
+}
+
+/* ===== Compact phones (small Android, iPhone SE held sideways) ===== */
+@media (max-width: 400px) {
+    .page-title {
+        font-size: 1.3rem;
+    }
+
+    body .table-custom thead th,
+    body .table-custom tbody td {
+        padding: 0.55rem 0.45rem;
+    }
+
+    .btn {
+        padding-left: 0.85rem;
+        padding-right: 0.85rem;
+    }
+
+    .pl-row {
+        grid-template-columns: 1.35rem 5rem;
+        column-gap: 0.35rem;
+    }
+}
+
+/* --------------------------------------------------------------------------
+   10. Record cards — a table that becomes stacked cards on a phone
+   --------------------------------------------------------------------------
+   The Sales Documentation order list already reads this way below 768px, so
+   the same shape is reused wherever a module lists records. The table stays
+   above that breakpoint (it is the right tool for eight columns); below it
+   each row becomes one card: a title and its badge, two columns of label and
+   value, a white block for the per-product lines, then full-width actions.
+   Same reading order as the row, without the sideways scroll.
+   -------------------------------------------------------------------------- */
+
+.rec-cards {
+    display: none;
+}
+
+@media (max-width: 767.98px) {
+    .rec-cards {
+        display: block;
+        padding: 0.85rem;
+    }
+
+    .rec-card {
+        background: #f8f9fa;
+        border-radius: 1rem;
+        box-shadow: 0 1px 3px rgba(16, 24, 40, 0.08);
+        padding: 1.1rem;
+        margin-bottom: 0.85rem;
+    }
+
+    .rec-card:last-child {
+        margin-bottom: 0;
+    }
+
+    .rec-card-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .rec-card-title {
+        min-width: 0;
+        margin: 0;
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #111827;
+        line-height: 1.25;
+        overflow-wrap: anywhere;
+    }
+
+    .rec-meta {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 0.15rem 0.75rem;
+        margin-bottom: 0.75rem;
+        font-size: 0.78rem;
+        color: #6b7280;
+    }
+
+    .rec-meta > div {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    .rec-meta .rec-r {
+        text-align: right;
+    }
+
+    .rec-span {
+        grid-column: 1 / -1;
+    }
+
+    .rec-k {
+        color: #6b7280;
+    }
+
+    .rec-v {
+        color: #111827;
+        font-weight: 600;
+    }
+
+    .rec-block {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.75rem;
+        padding: 0.6rem 0.75rem;
+        margin-bottom: 0.75rem;
+        font-size: 0.8rem;
+    }
+
+    .rec-line {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+    }
+
+    .rec-line + .rec-line {
+        margin-top: 0.25rem;
+    }
+
+    /* The delivery chips are drawn nowrap for the wide table; a card is
+       narrower than the longest chip. */
+    .rec-cards .prod-chip {
+        max-width: 100%;
+        white-space: normal;
+        text-align: left;
+    }
+
+    .rec-line > :first-child {
+        min-width: 0;
+    }
+
+    .rec-total {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 0.45rem;
+        padding-top: 0.35rem;
+        border-top: 1px solid #e5e7eb;
+        font-weight: 600;
+    }
+
+    /* One label/value line, e.g. Status or Clearance. */
+    .rec-kv {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        margin-bottom: 0.6rem;
+        font-size: 0.8rem;
+    }
+
+    .rec-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.25rem;
+    }
+
+    .rec-actions > .btn,
+    .rec-actions > form {
+        flex: 1 1 auto;
+    }
+
+    .rec-actions > form > .btn {
+        width: 100%;
+    }
+
+    .rec-actions .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 42px;
+        font-size: 0.8rem;
+    }
+
+    .rec-empty {
+        padding: 2.5rem 1rem;
+        text-align: center;
+        color: #6b7280;
+    }
+}

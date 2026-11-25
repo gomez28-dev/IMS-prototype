@@ -44,7 +44,12 @@
     .ws-strip .ws-stat { padding:6px 10px; border-radius:8px; }
     .ws-strip .ws-stat .k { font-size:.65rem; }
     .ws-strip .ws-stat .v { font-size:.88rem; }
-    @media (max-width: 575.98px) { .ws-strip { grid-template-columns:repeat(2, 1fr); } }
+    @media (max-width: 575.98px) {
+        .ws-strip { grid-template-columns:repeat(2, 1fr); }
+        /* Compartment rows keep five columns but give up the fixed tracks, so
+           the product and the figures still fit the modal on a phone. */
+        .ws-modal .ws-cmp { gap:5px; padding:5px 8px; grid-template-columns:26px minmax(60px,1fr) minmax(40px,1.2fr) auto auto; }
+    }
     .ws-modal .ws-truck { padding:4px 8px; border-radius:10px; }
     .ws-modal .ws-truck svg { max-height:150px; }
     .ws-modal .ws-cmp { padding:5px 10px; gap:8px; font-size:.78rem; grid-template-columns:30px minmax(80px,1fr) minmax(60px,1.4fr) auto auto; border-radius:8px; }

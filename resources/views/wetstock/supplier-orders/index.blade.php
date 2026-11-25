@@ -54,7 +54,7 @@
 <!-- Supplier Orders Table -->
 <div class="card card-custom border-0 shadow-sm">
     <div class="card-body p-4">
-        <div class="table-responsive">
+        <div class="table-responsive d-none d-md-block">
             <table class="table table-custom mb-0">
                 <thead>
                     <tr>
@@ -144,7 +144,91 @@
             </table>
         </div>
         <div class="mt-3">
-            {{ $supplierOrders->withQueryString()->links() }}
+            {{-- Phones: one card per incoming PO. --}}
+        <div class="rec-cards">
+            @foreach ($supplierOrders as $po)
+                <div class="rec-card">
+                    <div class="rec-card-head">
+                        <div class="rec-card-title">{{ $po->po_number }}</div>
+                        @if ($po->status === 'UNLIFTED_PICKUP')
+                            <span class="badge bg-warning text-dark px-2 py-1">Unlifted Pick Up</span>
+                        @elseif ($po->status === 'PENDING_DELIVERY')
+                            <span class="badge bg-info text-dark px-2 py-1">Pending Delivery</span>
+                        @elseif ($po->status === 'CANCELLED')
+                            <span class="badge bg-danger text-white px-2 py-1">Cancelled</span>
+                        @else
+                            <span class="badge bg-success px-2 py-1">Completed</span>
+                        @endif
+                    </div>
+
+                    <div class="rec-meta">
+                        <div class="rec-span"><span class="rec-k">Supplier:</span> <span class="rec-v">{{ $po->supplier_name }}</span></div>
+                        <div><span class="rec-k">ATL / DR#:</span> <span class="rec-v">{{ $po->atl_dr_number ?: '-' }}</span></div>
+                        <div class="rec-r"><span class="rec-k">Volume:</span> <span class="rec-v">{{ number_format($po->liters) }} L</span></div>
+                        <div><span class="rec-k">Location:</span> <span class="rec-v">{{ $po->warehouse->name ?? 'N/A' }}</span></div>
+                        <div class="rec-r"><span class="rec-k">Added by:</span> <span class="rec-v">{{ $po->creator->name ?? 'System' }}</span></div>
+                    </div>
+
+                    @if ($po->remarks)
+                        <div class="rec-meta">
+                            <div class="rec-span"><span class="rec-k">Remarks:</span> <span class="rec-v fw-normal">{{ $po->remarks }}</span></div>
+                        </div>
+                    @endif
+
+                    @php $pendingReq = $po->modificationRequests->first(); @endphp
+                    @if ($pendingReq)
+                        <div class="rec-meta">
+                            <div class="rec-span">
+                                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-2 py-1" title="Pending modification #{{ $pendingReq->id }}: {{ $pendingReq->reason }}">
+                                    <i class="bi bi-hourglass-split me-1"></i>Pending Approval
+                                </span>
+                            </div>
+                        </div>
+                    @endif
+
+                    @if (Auth::user()->canEditModule2())
+                        <div class="rec-actions">
+                            @php $hasPending = $po->modificationRequests->isNotEmpty(); @endphp
+                            @if ($po->status !== 'COMPLETED' && $po->status !== 'CANCELLED' && !$hasPending)
+                                <form action="{{ route('wetstock.supplier-orders.complete', $po->id) }}" method="POST" onsubmit="return confirm('Mark PO #{{ $po->po_number }} as COMPLETED / Received?')">
+                                    @csrf
+                                    <button type="submit" class="btn btn-sm btn-outline-success rounded-3" title="Mark Completed">
+                                        <i class="bi bi-check-lg me-1"></i> Complete
+                                    </button>
+                                </form>
+                            @endif
+                            @if ($hasPending)
+                                @if (Auth::user()->canApproveModule2Modification())
+                                    @php $pr = $po->modificationRequests->first(); @endphp
+                                    <form method="POST" action="{{ route('approvals.approve', $pr->id) }}" onsubmit="return confirm('Approve modification for PO #{{ $po->po_number }}?');">
+                                        @csrf
+                                        <button type="submit" class="btn btn-sm btn-success rounded-3" title="Approve &amp; Apply"><i class="bi bi-check-lg"></i></button>
+                                    </form>
+                                    <form method="POST" action="{{ route('approvals.reject', $pr->id) }}" onsubmit="return confirm('Reject modification for PO #{{ $po->po_number }}?');">
+                                        @csrf
+                                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-3" title="Reject"><i class="bi bi-x-lg"></i></button>
+                                    </form>
+                                @else
+                                    <span class="text-muted small"><i class="bi bi-lock me-1"></i>Awaiting Approval</span>
+                                @endif
+                            @else
+                                <a href="{{ route('wetstock.supplier-orders.edit', $po->id) }}" class="btn btn-sm btn-outline-primary rounded-3" title="Edit PO">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <form action="{{ route('wetstock.supplier-orders.destroy', $po->id) }}" method="POST" onsubmit="return confirm('Delete PO #{{ $po->po_number }}? This will permanently remove this incoming stock record and cannot be undone.');">
+                                    @csrf
+                                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-3" title="Delete PO">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            @endif
+                        </div>
+                    @endif
+                </div>
+            @endforeach
+        </div>
+
+        {{ $supplierOrders->withQueryString()->links() }}
         </div>
     </div>
 </div>

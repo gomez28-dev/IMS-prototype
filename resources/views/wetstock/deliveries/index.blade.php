@@ -228,7 +228,7 @@
                             <p class="text-muted">There are currently no deliveries awaiting tank assignment.</p>
                         </div>
                     @else
-                        <div class="table-responsive">
+                        <div class="table-responsive d-none d-md-block">
                             <table class="table table-hover align-middle mb-0 wetstock-deliveries-table">
                                 <thead class="bg-light">
                                     <tr>
@@ -295,6 +295,58 @@
                                     @endforeach
                                 </tbody>
                             </table>
+                        </div>
+
+                        {{-- Phones: the same rows as stacked cards (shared
+                             .rec-cards pattern). The table above stays for
+                             tablet and desktop. --}}
+                        <div class="rec-cards">
+                            @foreach ($unassignedDeliveries as $delivery)
+                                <div class="rec-card">
+                                    <div class="rec-card-head">
+                                        <div class="rec-card-title">
+                                            {{ $delivery->dr_number }}
+                                            @if ($delivery->allocations->isNotEmpty())
+                                                <span class="badge bg-warning-subtle border border-warning-subtle rounded-pill ms-1" style="color:#a16207; font-size:0.6rem;">PARTIAL</span>
+                                            @endif
+                                        </div>
+                                        @if ($delivery->type === 'PICK-UP')
+                                            <span class="badge badge-type-pickup rounded-pill wetstock-type-badge">PICK-UP</span>
+                                        @elseif ($delivery->type === 'SMALL TANKER')
+                                            <span class="badge badge-type-small-tanker rounded-pill wetstock-type-badge">SMALL TANKER</span>
+                                        @else
+                                            <span class="badge badge-type-big-tanker rounded-pill wetstock-type-badge">BIG TANKER</span>
+                                        @endif
+                                    </div>
+
+                                    <div class="rec-meta">
+                                        <div class="rec-span"><span class="rec-k">Client:</span> <span class="rec-v">{{ $delivery->order->account ?? '-' }}</span></div>
+                                        <div><span class="rec-k">ATL#:</span> <span class="rec-v">{{ $delivery->atl_number ?: '-' }}</span></div>
+                                        <div class="rec-r"><span class="rec-k">Delivery:</span> <span class="rec-v">{{ $delivery->delivery_date ? $delivery->delivery_date->format('M d, Y') : '-' }}</span></div>
+                                    </div>
+
+                                    <div class="rec-block">
+                                        <div class="d-flex flex-wrap gap-2">
+                                            @foreach ($linesOf($delivery) as $l)
+                                                <span class="prod-chip {{ $l['remaining'] <= 0 ? 'done' : '' }}" style="--pc: {{ $pcol[$l['code']] ?? '#9aa5b4' }};" title="{{ $l['code'] === '-' ? 'No product set' : $l['name'] }}: {{ number_format($l['allocated']) }} of {{ number_format($l['qty']) }} L allocated">
+                                                    <span class="dot"></span>{{ $l['code'] === '-' ? 'No product' : $l['name'] }} {{ number_format($l['qty']) }} L
+                                                    @if ($l['remaining'] <= 0)
+                                                        <i class="bi bi-check2 text-success"></i>
+                                                    @elseif ($l['allocated'] > 0)
+                                                        <span class="left">&middot; {{ number_format($l['remaining']) }} L left</span>
+                                                    @endif
+                                                </span>
+                                            @endforeach
+                                        </div>
+                                    </div>
+
+                                    <div class="rec-actions">
+                                        <button type="button" class="btn btn-sm btn-primary-custom rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#allocModal{{ $delivery->id }}">
+                                            <i class="bi bi-diagram-3 me-1"></i> {{ Auth::user()->canEditModule2() ? 'Assign Tanks' : 'View' }}
+                                        </button>
+                                    </div>
+                                </div>
+                            @endforeach
                         </div>
 
                         <div class="p-3">
@@ -526,7 +578,7 @@
                             <p class="text-muted">Allocate tanks in the Unassigned tab first. Once allocated, deliveries will appear here awaiting fulfillment.</p>
                         </div>
                     @else
-                        <div class="table-responsive">
+                        <div class="table-responsive d-none d-md-block">
                             <table class="table table-hover align-middle mb-0 wetstock-deliveries-table">
                                 <thead class="bg-light">
                                     <tr>
@@ -630,6 +682,66 @@
                             </table>
                         </div>
 
+                        {{-- Phones: one card per delivery awaiting fulfillment. --}}
+                        <div class="rec-cards">
+                            @foreach ($assignedDeliveries as $delivery)
+                                <div class="rec-card">
+                                    <div class="rec-card-head">
+                                        <div class="rec-card-title">{{ $delivery->dr_number }}</div>
+                                        <span class="badge bg-warning-subtle border border-warning-subtle rounded-pill px-2 py-1" style="color:#a16207;">HOLD (Pending)</span>
+                                    </div>
+
+                                    <div class="rec-meta">
+                                        <div class="rec-span"><span class="rec-k">Client:</span> <span class="rec-v">{{ $delivery->order->account ?? '-' }}</span></div>
+                                        <div><span class="rec-k">ATL#:</span> <span class="rec-v">{{ $delivery->atl_number ?: '-' }}</span></div>
+                                        <div class="rec-r"><span class="rec-k">Volume:</span> <span class="rec-v">{{ number_format($delivery->qty_out) }} L</span></div>
+                                        <div class="rec-span"><span class="rec-k">Created by:</span> <span class="rec-v">{{ $delivery->createdBy->name ?? 'Legacy Data' }}</span></div>
+                                    </div>
+
+                                    <div class="rec-block">
+                                        @foreach ($delivery->allocations as $alloc)
+                                            <div class="rec-line">
+                                                <span>
+                                                    @if ($alloc->item)
+                                                        <span class="prod-chip" style="--pc: {{ $pcol[$alloc->item->product_type ?? ''] ?? '#9aa5b4' }};"><span class="dot"></span>{{ $alloc->item->product_name }}</span>
+                                                    @endif
+                                                    <strong>{{ $alloc->tank->name ?? '—' }}</strong>
+                                                    <span class="text-muted">{{ $alloc->tank->warehouse->name ?? '—' }}</span>
+                                                    @if ($alloc->compartment)
+                                                        <span class="badge bg-light text-secondary border">C{{ $alloc->compartment->compartment_no }}</span>
+                                                    @endif
+                                                </span>
+                                                <span class="d-flex align-items-center gap-2 text-nowrap">
+                                                    <span class="font-monospace fw-bold">{{ number_format($alloc->quantity) }} L</span>
+                                                    @if (Auth::user()->canEditModule2())
+                                                        <form method="POST" action="{{ route('wetstock.deliveries.unassign', $alloc->id) }}" onsubmit="return confirm('Remove {{ number_format($alloc->quantity) }}L allocation from {{ $alloc->tank->name }}?');">
+                                                            @csrf
+                                                            <button type="submit" class="btn btn-link text-danger p-0" title="Remove tank allocation">
+                                                                <i class="bi bi-x-circle"></i>
+                                                            </button>
+                                                        </form>
+                                                    @endif
+                                                </span>
+                                            </div>
+                                        @endforeach
+                                    </div>
+
+                                    <div class="rec-actions">
+                                        @if (Auth::user()->canMarkFulfilled())
+                                            <form method="POST" action="{{ route('wetstock.deliveries.fulfill', $delivery->id) }}" onsubmit="return confirm('Mark DR #{{ $delivery->dr_number }} as FULFILLED? This will officially dispatch fuel from the assigned tanks.');">
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm btn-success rounded-pill px-3">
+                                                    <i class="bi bi-check-lg me-1"></i> Mark as Fulfilled
+                                                </button>
+                                            </form>
+                                        @else
+                                            <span class="text-muted small"><i class="bi bi-lock me-1"></i>Awaiting Ops Mgr</span>
+                                        @endif
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+
                         <div class="p-3">
                             {{ $assignedDeliveries->appends(['tab' => 'assigned', 'search' => $search ?? null])->links() }}
                         </div>
@@ -687,7 +799,7 @@
                             <p class="text-muted">Try another month or <a href="{{ route('wetstock.deliveries.index', ['tab' => 'history', 'history_all' => 1]) }}">show all records</a>.</p>
                         </div>
                     @else
-                        <div class="table-responsive">
+                        <div class="table-responsive d-none d-md-block">
                             <table class="table table-hover align-middle mb-0 wetstock-deliveries-table">
                                 <thead class="bg-light">
                                     <tr>
@@ -772,6 +884,47 @@
                                     @endforeach
                                 </tbody>
                             </table>
+                        </div>
+
+                        {{-- Phones: one card per dispatched delivery. --}}
+                        <div class="rec-cards">
+                            @foreach ($historyDeliveries as $delivery)
+                                <div class="rec-card">
+                                    <div class="rec-card-head">
+                                        <div class="rec-card-title">{{ $delivery->dr_number }}</div>
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1">FULFILLED</span>
+                                    </div>
+
+                                    <div class="rec-meta">
+                                        <div class="rec-span"><span class="rec-k">Client:</span> <span class="rec-v">{{ $delivery->order->account ?? '-' }}</span></div>
+                                        <div><span class="rec-k">ATL#:</span> <span class="rec-v">{{ $delivery->atl_number ?: '-' }}</span></div>
+                                        <div class="rec-r"><span class="rec-k">Volume:</span> <span class="rec-v">{{ number_format($delivery->qty_out) }} L</span></div>
+                                        <div class="rec-span"><span class="rec-k">Fulfilled:</span> <span class="rec-v">{{ $delivery->fulfilled_at ? $delivery->fulfilled_at->timezone('Asia/Manila')->format('M d, Y h:i A') : ($delivery->updated_at ? $delivery->updated_at->timezone('Asia/Manila')->format('M d, Y h:i A') : '-') }}</span></div>
+                                    </div>
+
+                                    <div class="rec-block">
+                                        @foreach ($delivery->allocations as $alloc)
+                                            <div class="rec-line">
+                                                <span>
+                                                    @if ($alloc->item){{ $alloc->item->product_name }} &middot; @endif{{ $alloc->tank->name ?? '—' }}@if ($alloc->compartment) C{{ $alloc->compartment->compartment_no }}@endif
+                                                </span>
+                                                <span class="font-monospace fw-bold text-nowrap">{{ number_format($alloc->quantity) }} L</span>
+                                            </div>
+                                        @endforeach
+                                    </div>
+
+                                    @if (Auth::user()->canMarkFulfilled())
+                                        <div class="rec-actions">
+                                            <form method="POST" action="{{ route('wetstock.deliveries.revert-fulfillment', $delivery->id) }}" onsubmit="return confirm('Revert DR #{{ $delivery->dr_number }} back to PENDING? This will place the fuel volume back on hold for adjustment.');">
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm btn-outline-warning rounded-pill px-3" title="Revert to Pending">
+                                                    <i class="bi bi-arrow-counterclockwise me-1"></i> Revert to Pending
+                                                </button>
+                                            </form>
+                                        </div>
+                                    @endif
+                                </div>
+                            @endforeach
                         </div>
 
                         <div class="p-3">

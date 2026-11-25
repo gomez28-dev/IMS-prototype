@@ -88,7 +88,7 @@
         @if ($tab === 'atls')
         <div class="card card-custom border-0 shadow-sm">
             <div class="card-body p-4">
-                <div class="table-responsive">
+                <div class="table-responsive d-none d-md-block">
                     <table class="table table-center table-hover align-middle mb-0">
                         <thead class="bg-light">
                             <tr>
@@ -206,6 +206,123 @@
                                         <button type="button" class="btn btn-sm btn-action btn-outline-secondary rounded-pill px-3 shadow-sm" onclick="openAtlCard(this.closest('tr'))">
                                             <i class="bi bi-eye me-1"></i> View
                                         </button>
+                {{-- Phones: one card per ATL. The payload and the hidden
+                     approve/reject forms stay on the card, so the shared
+                     review pop-up reads it exactly as it reads a row. --}}
+                <div class="rec-cards">
+                    @foreach ($pendingAtls as $atl)
+                        @php
+                            $atlPoNumbers = $atl->allocations->pluck('purchaseOrder')->filter()
+                                ->pluck('po_number')->unique();
+
+                            $atlBreakdown = collect($atl->productBreakdown());
+                            if ($atlBreakdown->isEmpty() && $atl->product) {
+                                $atlBreakdown = collect([$atl->product => (int) $atl->qty_to_receive]);
+                            }
+
+                            $atlPayload = [
+                                'kind' => 'atl',
+                                'id' => $atl->id,
+                                'atlNumber' => $atl->atl_number ?: ($atl->client_atl_number ?: null),
+                                'salesOrder' => $atl->order?->formatted_so_number ?? $atl->refNumber(),
+                                'account' => $atl->order?->account ?? ($atl->stockRequest->warehouse->name ?? null),
+                                'poNumbers' => $atlPoNumbers->isNotEmpty()
+                                    ? $atlPoNumbers->join(', ')
+                                    : ($atl->purchaseOrder->po_number ?? null),
+                                'pickUpDate' => $atl->receiving_date?->format('M d, Y'),
+                                'volume' => number_format((int) $atl->qty_to_receive),
+                                'preparedBy' => $atl->preparer->name ?? 'Purchasing',
+                                'corrections' => $atl->corrections->map(fn ($correction) => [
+                                    'by' => $correction->admin->name ?? 'Unknown',
+                                    'at' => $correction->created_at?->format('M d, Y g:i A'),
+                                    'changes' => $correction->changesForDisplay(),
+                                ])->values(),
+                                'driver' => $atl->driver_name,
+                                'plate' => $atl->plate_number,
+                                'products' => $atlBreakdown->map(fn ($qty, $product) => [
+                                    'product' => $product,
+                                    'qty' => number_format((int) $qty),
+                                ])->values(),
+                                'remarks' => $atl->additional_remarks,
+                            ];
+                        @endphp
+                        <div class="rec-card" data-atl="{{ json_encode($atlPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}">
+                            <div class="rec-card-head">
+                                <div class="rec-card-title">
+                                    {{ $atl->atl_number ?: '—' }}
+                                    <span class="d-block small text-muted fw-normal">
+                                        @if ($atl->issued_at)
+                                            Issued {{ $atl->issued_at->format('M d, Y') }}
+                                        @elseif ($atl->atl_number)
+                                            Issued {{ ($atl->created_at ?? now())->format('M d, Y') }}
+                                        @else
+                                            Not yet issued
+                                        @endif
+                                    </span>
+                                </div>
+                                @if ($atl->corrections->isNotEmpty())
+                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill">Corrected</span>
+                                @else
+                                    <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill">Awaiting</span>
+                                @endif
+                            </div>
+
+                            <div class="rec-meta">
+                                <div class="rec-span">
+                                    <span class="rec-k">Sales order:</span>
+                                    <span class="rec-v">
+                                        @if ($atl->order)
+                                            <a href="{{ route('stock-orders.atls.show', $atl->order->id) }}" class="text-decoration-none">{{ $atl->order->formatted_so_number }}</a>
+                                            <span class="d-block small text-muted fw-normal">{{ $atl->order->account }}</span>
+                                        @elseif ($atl->stockRequest)
+                                            <a href="{{ route('stock-orders.wet-stock-requests.atls', $atl->stockRequest->id) }}" class="text-decoration-none">{{ $atl->refNumber() }}</a>
+                                            <span class="d-block small text-muted fw-normal">{{ $atl->stockRequest->warehouse->name ?? '' }}</span>
+                                        @else
+                                            {{ $atl->so_number ?: '—' }}
+                                        @endif
+                                    </span>
+                                </div>
+                                <div><span class="rec-k">PO#:</span> <span class="rec-v">{{ $atlPoNumbers->isNotEmpty() ? $atlPoNumbers->join(', ') : ($atl->purchaseOrder->po_number ?? '—') }}</span></div>
+                                <div class="rec-r"><span class="rec-k">Pick Up:</span> <span class="rec-v">{{ $atl->receiving_date ? $atl->receiving_date->format('M d, Y') : '—' }}</span></div>
+                                <div><span class="rec-k">Volume:</span> <span class="rec-v">{{ number_format($atl->qty_to_receive) }} L</span></div>
+                                <div class="rec-r"><span class="rec-k">Prepared by:</span> <span class="rec-v">{{ $atl->preparer->name ?? 'Purchasing' }}</span></div>
+                                <div class="rec-span"><span class="rec-k">Driver:</span> <span class="rec-v">{{ $atl->driver_name ?: '—' }}{{ $atl->plate_number ? ' · ' . $atl->plate_number : '' }}</span></div>
+                            </div>
+
+                            <div class="rec-block">
+                                @foreach ($atlBreakdown as $product => $qty)
+                                    <div class="rec-line">
+                                        <span>{{ $product ?: 'Unspecified' }}</span>
+                                        <span class="fw-bold text-nowrap">{{ number_format((int) $qty) }} L</span>
+                                    </div>
+                                @endforeach
+                            </div>
+
+                            @if ($atl->corrections->isNotEmpty())
+                                <div class="rec-meta">
+                                    <div class="rec-span"><span class="rec-k">Corrections:</span> @include('wetstock.partials.atl-corrections', ['atl' => $atl])</div>
+                                </div>
+                            @endif
+
+                            <div class="rec-actions">
+                                <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill" onclick="openAtlCard(this.closest('.rec-card'))">
+                                    <i class="bi bi-eye me-1"></i> View
+                                </button>
+                                @if (Auth::user()->canApproveStockOrders())
+                                    <form method="POST" id="atl-approve-{{ $atl->id }}" action="{{ route('stock-orders.atl-approve', $atl->id) }}" class="d-none">
+                                        @csrf
+                                        <button type="submit">Approve</button>
+                                    </form>
+                                    <form method="POST" id="atl-reject-{{ $atl->id }}" action="{{ route('stock-orders.atl-reject', $atl->id) }}" class="d-none">
+                                        @csrf
+                                        <input type="hidden" name="rejection_reason" value="">
+                                    </form>
+                                @endif
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+
                                         @if (Auth::user()->canApproveStockOrders())
                                             <form method="POST" id="atl-approve-{{ $atl->id }}" action="{{ route('stock-orders.atl-approve', $atl->id) }}" class="d-none">
                                                 @csrf
@@ -231,6 +348,130 @@
                 </div>
 
                 @if ($pendingAtls->hasPages())
+                {{-- Phones: one card per purchase order awaiting the VP. --}}
+                <div class="rec-cards">
+                    @foreach ($pendingOrders as $order)
+                        @php
+                            $state = $order->request_status === 'REQUESTED'
+                                ? 'returned'
+                                : ($order->rejected_at ? 'revised' : 'pending');
+
+                            $reviewItems = $order->items->map(function ($i) {
+                                $price = (float) $i->unit_price;
+                                $qty = (int) $i->quantity_ordered;
+                                return [
+                                    'product' => $i->product,
+                                    'qty' => number_format($qty),
+                                    'price' => $price > 0 ? number_format($price, 2) : null,
+                                    'amount' => $price > 0 ? number_format($qty * $price, 2) : null,
+                                ];
+                            })->values();
+
+                            $reviewDeliveries = $order->deliveries->map(fn ($del) => [
+                                'product' => $del->product,
+                                'qty' => number_format((int) $del->qty_to_receive),
+                                'ref' => $del->atl_number ?: ($del->client_atl_number ?: $del->dr_number),
+                            ])->values();
+
+                            $reviewPayload = [
+                                'id' => $order->id,
+                                'po' => $order->po_number,
+                                'state' => $state,
+                                'lastReason' => $state !== 'pending' ? $order->rejection_reason : null,
+                                'rejectedAt' => $state !== 'pending' ? $order->rejected_at?->format('M d, Y g:i A') : null,
+                                'type' => ($order->isFuelTrade() || $order->isBuyBack()) ? $order->typeLabel() : null,
+                                'vendorLabel' => $order->supplier_name ? 'Vendor Company' : 'Client',
+                                'vendor' => $order->supplier_name ?: ($order->client->name ?? null),
+                                'address' => $order->supplier->location ?? null,
+                                'attention' => $order->attention,
+                                'terms' => $order->terms,
+                                'date' => ($order->po_date ?? $order->created_at)?->format('M d, Y'),
+                                'site' => $order->warehouse->name ?? ($order->isFuelTrade() ? 'Direct to Client' : null),
+                                'preparedBy' => $order->requester->name ?? 'Purchasing',
+                                'items' => $reviewItems,
+                                'deliveries' => $reviewDeliveries,
+                                'totalQty' => number_format((int) $order->qty_ordered),
+                                'hasAmounts' => (float) $order->total_amount > 0,
+                                'total' => number_format((float) $order->total_amount, 2),
+                                'vatable' => number_format((float) $order->vatable_sales_amount, 2),
+                                'vat' => number_format((float) $order->vat_amount, 2),
+                                'lessTax' => number_format((float) $order->less_w_tax, 2),
+                                'net' => number_format((float) $order->net_payable_amount, 2),
+                                'remarks' => $order->remarks,
+                            ];
+                        @endphp
+                        <div class="rec-card" data-po="{{ json_encode($reviewPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}">
+                            <div class="rec-card-head">
+                                <div class="rec-card-title">{{ $order->po_number }}</div>
+                                @if ($state === 'returned')
+                                    <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill">Returned</span>
+                                @elseif ($state === 'revised')
+                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill">Revised</span>
+                                @else
+                                    <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill">Awaiting</span>
+                                @endif
+                            </div>
+
+                            <div class="rec-meta">
+                                <div class="rec-span">
+                                    <span class="rec-k">Type:</span>
+                                    <span class="rec-v">
+                                        @if ($order->isFuelTrade())
+                                            Fuel Trade
+                                        @elseif ($order->isBuyBack())
+                                            Buy Back
+                                        @else
+                                            Replenishment
+                                        @endif
+                                    </span>
+                                </div>
+                                <div class="rec-span"><span class="rec-k">Supplier:</span> <span class="rec-v">{{ $order->supplier_name ?: ($order->client->name ?? '—') }}</span></div>
+                                <div class="rec-span">
+                                    <span class="rec-k">Site:</span>
+                                    <span class="rec-v">
+                                        @if ($order->warehouse)
+                                            {{ $order->warehouse->name }}
+                                        @elseif ($order->isFuelTrade())
+                                            Direct to Client
+                                        @else
+                                            —
+                                        @endif
+                                    </span>
+                                </div>
+                                <div><span class="rec-k">Volume:</span> <span class="rec-v">{{ number_format($order->qty_ordered) }} L</span></div>
+                                <div class="rec-r"><span class="rec-k">Prepared by:</span> <span class="rec-v">{{ $order->requester->name ?? 'Purchasing' }}</span></div>
+                            </div>
+
+                            <div class="rec-block">
+                                @forelse ($order->deliveries as $del)
+                                    <div class="rec-line">
+                                        <span>{{ $del->product }} <span class="text-muted">{{ $del->atl_number ?: ($del->client_atl_number ?: $del->dr_number) }}</span></span>
+                                        <span class="fw-bold text-nowrap">{{ number_format($del->qty_to_receive) }} L</span>
+                                    </div>
+                                @empty
+                                    <div class="rec-line"><span class="text-muted">No delivery lines</span></div>
+                                @endforelse
+                            </div>
+
+                            <div class="rec-actions">
+                                <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill" onclick="openPoCard(this.closest('.rec-card'))">
+                                    <i class="bi bi-eye me-1"></i> View
+                                </button>
+                                @if (Auth::user()->canApproveStockOrders() && $state !== 'returned')
+                                    <form method="POST" id="po-approve-{{ $order->id }}" action="{{ route('stock-orders.approve', $order->id) }}" class="d-none">
+                                        @csrf
+                                        <button type="submit">Approve</button>
+                                    </form>
+                                    <form method="POST" id="po-reject-{{ $order->id }}" action="{{ route('stock-orders.reject', $order->id) }}" class="d-none">
+                                        @csrf
+                                        <input type="hidden" name="rejection_reason" value="">
+                                    </form>
+                                @endif
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+
                     <div class="mt-3">
                         {{ $pendingAtls->links() }}
                     </div>
@@ -240,7 +481,7 @@
         @else
         <div class="card card-custom border-0 shadow-sm">
             <div class="card-body p-4">
-                <div class="table-responsive">
+                <div class="table-responsive d-none d-md-block">
                     <table class="table table-center table-hover align-middle mb-0">
                         <thead class="bg-light">
                             <tr>

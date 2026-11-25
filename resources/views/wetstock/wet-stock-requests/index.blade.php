@@ -99,7 +99,7 @@
             {{-- The section heading was removed and the search took its row:
                  the left edge of the card header, directly above the table it
                  filters. --}}
-            <div class="d-flex justify-content-start">
+            <div class="toolbar-row d-flex justify-content-start">
                 <form method="GET" action="{{ route('stock-orders.wet-stock-requests.index') }}"
                       class="d-flex gap-2 align-items-center flex-wrap">
                     @if (request('warehouse_id'))
@@ -108,7 +108,7 @@
                     {{-- The same fixed width the Purchase Orders list gives its
                          search, so the pair reads as one control instead of
                          stretching across the header. --}}
-                    <div class="input-group flex-shrink-0" style="width: 320px;">
+                    <div class="input-group filter-search">
                         <span class="input-group-text bg-white border-end-0">
                             <i class="bi bi-search text-muted"></i>
                         </span>
@@ -124,7 +124,7 @@
             </div>
         </div>
         <div class="card-body p-0">
-            <div class="table-responsive">
+            <div class="table-responsive d-none d-md-block">
                 <table class="table table-custom mb-0">
                     <thead>
                         <tr>
@@ -189,7 +189,52 @@
                 </table>
             </div>
             <div class="p-3">
-                {{ $stockRequests->links() }}
+            {{-- Phones: one card per request. --}}
+        <div class="rec-cards">
+            @foreach ($stockRequests as $req)
+                <div class="rec-card">
+                    <div class="rec-card-head">
+                        <div class="rec-card-title">{{ $req->request_number }}</div>
+                        <span class="badge bg-warning text-dark px-2 py-1">{{ $req->status }}</span>
+                    </div>
+
+                    <div class="rec-meta">
+                        <div class="rec-span"><span class="rec-k">Site:</span> <span class="rec-v">{{ $req->warehouse->name ?? 'All Depots' }}</span></div>
+                        <div><span class="rec-k">Type:</span> <span class="rec-v">{{ $req->type_label }}</span></div>
+                        <div class="rec-r"><span class="rec-k">Needed:</span> <span class="rec-v">{{ $req->date_needed ? $req->date_needed->format('M d, Y') : '-' }}</span></div>
+                        <div class="rec-span"><span class="rec-k">Requested by:</span> <span class="rec-v">{{ $req->requester->name ?? 'Depot' }}</span></div>
+                    </div>
+
+                    @if ($req->lines->isNotEmpty())
+                        <div class="rec-block">
+                            @foreach ($req->lines as $line)
+                                <div class="rec-line">
+                                    <span>{!! $chip(\Illuminate\Support\Str::substr((string) $line->product, 0, 1), $line->product) !!} <span class="ms-1">{{ $line->product }}</span></span>
+                                    <span class="fw-bold text-nowrap">{{ number_format($line->qty_requested) }}</span>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    @if ($req->remarks)
+                        <div class="rec-meta">
+                            <div class="rec-span"><span class="rec-k">Remarks:</span> <span class="rec-v fw-normal">{{ $req->remarks }}</span></div>
+                        </div>
+                    @endif
+
+                    <div class="rec-actions">
+                        @if (Auth::user()->canEditStockOrders())
+                            <a href="{{ route('stock-orders.wet-stock-requests.atls', $req->id) }}"
+                               class="btn btn-sm btn-primary rounded-pill" title="Open this request's ATL records">
+                                <i class="bi bi-card-list me-1"></i> View ATLs
+                            </a>
+                        @endif
+                    </div>
+                </div>
+            @endforeach
+        </div>
+
+            {{ $stockRequests->links() }}
             </div>
         </div>
     </div>

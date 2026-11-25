@@ -52,6 +52,44 @@
             $badgeRet = 'bg-danger-subtle text-danger border border-danger-subtle';
             $badgeNone = 'bg-secondary-subtle text-secondary border border-secondary-subtle';
 
+            // One place decides what a purchase order shows for status, terms
+            // and amount, so the table and the phone cards below cannot drift
+            // apart. A cancelled PO is checked first so it never reads as
+            // approved; RECEIVED is this codebase's pending-VP-approval state.
+            $poState = function ($po) use ($badgeOk, $badgeWait, $badgeRet, $badgeNone) {
+                $isApproved = $po->isVpApproved();
+                $isCancelled = $po->isCancelled();
+
+                if ($isCancelled) {
+                    $label = 'Cancelled';
+                    $class = $badgeNone;
+                } elseif ($isApproved) {
+                    $label = 'Approved';
+                    $class = $badgeOk;
+                } elseif ($po->request_status === 'REQUESTED' && ! empty($po->rejection_reason)) {
+                    $label = 'Returned';
+                    $class = $badgeRet;
+                } elseif ($po->request_status === 'RECEIVED') {
+                    $label = 'For Approval';
+                    $class = $badgeWait;
+                } else {
+                    $label = $po->computed_status ?: 'Draft';
+                    $class = $badgeNone;
+                }
+
+                return [
+                    'approved' => $isApproved,
+                    'cancelled' => $isCancelled,
+                    'label' => $label,
+                    'class' => $class,
+                    'terms' => trim((string) $po->terms),
+                    // Legacy POs predate the stored total, so fall back to
+                    // summing their own line items.
+                    'amount' => (float) ($po->total_amount
+                        ?: $po->items->sum(fn ($i) => $i->quantity_ordered * (float) $i->unit_price)),
+                ];
+            };
+
             $returnedPos = $returnedPos ?? collect();
             $historyEvents = $historyEvents ?? collect();
         @endphp
@@ -195,10 +233,10 @@
              Search button under the input and dropped Create P.O. onto a line
              of its own, so the input group is given an explicit width and keeps
              the button beside it. --}}
-        <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+        <div class="toolbar-row d-flex justify-content-between align-items-center gap-2 mb-3">
             <form method="GET" action="{{ route('stock-orders.purchase-orders.index') }}"
                   class="d-flex gap-2 align-items-center">
-                <div class="input-group flex-shrink-0" style="width: 320px;">
+                <div class="input-group filter-search">
                     <span class="input-group-text bg-white border-end-0">
                         <i class="bi bi-search text-muted"></i>
                     </span>
@@ -224,7 +262,7 @@
              gives both lists the same type scale. --}}
         <div class="card card-custom border-0 shadow-sm">
             <div class="card-body p-0">
-                <div class="table-responsive">
+                <div class="table-responsive d-none d-md-block">
                     <table class="table table-custom table-hover align-middle mb-0 po-table">
                         <thead>
                             <tr>
@@ -381,6 +419,87 @@
                             @endforelse
                         </tbody>
                     </table>
+                </div>
+
+                {{-- Phones: the same rows as stacked cards (shared .rec-cards
+                     pattern). The table above stays for tablet and desktop,
+                     where eight columns fit. --}}
+                <div class="rec-cards">
+                    @forelse ($purchaseOrders as $po)
+                        @php $state = $poState($po); @endphp
+                        <div class="rec-card">
+                            <div class="rec-card-head">
+                                <div class="rec-card-title">
+                                    {{ $po->po_number ?: 'Pending PO#' }}
+                                    @if ($po->linkedOrder)
+                                        <div class="small text-muted fw-normal">SO: {{ $po->linkedOrder->so_number }}</div>
+                                    @endif
+                                </div>
+                                <span class="badge rounded-pill px-2 py-1 {{ $state['class'] }}">{{ $state['label'] }}</span>
+                            </div>
+
+                            <div class="rec-meta">
+                                <div class="rec-span"><span class="rec-k">Supplier:</span> <span class="rec-v">{{ $po->supplier_name ?: ($po->client->name ?? '-') }}</span></div>
+                                <div><span class="rec-k">Terms:</span> <span class="rec-v">{{ $state['terms'] !== '' ? $state['terms'] : '-' }}</span></div>
+                                @if ($po->items->isEmpty())
+                                    <div class="rec-r"><span class="rec-k">Amount:</span> <span class="rec-v">{{ $state['amount'] > 0 ? number_format($state['amount'], 2) : '-' }}</span></div>
+                                @endif
+                            </div>
+
+                            <div class="rec-block">
+                                @forelse ($po->items as $it)
+                                    <div class="rec-line">
+                                        <span>{!! $chip(\Illuminate\Support\Str::substr($it->product, 0, 1), $it->product) !!} <span class="ms-1">{{ $it->product }}</span></span>
+                                        <span class="text-muted text-nowrap">{{ number_format($it->quantity_ordered) }} L @ {{ (float) $it->unit_price > 0 ? number_format((float) $it->unit_price, 2) : '-' }}</span>
+                                    </div>
+                                @empty
+                                    <div class="rec-line">
+                                        <span class="text-muted">Qty ordered</span>
+                                        <span class="fw-semibold">{{ number_format($po->qty_ordered) }} L</span>
+                                    </div>
+                                @endforelse
+                                <div class="rec-total">
+                                    <span>Amount</span>
+                                    <span>{{ $state['amount'] > 0 ? number_format($state['amount'], 2) : '-' }}</span>
+                                </div>
+                            </div>
+
+                            <div class="rec-actions">
+                                @if ($state['cancelled'])
+                                    {{-- cancelled: View Detailed only --}}
+                                @elseif ($state['approved'])
+                                    <a href="{{ route('stock-orders.po-pdf', $po->id) }}" class="btn btn-sm btn-outline-danger rounded-3">
+                                        <i class="bi bi-printer me-1"></i> Print
+                                    </a>
+                                @elseif (Auth::user()->canEditStockOrders())
+                                    <a href="{{ route('stock-orders.edit-supplier-po', $po->id) }}" class="btn btn-sm btn-outline-secondary rounded-3">
+                                        <i class="bi bi-pencil me-1"></i> Edit
+                                    </a>
+                                @endif
+
+                                <a href="{{ route('stock-orders.purchase-orders.show', $po->id) }}" class="btn btn-sm btn-outline-primary rounded-3">
+                                    <i class="bi bi-eye me-1"></i> View
+                                </a>
+
+                                @if (! $state['cancelled'] && Auth::user()->canApproveStockOrders())
+                                    @if ($po->hasActiveAtl())
+                                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-3" disabled style="pointer-events:none;" title="This purchase order has an active ATL. Cancel the ATL first.">
+                                            <i class="bi bi-x-circle me-1"></i> Cancel
+                                        </button>
+                                    @else
+                                        <button type="button" class="btn btn-sm btn-outline-danger rounded-3"
+                                                data-action="{{ route('stock-orders.cancel', $po->id) }}"
+                                                data-po="{{ $po->po_number ?: 'Pending PO#' }}"
+                                                onclick="openCancelPn(this)">
+                                            <i class="bi bi-x-circle me-1"></i> Cancel
+                                        </button>
+                                    @endif
+                                @endif
+                            </div>
+                        </div>
+                    @empty
+                        <div class="rec-empty">No stock orders found matching criteria.</div>
+                    @endforelse
                 </div>
 
                 <div class="p-3">

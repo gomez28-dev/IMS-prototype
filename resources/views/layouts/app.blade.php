@@ -69,6 +69,7 @@
             left: 0;
             width: var(--sidebar-current-width);
             height: 100vh;
+            height: 100dvh;
             background: #ffffff;
             display: flex;
             flex-direction: column;
@@ -636,12 +637,19 @@
             top: 0;
             left: -300px;
             width: 280px;
+            max-width: 100vw;
+            /* dvh, not vh: on a phone the browser chrome collapses as you
+               scroll, and 100vh then runs the logout button off the screen. */
             height: 100vh;
+            height: 100dvh;
             background: #ffffff;
             box-shadow: 4px 0 20px rgba(0,0,0,0.1);
             z-index: 1050;
             transition: left 0.3s ease-in-out;
             overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+            padding-bottom: env(safe-area-inset-bottom);
         }
 
         .sidebar-drawer.open {
@@ -680,13 +688,18 @@
         }
 
         /* Mobile top bar adjustments */
+        /* Sticky: on a phone this bar carries the only navigation, so it has to
+           stay reachable while a long list scrolls. */
         .mobile-topbar {
             background: #ffffff;
             border-bottom: 1px solid var(--border-color);
-            padding: 0.75rem 1rem;
+            padding: 0.75rem max(1rem, env(safe-area-inset-right)) 0.75rem max(1rem, env(safe-area-inset-left));
             display: flex;
             align-items: center;
             justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 1020;
         }
 
         .hamburger-btn {
@@ -696,6 +709,50 @@
             color: var(--text-dark);
             padding: 0.25rem 0.5rem;
             cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            /* 36px was under every touch-target guideline; this is used with a
+               thumb, not a cursor. */
+            min-width: 44px;
+            min-height: 44px;
+            margin-left: -0.35rem;
+            border-radius: 8px;
+        }
+
+        .hamburger-btn:active {
+            background: var(--light-slate);
+        }
+
+        .drawer-close-btn {
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 1rem;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-right: -0.5rem;
+        }
+
+        .drawer-close-btn:hover {
+            background: var(--light-slate);
+            color: var(--text-dark);
+        }
+
+        /* Page actions repeated under the mobile top bar. Wraps rather than
+           pushing the page sideways when a page pushes three controls. */
+        .mobile-page-actions {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.7rem 1rem 0;
         }
     </style>
 </head>
@@ -744,8 +801,11 @@
     {{-- ============ MOBILE SIDEBAR DRAWER (< 992px, preserved) ============ --}}
     <div class="sidebar-drawer d-lg-none" id="sidebarDrawer">
         <div class="d-flex flex-column h-100">
-            <div class="p-3 border-bottom">
+            <div class="p-3 border-bottom d-flex align-items-center justify-content-between">
                 <h5 class="fw-bold mb-0 text-dark">Menu</h5>
+                <button type="button" class="drawer-close-btn" onclick="closeSidebar()" aria-label="Close menu">
+                    <i class="bi bi-x-lg"></i>
+                </button>
             </div>
             <nav class="flex-grow-1">
                 @if (request()->is('executive*'))
@@ -1190,16 +1250,28 @@
             <div class="app-content-wrapper" id="appContentWrapper">
                 {{-- Mobile top bar --}}
                 <div class="mobile-topbar d-lg-none">
-                    <div class="d-flex align-items-center gap-2">
+                    <div class="d-flex align-items-center gap-2" style="min-width: 0;">
                         <button class="hamburger-btn" type="button" onclick="openSidebar()" aria-label="Open menu">
                             <i class="bi bi-list"></i>
                         </button>
-                        <span class="fw-semibold text-dark" style="font-size: 0.85rem;">@yield('title', 'IMS')</span>
+                        <span class="fw-semibold text-dark text-truncate" style="font-size: 0.85rem;">@yield('title', 'IMS')</span>
                     </div>
-                    <a href="{{ route('portal') }}">
+                    <a href="{{ route('portal') }}" class="flex-shrink-0">
                         <img src="{{ asset('images/logo_ims.png') }}" alt="IMS" style="height: 22px;">
                     </a>
                 </div>
+
+                {{-- Page actions on touch screens.
+
+                     Print, Edit and Back are pushed into the desktop top bar.
+                     That bar is hidden below 992px, which left those controls
+                     unreachable on a phone, so the same stack is repeated here
+                     whenever a page pushed anything into it. --}}
+                @if (trim($__env->yieldPushContent('page-actions')) !== '')
+                    <div class="mobile-page-actions d-lg-none" data-realtime-container="mobile-page-actions">
+                        @stack('page-actions')
+                    </div>
+                @endif
 
                 {{-- Desktop slim top bar --}}
                 <div class="app-topbar d-none d-lg-flex">
@@ -1228,7 +1300,7 @@
                 </div>
 
                 {{-- Main content area --}}
-                <div class="container-fluid px-4 py-4 flex-grow-1" data-realtime-container="main">
+                <div class="container-fluid px-3 px-md-4 py-3 py-md-4 flex-grow-1" data-realtime-container="main">
                     @if (session('success'))
                         <div class="alert alert-success alert-dismissible fade show rounded-4 shadow-sm mb-4 p-3 border-0" role="alert" style="background-color: #dcfce7; color: #15803d;">
                             <i class="bi bi-check-circle-fill me-2"></i> {{ session('success') }}
@@ -1586,15 +1658,31 @@
     <script>
         // ===== Mobile drawer (preserved) =====
         function openSidebar() {
-            document.getElementById('sidebarDrawer').classList.add('open');
-            document.getElementById('sidebarOverlay').classList.add('open');
+            var drawer = document.getElementById('sidebarDrawer');
+            var overlay = document.getElementById('sidebarOverlay');
+            if (drawer) drawer.classList.add('open');
+            if (overlay) overlay.classList.add('open');
             document.body.style.overflow = 'hidden';
         }
         function closeSidebar() {
-            document.getElementById('sidebarDrawer').classList.remove('open');
-            document.getElementById('sidebarOverlay').classList.remove('open');
+            var drawer = document.getElementById('sidebarDrawer');
+            var overlay = document.getElementById('sidebarOverlay');
+            if (drawer) drawer.classList.remove('open');
+            if (overlay) overlay.classList.remove('open');
             document.body.style.overflow = '';
         }
+
+        // Escape closes the drawer: with the overlay behind it, a keyboard user
+        // otherwise has no way out.
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closeSidebar();
+        });
+
+        // Widening past the drawer breakpoint (rotating a tablet, resizing a
+        // window) used to leave the page scroll-locked by the open drawer.
+        window.addEventListener('resize', function () {
+            if (window.innerWidth >= 992) closeSidebar();
+        });
 
         // ===== Desktop sidebar collapse/expand =====
         (function() {

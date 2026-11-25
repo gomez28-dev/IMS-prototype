@@ -241,7 +241,7 @@
                         <p class="text-muted">Try adjusting your filters, or create a new record using the buttons above.</p>
                     </div>
                 @else
-                    <div class="table-responsive">
+                    <div class="table-responsive d-none d-md-block">
                         <table class="table table-hover align-middle mb-0 wetstock-transfers-table">
                             <thead class="bg-light">
                                 <tr>
@@ -369,6 +369,121 @@
                                 @endforeach
                             </tbody>
                         </table>
+                    </div>
+
+                    {{-- Phones: one card per transfer, in the same reading
+                         order as the row (source → destination, then the
+                         volume and who moved it). --}}
+                    <div class="rec-cards">
+                        @foreach ($transfers as $tx)
+                            @php
+                                $pcode = $tx->product_type ?: ($tx->sourceTank->isTanker() ? null : $tx->sourceTank->product_type);
+                                $pendingRequest = $tx->modificationRequests->first();
+                            @endphp
+                            <div class="rec-card">
+                                <div class="rec-card-head">
+                                    <div class="rec-card-title">{{ $tx->transfer_number }}</div>
+                                    @if ($pcode)
+                                        <span class="badge rounded-pill text-white" style="background: {{ ['U' => '#22a45d', 'P' => '#e5383b', 'D' => '#f2a900'][$pcode] ?? '#6c757d' }};">
+                                            {{ \App\Models\Order::PRODUCT_TYPES[$pcode] ?? $pcode }}
+                                        </span>
+                                    @endif
+                                </div>
+
+                                <div class="rec-meta">
+                                    <div><span class="rec-k">Date:</span> <span class="rec-v">{{ $tx->transfer_date ? $tx->transfer_date->format('M d, Y') : '-' }}</span></div>
+                                    <div class="rec-r"><span class="rec-k">Volume:</span> <span class="rec-v">{{ number_format($tx->quantity) }} L</span></div>
+                                    <div class="rec-span"><span class="rec-k">Operator:</span> <span class="rec-v">{{ $tx->transferredBy->name ?? 'System' }}</span></div>
+                                </div>
+
+                                <div class="rec-block">
+                                    <div class="rec-line">
+                                        <span>
+                                            <span class="text-muted small">From</span><br>
+                                            <strong>{{ $tx->sourceTank->name }}</strong>
+                                            @if ($tx->sourceCompartment)
+                                                <span class="badge bg-light text-secondary border">C{{ $tx->sourceCompartment->compartment_no }}</span>
+                                            @endif
+                                        </span>
+                                        <span class="badge {{ $tx->sourceTank->isTanker() ? 'badge-type-small-tanker' : 'badge-type-pickup' }} wetstock-type-badge rounded-pill px-2 py-0">
+                                            {{ $tx->sourceTank->isTanker() ? 'Tanker' : 'Depot' }}
+                                        </span>
+                                    </div>
+                                    <div class="rec-line">
+                                        <span>
+                                            <span class="text-muted small">To</span><br>
+                                            <strong>{{ $tx->destinationTank->name }}</strong>
+                                            @if ($tx->destinationCompartment)
+                                                <span class="badge bg-light text-secondary border">C{{ $tx->destinationCompartment->compartment_no }}</span>
+                                            @endif
+                                        </span>
+                                        <span class="badge {{ $tx->destinationTank->isTanker() ? 'badge-type-small-tanker' : 'badge-type-pickup' }} wetstock-type-badge rounded-pill px-2 py-0">
+                                            {{ $tx->destinationTank->isTanker() ? 'Tanker' : 'Depot' }}
+                                        </span>
+                                    </div>
+                                    <div class="rec-line">
+                                        <span class="text-muted small">{{ $tx->sourceWarehouse->name }} &rarr; {{ $tx->destinationWarehouse->name }}</span>
+                                    </div>
+                                </div>
+
+                                @if ($tx->notes)
+                                    <div class="rec-meta">
+                                        <div class="rec-span"><span class="rec-k">Notes:</span> <span class="rec-v fw-normal">{{ $tx->notes }}</span></div>
+                                    </div>
+                                @endif
+
+                                <div class="rec-actions">
+                                    @if (Auth::user()->canEditModule2())
+                                        @if ($pendingRequest)
+                                            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-2 py-1"
+                                                  title="Requested by {{ $pendingRequest->requestedBy->name ?? 'User' }} — {{ $pendingRequest->reason }}">
+                                                <i class="bi bi-hourglass-split me-1"></i>Pending Approval
+                                            </span>
+                                            @if (Auth::user()->canApproveModule2Modification())
+                                                <form method="POST" action="{{ route('approvals.approve', $pendingRequest->id) }}" onsubmit="return confirm('Approve Modification Request #{{ $pendingRequest->id }} for {{ $tx->transfer_number }}? This will immediately update the live inventory record.');">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-sm btn-success rounded-3" title="Approve &amp; Apply">
+                                                        <i class="bi bi-check-lg"></i>
+                                                    </button>
+                                                </form>
+                                                <form method="POST" action="{{ route('approvals.reject', $pendingRequest->id) }}" onsubmit="return confirm('Reject Modification Request #{{ $pendingRequest->id }} for {{ $tx->transfer_number }}?');">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-3" title="Reject Request">
+                                                        <i class="bi bi-x-lg"></i>
+                                                    </button>
+                                                </form>
+                                            @else
+                                                <span class="text-muted small"><i class="bi bi-lock me-1"></i>Awaiting Approval</span>
+                                            @endif
+                                        @else
+                                            <button type="button" class="js-open-transfer btn btn-sm btn-outline-secondary rounded-3" title="Request Modification"
+                                                data-mode="edit"
+                                                data-id="{{ $tx->id }}"
+                                                data-number="{{ $tx->transfer_number }}"
+                                                data-type="{{ $tx->type }}"
+                                                data-source-tank="{{ $tx->source_tank_id }}"
+                                                data-source-comp="{{ $tx->source_compartment_id }}"
+                                                data-dest-tank="{{ $tx->destination_tank_id }}"
+                                                data-dest-comp="{{ $tx->destination_compartment_id }}"
+                                                data-quantity="{{ $tx->quantity }}"
+                                                data-date="{{ $tx->transfer_date ? $tx->transfer_date->format('Y-m-d') : '' }}"
+                                                data-notes="{{ $tx->notes }}">
+                                                <i class="bi bi-pencil me-1"></i> Modify
+                                            </button>
+                                        @endif
+                                    @endif
+
+                                    @if (Auth::user()->isAdmin())
+                                        <form method="POST" action="{{ route('wetstock.transfers.destroy', $tx->id) }}" class="js-preserve-scroll" onsubmit="return confirm('Permanently delete transfer #{{ $tx->transfer_number }} ({{ number_format($tx->quantity) }}L)? This cannot be undone.');">
+                                            @csrf
+                                            <button type="submit" class="btn btn-sm btn-outline-danger rounded-3" title="Delete Transfer (Portal Administrator only)">
+                                                <i class="bi bi-trash me-1"></i> Delete
+                                            </button>
+                                        </form>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
                     </div>
 
                     <div class="p-3">

@@ -79,48 +79,48 @@
             </table>
         </div>
 
-        <!-- Mobile cards -->
-        <div class="d-md-none p-3">
+        <!-- Phones: the shared .rec-card, the same pattern as every other
+             list in Wet Stock. -->
+        <div class="rec-cards">
             @forelse ($suppliers as $supplier)
-                <div class="card border-0 bg-light mb-3 rounded-4 shadow-sm">
-                    <div class="card-body p-4">
-                        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-                            <h5 class="fw-bold text-dark mb-0">{{ $supplier->company_name }}</h5>
-                            @if ($supplier->is_active)
-                                <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1">Active</span>
-                            @else
-                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-3 py-1">Inactive</span>
-                            @endif
-                        </div>
-                        @if ($supplier->location !== '')
-                            <div class="small text-muted mb-1"><i class="bi bi-geo-alt me-1"></i>{{ $supplier->location }}</div>
+                <div class="rec-card">
+                    <div class="rec-card-head">
+                        <div class="rec-card-title">{{ $supplier->company_name }}</div>
+                        @if ($supplier->is_active)
+                            <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1">Active</span>
+                        @else
+                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-3 py-1">Inactive</span>
                         @endif
-                        @if ($supplier->attention)
-                            <div class="small text-muted mb-1"><i class="bi bi-person me-1"></i>{{ $supplier->attention }}</div>
-                        @endif
+                    </div>
+
+                    <div class="rec-meta">
+                        <div class="rec-span"><span class="rec-k">Location:</span> <span class="rec-v">{{ $supplier->location !== '' ? $supplier->location : '—' }}</span></div>
+                        <div class="rec-span"><span class="rec-k">Attention:</span> <span class="rec-v">{{ $supplier->attention ?: '—' }}</span></div>
                         @if ($supplier->address)
-                            <div class="small text-muted mb-3"><i class="bi bi-pin-map me-1"></i>{{ $supplier->address }}</div>
+                            <div class="rec-span"><span class="rec-k">Address:</span> <span class="rec-v fw-normal">{{ $supplier->address }}</span></div>
                         @endif
-                        <div class="d-flex gap-2">
-                            <a href="{{ route('stock-orders.suppliers.edit', $supplier->id) }}" class="btn btn-sm btn-outline-secondary rounded-3 flex-fill text-center">
-                                <i class="bi bi-pencil me-1"></i> Edit
-                            </a>
-                            <form method="POST" action="{{ route('stock-orders.suppliers.toggle-active', $supplier->id) }}">
-                                @csrf
-                                <button type="submit" class="btn btn-sm {{ $supplier->is_active ? 'btn-outline-warning' : 'btn-outline-success' }} rounded-3">
-                                    <i class="bi {{ $supplier->is_active ? 'bi-pause-circle' : 'bi-play-circle' }} me-1"></i>
-                                    {{ $supplier->is_active ? 'Deactivate' : 'Reactivate' }}
-                                </button>
-                            </form>
-                        </div>
+                    </div>
+
+                    <div class="rec-actions">
+                        <a href="{{ route('stock-orders.suppliers.edit', $supplier->id) }}" class="btn btn-sm btn-outline-secondary rounded-3">
+                            <i class="bi bi-pencil me-1"></i> Edit
+                        </a>
+                        <form method="POST" action="{{ route('stock-orders.suppliers.toggle-active', $supplier->id) }}" onsubmit="return confirm('{{ $supplier->is_active ? 'Deactivate' : 'Reactivate' }} {{ $supplier->company_name }}?');">
+                            @csrf
+                            <button type="submit" class="btn btn-sm {{ $supplier->is_active ? 'btn-outline-warning' : 'btn-outline-success' }} rounded-3">
+                                <i class="bi {{ $supplier->is_active ? 'bi-pause-circle' : 'bi-play-circle' }} me-1"></i>
+                                {{ $supplier->is_active ? 'Deactivate' : 'Reactivate' }}
+                            </button>
+                        </form>
                     </div>
                 </div>
             @empty
-                <div class="text-center py-5 text-muted">
+                <div class="rec-empty">
                     <i class="bi bi-building fs-1 d-block mb-3 text-secondary"></i>
                     No suppliers found.
                 </div>
             @endforelse
+        </div>
         </div>
     </div>
 </div>

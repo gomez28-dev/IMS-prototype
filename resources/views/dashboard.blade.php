@@ -260,7 +260,7 @@
 </div>
 
 <!-- Order Status Tabs -->
-<ul class="nav nav-tabs nav-fill border-bottom mb-4" id="orderTabs" role="tablist">
+<ul class="nav nav-tabs nav-fill tabs-scroll border-bottom mb-4" id="orderTabs" role="tablist">
     <li class="nav-item" role="presentation">
         <a class="nav-link d-flex align-items-center justify-content-center gap-2 py-2 small fw-medium {{ $activeTab === 'pending' ? 'active text-primary' : 'text-secondary' }}" href="{{ route('dashboard', ['tab' => 'pending', 'search' => $searchQuery ?: null]) }}">
             <i class="bi bi-hourglass-split text-warning"></i>
@@ -538,147 +538,126 @@
             </table>
         </div>
 
-        <!-- Mobile cards -->
-        <div class="d-md-none p-3">
+        <!-- Mobile cards — the shared .rec-* record card, the same markup the
+             Stock Orders, Wet Stock and Logistics lists use. -->
+        <div class="rec-cards">
             @if ($orders->isNotEmpty())
                 @foreach ($orders as $order)
-                @php $price = $priceInfo($order); @endphp
-                <div class="card border-0 bg-light mb-3 rounded-4 shadow-sm {{ $order->status === 'Cancelled' ? 'order-cancelled' : '' }}">
-                    <div class="card-body p-4">
-                        <div class="d-flex justify-content-between align-items-start mb-2">
+                @php
+                    $price = $priceInfo($order);
+                    $clear = $order->clearing_status;
+                    $clearClass = match($clear) {
+                        'Approved' => 'bg-success-subtle text-success border-success-subtle',
+                        'Declined' => 'bg-danger-subtle text-danger border-danger-subtle',
+                        'Hold' => 'bg-warning-subtle text-warning-emphasis border-warning-subtle',
+                        default => 'bg-secondary-subtle text-secondary border-secondary-subtle',
+                    };
+                @endphp
+                <div class="rec-card {{ $order->status === 'Cancelled' ? 'order-cancelled' : '' }}">
+                    <div class="rec-card-head">
+                        <div class="rec-card-title d-flex align-items-start gap-2">
                             @if (auth()->user()->canClearOrders())
-                            <div class="d-flex align-items-center gap-2">
-                                <input type="checkbox" class="form-check-input order-check" value="{{ $order->id }}">
-                                <h5 class="fw-bold text-dark mb-0">
+                                <input type="checkbox" class="form-check-input order-check mt-1 flex-shrink-0" value="{{ $order->id }}">
+                            @endif
+                            <span>
                                 {{ $order->account }}
                                 @if ($order->location === 'San Simon')
                                     <span class="badge ms-1" style="background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a; font-size: 0.6rem;">San Simon</span>
                                 @else
                                     <span class="badge ms-1" style="background-color: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; font-size: 0.6rem;">Valenzuela</span>
                                 @endif
-                                </h5>
-                            </div>
-                            @else
-                            <h5 class="fw-bold text-dark mb-0">
-                            {{ $order->account }}
-                            @if ($order->location === 'San Simon')
-                                <span class="badge ms-1" style="background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a; font-size: 0.6rem;">San Simon</span>
-                            @else
-                                <span class="badge ms-1" style="background-color: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; font-size: 0.6rem;">Valenzuela</span>
+                            </span>
+                        </div>
+                        {!! $soBadge($order) !!}
+                    </div>
+
+                    <div class="rec-meta">
+                        <div class="rec-span"><span class="rec-k">PO#:</span> <span class="rec-v">{{ $order->po_number ?: '—' }}</span></div>
+                        <div><span class="rec-k">Date:</span> <span class="rec-v">{{ $order->date ? $order->date->format('Y-m-d') : '—' }}</span></div>
+                        <div class="rec-r"><span class="rec-k">Qty Ordered:</span> <span class="rec-v">{{ number_format($order->effective_qty_ordered) }}</span></div>
+                        <div>
+                            <span class="rec-k">Price:</span> <span class="rec-v">{{ $price['text'] ?? '—' }}</span>
+                            @if ($price['sub'])
+                                <span class="d-block small text-muted">{{ $price['sub'] }}</span>
                             @endif
-                            </h5>
-                            @endif
-                            {!! $soBadge($order) !!}
                         </div>
-                        <p class="text-muted small mb-1"><span class="fw-medium">PO#:</span> {{ $order->po_number }}</p>
-                        <div class="row mb-3 small text-muted">
-                            <div class="col-6">
-                                <span class="fw-medium">Date:</span> {{ $order->date ? $order->date->format('Y-m-d') : '' }}
-                            </div>
-                            <div class="col-6 text-end">
-                                <span class="fw-medium">Qty Ordered:</span> {{ number_format($order->effective_qty_ordered) }}
-                            </div>
-                        </div>
-                        <div class="row mb-3 small text-muted">
-                            <div class="col-6">
-                                <span class="fw-medium">Price:</span> {{ $price['text'] ?? '—' }}
-                                @if ($price['sub'])
-                                    <span class="d-block" style="font-size: 0.7rem;">{{ $price['sub'] }}</span>
-                                @endif
-                            </div>
-                            <div class="col-6 text-end">
-                                <span class="fw-medium">Terms:</span> {{ $order->terms ?: '—' }}
-                            </div>
-                        </div>
-                        @if ($order->items->count() > 0)
-                        <div class="bg-white border rounded-3 px-3 py-2 mb-3 small">
+                        <div class="rec-r"><span class="rec-k">Terms:</span> <span class="rec-v">{{ $order->terms ?: '—' }}</span></div>
+                    </div>
+
+                    @if ($order->items->count() > 0)
+                        <div class="rec-block">
                             @foreach ($order->items as $item)
-                            <div class="d-flex justify-content-between align-items-center {{ !$loop->last ? 'mb-1' : '' }}">
-                                <span>{!! $chip($item->product_type) !!} <span class="ms-1">{{ $item->product_name }}</span></span>
-                                <span class="text-muted">{{ number_format($item->qty) }} @ {{ (float) $item->price > 0 ? '₱' . number_format((float) $item->price, 2) : '—' }}</span>
-                            </div>
+                                <div class="rec-line">
+                                    <span>{!! $chip($item->product_type) !!} <span class="ms-1">{{ $item->product_name }}</span></span>
+                                    <span class="text-muted text-nowrap">{{ number_format($item->qty) }} @ {{ (float) $item->price > 0 ? '₱' . number_format((float) $item->price, 2) : '—' }}</span>
+                                </div>
                             @endforeach
-                            <div class="d-flex justify-content-between border-top mt-2 pt-1 fw-semibold">
+                            <div class="rec-total">
                                 <span>Amount</span>
                                 <span>₱{{ number_format((float) $order->amount, 2) }}</span>
                             </div>
                         </div>
-                        @endif
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <div>
-                                <span class="text-muted small d-block">Qty Out</span>
-                                <span class="fw-semibold">{{ number_format($order->total_qty_out) }}</span>
-                            </div>
-                            <div class="text-end">
-                                <span class="text-muted small d-block">Remaining</span>
-                                @if ($order->remaining_balance == 0)
-                                    <span class="badge badge-balance-zero rounded-pill">
-                                        <i class="bi bi-check-circle-fill me-1"></i> 0
-                                    </span>
-                                @else
-                                    <span class="badge badge-balance-positive rounded-pill">
-                                        <i class="bi bi-clock-history me-1"></i> {{ number_format($order->remaining_balance) }}
-                                    </span>
-                                @endif
-                            </div>
-                        </div>
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="text-muted small">Status:</span>
-                            <span class="badge rounded-pill px-3 py-1 {{ $order->computed_status_badge_class }}">
-                                {{ $order->computed_status }}
-                            </span>
-                        </div>
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <span class="text-muted small">Clearance:</span>
-                            @php
-                                $cls = $order->clearing_status;
-                                $badgeClass = match($cls) {
-                                    'Approved' => 'bg-success-subtle text-success border-success-subtle',
-                                    'Declined' => 'bg-danger-subtle text-danger border-danger-subtle',
-                                    'Hold' => 'bg-warning-subtle text-warning-emphasis border-warning-subtle',
-                                    default => 'bg-secondary-subtle text-secondary border-secondary-subtle',
-                                };
-                            @endphp
-                            @if (auth()->user()->canClearOrders())
-                                <form method="POST" action="{{ route('order.clearance', $order->id) }}" class="d-inline">
-                                    @csrf
-                                    <select name="clearing_status" class="form-select form-select-sm d-inline-block w-auto" data-clearing-select="{{ $order->id }}" onchange="this.form.submit()">
-                                        <option value="Pending" {{ $cls === 'Pending' ? 'selected' : '' }}>Pending</option>
-                                        <option value="Declined" {{ $cls === 'Declined' ? 'selected' : '' }}>Declined</option>
-                                        <option value="Hold" {{ $cls === 'Hold' ? 'selected' : '' }}>Hold</option>
-                                        <option value="Approved" {{ $cls === 'Approved' ? 'selected' : '' }}>Approved</option>
-                                    </select>
-                                </form>
+                    @endif
+
+                    <div class="rec-meta">
+                        <div><span class="rec-k">Qty Out:</span> <span class="rec-v">{{ number_format($order->total_qty_out) }}</span></div>
+                        <div class="rec-r">
+                            <span class="rec-k">Remaining:</span>
+                            @if ($order->remaining_balance == 0)
+                                <span class="badge badge-balance-zero rounded-pill"><i class="bi bi-check-circle-fill me-1"></i> 0</span>
                             @else
-                                <span class="badge rounded-pill px-3 py-1 border {{ $badgeClass }}" data-clearing-badge="{{ $order->id }}" data-clearing-status="{{ $cls }}">{{ $cls }}</span>
+                                <span class="badge badge-balance-positive rounded-pill"><i class="bi bi-clock-history me-1"></i> {{ number_format($order->remaining_balance) }}</span>
                             @endif
                         </div>
-                        <div class="d-flex gap-2">
-                            <a href="{{ route('order.deliveries', $order->id) }}" class="btn btn-sm btn-outline-primary rounded-3 px-3 py-2 flex-fill text-center">
-                                <i class="bi bi-truck me-1"></i> Deliveries
-                            </a>
-                            <a href="{{ route('order.receipt', $order->id) }}" class="btn btn-sm btn-outline-success rounded-3 px-3 py-2 text-center" title="Download SO Receipt">
-                                <i class="bi bi-file-earmark-pdf"></i>
-                            </a>
-                            @if (Auth::user()->canEditModule1())
-                            <a href="{{ route('order.edit', $order->id) }}" class="btn btn-sm btn-outline-secondary rounded-3 px-3 py-2 flex-fill text-center">
-                                <i class="bi bi-pencil me-1"></i> Edit
-                            </a>
-                            @endif
-                            @if (Auth::user()->isAdmin())
-                            <form method="POST" action="{{ route('order.delete', $order->id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this order? This will also delete all associated deliveries.');">
+                    </div>
+
+                    <div class="rec-kv">
+                        <span class="rec-k">Status</span>
+                        <span class="badge rounded-pill px-3 py-1 {{ $order->computed_status_badge_class }}">{{ $order->computed_status }}</span>
+                    </div>
+
+                    <div class="rec-kv">
+                        <span class="rec-k">Clearance</span>
+                        @if (auth()->user()->canClearOrders())
+                            <form method="POST" action="{{ route('order.clearance', $order->id) }}" class="d-inline">
                                 @csrf
-                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-3 px-3 py-2">
+                                <select name="clearing_status" class="form-select form-select-sm d-inline-block w-auto" data-clearing-select="{{ $order->id }}" onchange="this.form.submit()">
+                                    <option value="Pending" {{ $clear === 'Pending' ? 'selected' : '' }}>Pending</option>
+                                    <option value="Declined" {{ $clear === 'Declined' ? 'selected' : '' }}>Declined</option>
+                                    <option value="Hold" {{ $clear === 'Hold' ? 'selected' : '' }}>Hold</option>
+                                    <option value="Approved" {{ $clear === 'Approved' ? 'selected' : '' }}>Approved</option>
+                                </select>
+                            </form>
+                        @else
+                            <span class="badge rounded-pill px-3 py-1 border {{ $clearClass }}" data-clearing-badge="{{ $order->id }}" data-clearing-status="{{ $clear }}">{{ $clear }}</span>
+                        @endif
+                    </div>
+
+                    <div class="rec-actions">
+                        <a href="{{ route('order.deliveries', $order->id) }}" class="btn btn-sm btn-outline-primary rounded-3">
+                            <i class="bi bi-truck me-1"></i> Deliveries
+                        </a>
+                        <a href="{{ route('order.receipt', $order->id) }}" class="btn btn-sm btn-outline-success rounded-3" title="Download SO Receipt">
+                            <i class="bi bi-file-earmark-pdf"></i>
+                        </a>
+                        @if (Auth::user()->canEditModule1())
+                            <a href="{{ route('order.edit', $order->id) }}" class="btn btn-sm btn-outline-secondary rounded-3" title="Edit Order">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                        @endif
+                        @if (Auth::user()->isAdmin())
+                            <form method="POST" action="{{ route('order.delete', $order->id) }}" onsubmit="return confirm('Are you sure you want to delete this order? This will also delete all associated deliveries.');">
+                                @csrf
+                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-3" title="Delete Order">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </form>
-                            @endif
-                        </div>
+                        @endif
                     </div>
                 </div>
                 @endforeach
             @else
-                <div class="text-center py-5 text-muted">
+                <div class="rec-empty">
                     <i class="bi bi-inbox fs-1 d-block mb-3 text-secondary"></i>
                     No orders found in this view.
                 </div>

@@ -192,7 +192,7 @@
             <h5 class="fw-bold text-dark mb-0"><i class="bi bi-truck text-primary me-2"></i>Depot Inbound Deliveries</h5>
         </div>
         <div class="card-body p-0">
-            <div class="table-responsive">
+            <div class="table-responsive d-none d-md-block">
                 <table class="table table-custom mb-0">
                     <thead>
                         <tr>
@@ -241,6 +241,35 @@
                     </tbody>
                 </table>
             </div>
+            {{-- Phones: one card per inbound depot delivery. --}}
+            <div class="rec-cards">
+                @foreach ($incomingDeliveries->whereIn('status', ['Pending', 'Active']) as $del)
+                    <div class="rec-card">
+                        <div class="rec-card-head">
+                            <div class="rec-card-title">{{ $del->purchaseOrder->po_number ?? 'PO #' . $del->purchase_order_id }}</div>
+                            <span class="badge {{ $del->status === 'Active' ? 'bg-info' : 'bg-warning text-dark' }} px-2 py-1">
+                                {{ $del->status === 'Active' ? 'Dispatched' : 'Pending' }}
+                            </span>
+                        </div>
+
+                        <div class="rec-meta">
+                            <div class="rec-span"><span class="rec-k">Product:</span> <span class="rec-v">{{ $del->product }}</span></div>
+                            <div><span class="rec-k">Liters:</span> <span class="rec-v">{{ number_format($del->qty_to_receive) }} L</span></div>
+                            <div class="rec-r"><span class="rec-k">Channel:</span> <span class="rec-v">{{ $del->channel_label }}</span></div>
+                            <div class="rec-span"><span class="rec-k">DR / ATL#:</span> <span class="rec-v">{{ $del->dr_number ?: ($del->atl_number ?: 'Pending') }}</span></div>
+                            <div class="rec-span"><span class="rec-k">Depot:</span> <span class="rec-v">{{ $del->purchaseOrder->warehouse->name ?? 'Any Depot' }}</span></div>
+                        </div>
+
+                        @if (Auth::user()->canReceiveStockIntoDepot())
+                            <div class="rec-actions">
+                                <button type="button" class="btn btn-sm btn-primary-custom rounded-pill" data-bs-toggle="modal" data-bs-target="#receiveStockModal{{ $del->id }}">
+                                    <i class="bi bi-box-arrow-in-down me-1"></i> Receive Stock
+                                </button>
+                            </div>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
         </div>
     </div>
 
@@ -250,7 +279,7 @@
             <h5 class="fw-bold text-dark mb-0"><i class="bi bi-file-earmark-text text-secondary me-2"></i>Submitted Replenishment Requests</h5>
         </div>
         <div class="card-body p-0">
-            <div class="table-responsive">
+            <div class="table-responsive d-none d-md-block">
                 <table class="table table-custom mb-0">
                     <thead>
                         <tr>
@@ -386,6 +415,86 @@
                         @endforelse
                     </tbody>
                 </table>
+            </div>
+            {{-- Phones: one card per replenishment request. --}}
+            <div class="rec-cards">
+                @foreach ($stockRequests as $req)
+                    <div class="rec-card">
+                        <div class="rec-card-head">
+                            <div class="rec-card-title">{{ $req->request_number }}</div>
+                            <span class="badge bg-warning text-dark px-2 py-1">{{ $req->status }}</span>
+                        </div>
+
+                        <div class="rec-meta">
+                            <div class="rec-span"><span class="rec-k">Site:</span> <span class="rec-v">{{ $req->warehouse->name ?? 'All Depots' }}</span></div>
+                            <div><span class="rec-k">Type:</span> <span class="rec-v">{{ $req->type_label }}</span></div>
+                            <div class="rec-r"><span class="rec-k">Needed:</span> <span class="rec-v">{{ $req->date_needed ? $req->date_needed->format('M d, Y') : '-' }}</span></div>
+                            <div><span class="rec-k">Requested by:</span> <span class="rec-v">{{ $req->requester->name ?? 'Depot' }}</span></div>
+                            <div class="rec-r">
+                                <span class="rec-k">Purchasing:</span>
+                                @if ($req->hasBeenPickedUpByPurchasing())
+                                    <span class="rec-v">{{ $req->purchasingReceiver?->name ?? 'Purchasing' }}</span>
+                                @else
+                                    <span class="badge bg-warning-subtle text-warning-emphasis border rounded-pill px-2 py-1">Awaiting</span>
+                                @endif
+                            </div>
+                        </div>
+
+                        @if ($req->lines->isNotEmpty())
+                            <div class="rec-block">
+                                @foreach ($req->lines as $line)
+                                    <div class="rec-line">
+                                        <span>{!! $chip(\Illuminate\Support\Str::substr((string) $line->product, 0, 1), $line->product) !!} <span class="ms-1">{{ $line->product }}</span></span>
+                                        <span class="text-nowrap text-muted">
+                                            <span class="text-dark fw-bold">{{ number_format($line->qty_requested) }}</span> req
+                                            &middot; {{ number_format($line->qty_received) }} rec
+                                            &middot; <span class="text-warning-emphasis">{{ number_format($line->qty_pending) }}</span> pend
+                                        </span>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+
+                        @if ($req->remarks)
+                            <div class="rec-meta">
+                                <div class="rec-span"><span class="rec-k">Remarks:</span> <span class="rec-v fw-normal">{{ $req->remarks }}</span></div>
+                            </div>
+                        @endif
+
+                        <div class="rec-actions">
+                            <a href="{{ route('stock-orders.wet-stock-requests.atls', $req->id) }}"
+                               class="btn btn-sm btn-light border rounded-pill text-secondary" title="View request ATLs">
+                                <i class="bi bi-eye me-1"></i> View
+                            </a>
+
+                            @if (Auth::user()->canEditModule2())
+                                <button type="button" class="btn btn-sm btn-light border rounded-pill text-secondary"
+                                        data-bs-toggle="modal" data-bs-target="#requestFormModal"
+                                        data-request-mode="edit"
+                                        data-request-id="{{ $req->id }}"
+                                        data-request-number="{{ $req->request_number }}"
+                                        data-request-warehouse="{{ $req->warehouse_id }}"
+                                        data-request-type="{{ $req->request_type }}"
+                                        data-request-date-needed="{{ $req->date_needed ? $req->date_needed->format('Y-m-d') : '' }}"
+                                        data-request-remarks="{{ $req->remarks }}"
+                                        data-request-lines="{{ $req->lines->map(fn ($l) => $l->id.'|'.$l->product.'|'.$l->qty_requested)->implode(';;') }}"
+                                        title="Edit request">
+                                    <i class="bi bi-pencil me-1"></i> Pen
+                                </button>
+                            @endif
+
+                            @if (Auth::user()->canEditStockOrders()
+                                && $req->isPrepared()
+                                && $req->purchaseOrder?->isVpApproved())
+                                <a href="{{ route('stock-orders.add-atl', $req->purchase_order_id) }}"
+                                   class="btn btn-sm btn-primary-custom rounded-pill"
+                                   title="Raise an ATL against PO #{{ $req->purchaseOrder->po_number }}">
+                                    <i class="bi bi-plus-lg me-1"></i> Add ATL
+                                </a>
+                            @endif
+                        </div>
+                    </div>
+                @endforeach
             </div>
             <div class="p-3">
                 {{ $stockRequests->links() }}

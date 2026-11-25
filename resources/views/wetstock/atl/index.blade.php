@@ -73,7 +73,7 @@
         {{-- Orders --}}
         <div class="card card-custom border-0 shadow-sm">
             <div class="card-body p-0">
-                <div class="table-responsive">
+                <div class="table-responsive d-none d-md-block">
                     <table class="table table-hover align-middle mb-0">
                         <thead class="bg-light">
                             <tr>
@@ -163,6 +163,69 @@
                             @endforelse
                         </tbody>
                     </table>
+                </div>
+
+                {{-- Phones: one card per order in the ATL queue. --}}
+                <div class="rec-cards">
+                    @foreach ($orders as $row)
+                        @php
+                            $rowAtls = $atlsByOrder[$row->id] ?? [];
+                            $allLifted = count($rowAtls) > 0
+                                && collect($rowAtls)->every(fn($a) => $a->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_LIFTED);
+                            $clearanceClass = match ($row->clearing_status) {
+                                'Approved' => 'bg-success-subtle text-success border border-success-subtle',
+                                'Declined' => 'bg-danger-subtle text-danger border border-danger-subtle',
+                                'Hold' => 'bg-warning-subtle text-warning-emphasis border border-warning-subtle',
+                                default => 'bg-secondary-subtle text-secondary border border-secondary-subtle',
+                            };
+                        @endphp
+                        <div class="rec-card">
+                            <div class="rec-card-head">
+                                <div class="rec-card-title">{{ $row->formatted_so_number }}</div>
+                                <span class="badge rounded-pill border px-2 py-1 {{ $clearanceClass }}">
+                                    {{ $row->clearing_status ?: 'Pending' }}
+                                </span>
+                            </div>
+
+                            <div class="rec-meta">
+                                <div class="rec-span"><span class="rec-k">Client:</span> <span class="rec-v">{{ $row->account }}</span></div>
+                                <div><span class="rec-k">Qty:</span> <span class="rec-v">{{ number_format($row->qty_ordered) }} L</span></div>
+                                <div class="rec-r"><span class="rec-k">Date:</span> <span class="rec-v">{{ $row->date ? $row->date->format('M d, Y') : '-' }}</span></div>
+                                <div class="rec-span">
+                                    <span class="rec-k">ATL:</span>
+                                    @if ($rowAtls === [])
+                                        <span class="badge bg-light text-muted border rounded-pill px-2 py-1">No ATL Yet</span>
+                                    @elseif ($allLifted)
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1">{{ count($rowAtls) }} Lifted</span>
+                                    @else
+                                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2 py-1">{{ count($rowAtls) }} Unlifted</span>
+                                    @endif
+                                </div>
+                            </div>
+
+                            @if ($row->items->isNotEmpty())
+                                <div class="rec-block">
+                                    @foreach ($row->items as $item)
+                                        <div class="rec-line">
+                                            <span>{{ $item->product_name }}</span>
+                                            <span class="text-nowrap fw-bold">{{ number_format($item->qty) }} L</span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
+
+                            <div class="rec-actions">
+                                @if ($row->canBeIssuedAtl() && Auth::user()->canEditStockOrders())
+                                    <a href="{{ route('stock-orders.create-fuel-trade-po', $row->id) }}" class="btn btn-sm btn-primary rounded-pill">
+                                        <i class="bi bi-plus-circle me-1"></i> Create ATL
+                                    </a>
+                                @endif
+                                <a href="{{ route('stock-orders.atls.show', $row->id) }}" class="btn btn-sm btn-outline-secondary rounded-pill">
+                                    ATL Details
+                                </a>
+                            </div>
+                        </div>
+                    @endforeach
                 </div>
 
                 @if ($orders->hasPages())

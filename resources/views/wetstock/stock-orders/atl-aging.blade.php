@@ -79,7 +79,7 @@
                 </form>
             </div>
             <div class="card-body p-0">
-                <div class="table-responsive">
+                <div class="table-responsive d-none d-md-block">
                     <table class="table table-hover align-middle mb-0">
                         <thead class="bg-light">
                             <tr>
@@ -145,6 +145,53 @@
                         </tbody>
                     </table>
                 </div>
+                {{-- Phones: one card per stuck ATL. --}}
+                <div class="rec-cards">
+                    @foreach ($atls as $atl)
+                        @php
+                            $days = (int) $atl->receiving_date->startOfDay()->diffInDays(today()->startOfDay());
+                            $client = $atl->order->account ?? ($atl->stockRequest->warehouse->name ?? null);
+                            $poNumbers = $atl->allocations->pluck('purchaseOrder')->filter()
+                                ->pluck('po_number')->unique()->join(', ');
+                            $poNumbers = $poNumbers !== '' ? $poNumbers : ($atl->purchaseOrder->po_number ?? '—');
+                            $breakdown = $atl->productBreakdown() ?: [$atl->product => (int) $atl->qty_to_receive];
+                            $label = $atl->atl_number ?: ($atl->client_atl_number ?: '#'.$atl->id);
+                        @endphp
+                        <div class="rec-card">
+                            <div class="rec-card-head">
+                                <div class="rec-card-title">
+                                    @if ($atl->order)
+                                        <a href="{{ route('stock-orders.sales-orders.show', $atl->order->id) }}" class="text-decoration-none">{{ $label }}</a>
+                                    @else
+                                        {{ $label }}
+                                    @endif
+                                </div>
+                                <span class="badge rounded-pill px-2 py-1 {{ $days > 7
+                                    ? 'bg-danger-subtle text-danger border border-danger-subtle'
+                                    : 'bg-warning-subtle text-warning-emphasis border border-warning-subtle' }}">
+                                    {{ $days }} day{{ $days === 1 ? '' : 's' }}
+                                </span>
+                            </div>
+
+                            <div class="rec-meta">
+                                <div class="rec-span"><span class="rec-k">Client:</span> <span class="rec-v">{{ $client ?: '—' }}</span></div>
+                                <div><span class="rec-k">PO#:</span> <span class="rec-v">{{ $poNumbers }}</span></div>
+                                <div class="rec-r"><span class="rec-k">Pick Up:</span> <span class="rec-v">{{ $atl->receiving_date->format('M d, Y') }}</span></div>
+                                <div class="rec-span"><span class="rec-k">Driver:</span> <span class="rec-v">{{ $atl->driver_name ?: '—' }}</span>{{ $atl->plate_number ? ' · ' . $atl->plate_number : '' }}</div>
+                            </div>
+
+                            <div class="rec-block">
+                                @foreach ($breakdown as $product => $qty)
+                                    <div class="rec-line">
+                                        <span>{{ $product ?: 'Unspecified' }}</span>
+                                        <span class="fw-bold text-nowrap">{{ number_format((int) $qty) }} L</span>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+
                 @if ($atls->hasPages())
                     <div class="mt-3 px-3 pb-3">
                         {{ $atls->links() }}

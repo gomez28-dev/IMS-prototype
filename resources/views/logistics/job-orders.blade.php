@@ -62,7 +62,7 @@
 </ul>
 
 <div class="card card-custom jo-card border-0 shadow-sm">
-    <div class="table-responsive">
+    <div class="table-responsive d-none d-md-block">
         <table class="table table-custom jo-table mb-0">
 
             {{-- ===== To schedule ===== --}}
@@ -147,6 +147,71 @@
                 </tbody>
             @endif
         </table>
+    </div>
+    {{-- Phones: one card per job order, in the same reading order as the
+         row. The table above stays for tablet and desktop. --}}
+    <div class="rec-cards">
+        @forelse ($pager as $j)
+            @php [$cls, $txt] = $tag($j); @endphp
+            <div class="rec-card">
+                <div class="rec-card-head">
+                    <div class="rec-card-title">
+                        {{ $j->client }}
+                        <div class="small text-muted fw-normal">{{ $j->location }}</div>
+                    </div>
+                    <span class="jo-tag {{ $cls }}">{{ $txt }}</span>
+                </div>
+
+                <div class="rec-meta">
+                    <div><span class="rec-k">DR#:</span> <span class="rec-v">{{ $j->dr ?: '-' }}</span></div>
+                    <div class="rec-r"><span class="rec-k">SO#:</span> <span class="rec-v">{{ $j->so ?: '-' }}</span></div>
+                    <div><span class="rec-k">Product:</span> <span class="rec-v">{{ $j->products ?: '-' }}</span></div>
+                    <div class="rec-r"><span class="rec-k">Volume:</span> <span class="rec-v">{{ number_format($j->liters) }} L</span></div>
+                    @if ($tab !== 'waiting')
+                        <div class="rec-span"><span class="rec-k">Tanker:</span> <span class="rec-v">{{ $j->tank ? $j->tank->code . ' - ' . $j->tank->name : 'Not loaded yet' }}</span></div>
+                    @endif
+                    @if ($tab === 'scheduled' && $j->trip)
+                        <div class="rec-span">
+                            <span class="rec-k">Trip:</span>
+                            <a href="{{ route('logistics.schedule', ['view' => 'day', 'date' => $j->trip->trip_date]) }}" class="rec-v text-decoration-none">{{ $j->trip->trip_no }}</a>
+                            <span class="text-muted ms-1">&middot; {{ \Carbon\Carbon::parse($j->trip->trip_date)->format('M j, Y') }}</span>
+                        </div>
+                    @endif
+                </div>
+
+                <div class="rec-actions">
+                    @if ($tab === 'schedule' && $canEdit)
+                        <button type="button" class="btn btn-primary-custom btn-sm"
+                                data-schedule
+                                data-delivery="{{ $j->delivery_id }}"
+                                data-tank="{{ $j->tank->id ?? '' }}"
+                                data-date="{{ ($j->required && $j->required->gte($today)) ? $j->required->toDateString() : $today->toDateString() }}"
+                                data-label="DR# {{ $j->dr ?: '-' }} &middot; {{ $j->client }} &middot; {{ number_format($j->liters) }} L"
+                                data-tanker="{{ $j->tank ? $j->tank->code . ' - ' . $j->tank->name : '' }}">
+                            <i class="bi bi-calendar-plus me-1"></i> Schedule
+                        </button>
+                    @elseif ($tab === 'scheduled' && $j->trip)
+                        <a href="{{ route('logistics.schedule', ['view' => 'day', 'date' => $j->trip->trip_date]) }}" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-calendar3 me-1"></i> View trip
+                        </a>
+                    @elseif ($tab === 'waiting')
+                        <a href="{{ route('wetstock.deliveries.index', ['tab' => 'unassigned']) }}" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-truck me-1"></i> Assign in Wet Stock
+                        </a>
+                    @endif
+                </div>
+            </div>
+        @empty
+            <div class="rec-empty">
+                @if ($tab === 'schedule')
+                    Nothing waiting. Every delivery loaded to a tanker is already on a trip.
+                @elseif ($tab === 'scheduled')
+                    No deliveries are on a trip yet.
+                @else
+                    Every open delivery is already assigned to a tanker.
+                @endif
+            </div>
+        @endforelse
     </div>
     @if ($pager->hasPages())
         <div class="p-3 border-top">{{ $pager->links() }}</div>

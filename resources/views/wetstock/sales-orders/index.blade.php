@@ -128,10 +128,10 @@
 
         {{-- Search: the Orders Dashboard's control row, directly above the
              table it narrows. --}}
-        <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+        <div class="toolbar-row d-flex justify-content-between align-items-center gap-2 mb-3">
             <form method="GET" action="{{ route('stock-orders.sales-orders.index') }}"
                   class="d-flex gap-2 align-items-center">
-                <div class="input-group flex-shrink-0" style="width: 320px;">
+                <div class="input-group filter-search">
                     <span class="input-group-text bg-white border-end-0">
                         <i class="bi bi-search text-muted"></i>
                     </span>
@@ -148,7 +148,7 @@
         {{-- Orders --}}
         <div class="card card-custom border-0 shadow-sm">
             <div class="card-body p-0">
-                <div class="table-responsive">
+                <div class="table-responsive d-none d-md-block">
                     <table class="table table-custom table-hover align-middle mb-0">
                         <thead class="bg-light">
                             <tr>
@@ -278,6 +278,93 @@
                             @endforelse
                         </tbody>
                     </table>
+                </div>
+
+                {{-- Phones: the same rows as cards, using the shared
+                     .rec-cards pattern from public/css/ims-ui.css. --}}
+                <div class="rec-cards">
+                    @foreach ($orders as $row)
+                        @php
+                            $rowAtls = $atlsByOrder[$row->id] ?? [];
+                            $allLifted = count($rowAtls) > 0
+                                && collect($rowAtls)->every(fn($a) => $a->lift_status === \App\Models\PurchaseOrderDelivery::LIFT_LIFTED);
+                            $pickupDates = collect($rowAtls)->pluck('receiving_date')->filter()
+                                ->map(fn($d) => \Illuminate\Support\Carbon::parse($d)->toDateString())
+                                ->unique()->sort()->values();
+                            $fromOrder = false;
+                            if ($pickupDates->isEmpty() && $row->date_needed) {
+                                $pickupDates = collect([$row->date_needed->toDateString()]);
+                                $fromOrder = true;
+                            }
+                            $rowVolumes = [];
+                            foreach ($row->items as $item) {
+                                $name = $item->product_name;
+                                $rowVolumes[$name] = ($rowVolumes[$name] ?? 0) + (int) $item->qty;
+                            }
+                            $clearanceClass = match ($row->clearing_status) {
+                                'Approved' => 'bg-success-subtle text-success border border-success-subtle',
+                                'Declined' => 'bg-danger-subtle text-danger border border-danger-subtle',
+                                'Hold' => 'bg-warning-subtle text-warning-emphasis border border-warning-subtle',
+                                default => 'bg-secondary-subtle text-secondary border border-secondary-subtle',
+                            };
+                        @endphp
+                        <div class="rec-card">
+                            <div class="rec-card-head">
+                                <div class="rec-card-title">{{ $row->formatted_so_number }}</div>
+                                <span class="badge rounded-pill border px-2 py-1 {{ $clearanceClass }}">
+                                    {{ $row->clearing_status ?: 'Pending' }}
+                                </span>
+                            </div>
+
+                            <div class="rec-meta">
+                                <div class="rec-span"><span class="rec-k">Client:</span> <span class="rec-v">{{ $row->account }}</span></div>
+                                <div class="rec-span">
+                                    <span class="rec-k">Pick Up:</span>
+                                    <span class="rec-v {{ $fromOrder ? 'text-muted' : '' }} {{ $fromOrder ? 'fw-normal' : '' }}">
+                                        @forelse ($pickupDates as $pickupDate)
+                                            {{ \Illuminate\Support\Carbon::parse($pickupDate)->format('M d, Y') }}@if (! $loop->last), @endif
+                                        @empty
+                                            &mdash;
+                                        @endforelse
+                                    </span>
+                                </div>
+                                <div>
+                                    <span class="rec-k">ATL:</span>
+                                    @if ($rowAtls === [])
+                                        <span class="badge bg-light text-muted border rounded-pill px-2 py-1">No ATL Yet</span>
+                                    @elseif ($allLifted)
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1">{{ count($rowAtls) }} Lifted</span>
+                                    @else
+                                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2 py-1">{{ count($rowAtls) }} Unlifted</span>
+                                    @endif
+                                </div>
+                            </div>
+
+                            <div class="rec-block">
+                                @if ($rowVolumes === [])
+                                    <div class="rec-line">
+                                        <span class="text-muted">Qty ordered</span>
+                                        <span class="fw-bold text-nowrap">{{ number_format($row->qty_ordered) }}</span>
+                                    </div>
+                                @else
+                                    @foreach ($rowVolumes as $product => $qty)
+                                        @php $code = \Illuminate\Support\Str::substr((string) $product, 0, 1); @endphp
+                                        <div class="rec-line">
+                                            <span>{!! $chip($code, $product) !!} <span class="ms-1">{{ $product }}</span></span>
+                                            <span class="fw-bold text-nowrap">{{ number_format($qty) }}</span>
+                                        </div>
+                                    @endforeach
+                                @endif
+                            </div>
+
+                            <div class="rec-actions">
+                                <a href="{{ route('stock-orders.sales-orders.show', $row->id) }}"
+                                   class="btn btn-sm btn-outline-secondary rounded-pill">
+                                    <i class="bi bi-card-list me-1"></i> ATL Details
+                                </a>
+                            </div>
+                        </div>
+                    @endforeach
                 </div>
 
                 @if ($orders->hasPages())

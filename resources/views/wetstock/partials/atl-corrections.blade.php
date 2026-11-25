@@ -15,7 +15,10 @@
             <div class="small text-muted mt-1">
                 {{ $correction->admin->name ?? 'Unknown' }} · {{ $correction->created_at?->format('M d, Y g:i A') }}
             </div>
-            <table class="table table-sm mb-0 mt-1">
+            {{-- Scrolls on its own: this sits inside a table cell, so an
+                 unwrapped 3-column table would widen the whole list. --}}
+            <div class="table-responsive mt-1">
+            <table class="table table-sm mb-0">
                 <thead>
                     <tr>
                         <th class="small fw-semibold">Field</th>
@@ -33,6 +36,7 @@
                     @endforeach
                 </tbody>
             </table>
+            </div>
         @endforeach
     </details>
 @endif

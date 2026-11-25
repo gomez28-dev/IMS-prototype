@@ -34,7 +34,7 @@
                         @endif
                     </div>
                 @else
-                    <div class="table-responsive">
+                    <div class="table-responsive d-none d-md-block">
                         <table class="table table-custom align-middle">
                             <thead>
                                 <tr>
@@ -114,6 +114,61 @@
                                 @endforeach
                             </tbody>
                         </table>
+                    </div>
+
+                    {{-- Phones: one card per entry. The table above stays for
+                         tablet and desktop. --}}
+                    <div class="rec-cards">
+                        @foreach ($stockIns as $stockIn)
+                            @php
+                                $isReversal = $stockIn->reverses_id !== null;
+                                $isReverted = $stockIn->reversal !== null;
+                            @endphp
+                            <div class="rec-card">
+                                <div class="rec-card-head">
+                                    <div class="rec-card-title">
+                                        <i class="bi bi-box-seam me-1 text-secondary"></i>{{ $stockIn->tank->name ?? '-' }}
+                                        @if ($isReversal)
+                                            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill ms-1" title="Reversal of entry #{{ $stockIn->reverses_id }}">REVERSAL</span>
+                                        @elseif ($isReverted)
+                                            <span class="badge bg-secondary-subtle text-secondary border rounded-pill ms-1">REVERTED</span>
+                                        @endif
+                                    </div>
+                                    <span class="fw-bold text-nowrap {{ $stockIn->quantity < 0 ? 'text-danger' : 'text-success' }}">
+                                        {{ $stockIn->quantity < 0 ? '' : '+' }}{{ number_format($stockIn->quantity) }} L
+                                    </span>
+                                </div>
+
+                                <div class="rec-meta">
+                                    <div><span class="rec-k">Date:</span> <span class="rec-v">{{ $stockIn->date ? $stockIn->date->format('M d, Y') : '-' }}</span></div>
+                                    <div class="rec-r"><span class="rec-k">Warehouse:</span> <span class="rec-v">{{ $stockIn->tank->warehouse->name ?? '-' }}</span></div>
+                                    <div><span class="rec-k">Logged by:</span> <span class="rec-v">{{ $stockIn->admin->name ?? 'System' }}</span></div>
+                                    <div class="rec-r"><span class="rec-k">Logged:</span> <span class="rec-v">{{ $stockIn->created_at ? $stockIn->created_at->format('Y-m-d H:i') : '-' }}</span></div>
+                                </div>
+
+                                @if (Auth::user()->canEditModule2() && !$isReversal && !$isReverted)
+                                    <div class="rec-actions">
+                                        <a href="{{ route('wetstock.stock-in.edit', $stockIn->id) }}" class="btn btn-outline-primary btn-sm">
+                                            <i class="bi bi-pencil me-1"></i> Correct
+                                        </a>
+                                        <form method="POST" action="{{ route('wetstock.stock-in.revert', $stockIn->id) }}" onsubmit="return confirm('Revert this entry? This logs an offsetting -{{ number_format($stockIn->quantity) }} L entry; the original stays for audit.');">
+                                            @csrf
+                                            <button type="submit" class="btn btn-outline-warning btn-sm">
+                                                <i class="bi bi-arrow-counterclockwise me-1"></i> Revert
+                                            </button>
+                                        </form>
+                                        @if (Auth::user()->isAdmin())
+                                            <form method="POST" action="{{ route('wetstock.stock-in.destroy', $stockIn->id) }}" onsubmit="return confirm('Permanently delete this Stock IN entry? This cannot be undone.');">
+                                                @csrf
+                                                <button type="submit" class="btn btn-outline-danger btn-sm">
+                                                    <i class="bi bi-trash me-1"></i> Delete
+                                                </button>
+                                            </form>
+                                        @endif
+                                    </div>
+                                @endif
+                            </div>
+                        @endforeach
                     </div>
 
                     <div class="mt-3">
