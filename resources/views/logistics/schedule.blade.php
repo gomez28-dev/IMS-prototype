@@ -61,7 +61,25 @@
         .ts-month-head { gap: 3px; margin-bottom: 0.15rem; }
         .ts-month-head div { font-size: 0.62rem; padding-bottom: 0.1rem; }
         .ts-month-grid { gap: 3px; }
-        .ts-mday { min-height: 0; padding: 0.3rem 0.15rem 0.25rem; text-align: center; border-radius: 8px; }
+        .ts-mday { position: relative; min-height: 34px; padding: 0.3rem 0.15rem 0.25rem; text-align: center; border-radius: 8px; }
+        /* A day with nothing on it has no card in the list below, so the cell
+           itself is the add target. This invisible button covers the cell:
+           being a real button is what lets a screen reader announce the tap
+           for what it does, which a bare day number cannot, and it is also
+           what makes Enter/Space work. It is hidden from tablet up, so the
+           desktop grid keeps its own "+" and nothing else. */
+        .ts-mday-add {
+            position: absolute;
+            inset: -1px; /* the cell has a 1px border */
+            padding: 0;
+            border: 0;
+            border-radius: 8px;
+            background: transparent;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .ts-mday-add:active { background: rgba(255, 69, 0, 0.08); }
+        .ts-mday-add:focus-visible { outline: 2px solid var(--brand-color); outline-offset: 1px; }
         .ts-mday > .d-flex { justify-content: center !important; }
         .ts-mday .ts-add-mini, .ts-mday .ts-mpills { display: none; }
         .ts-mnum { font-size: 0.8rem; }
@@ -283,6 +301,10 @@
                                         @endif
                                     @endforeach
                                 </div>
+                                @if ($canEdit)
+                                    <button type="button" class="ts-mday-add d-md-none" data-add data-date="{{ $ds }}"
+                                            aria-label="Schedule a trip on {{ $d->format('l, M j') }}"></button>
+                                @endif
                             </div>
                         @endforeach
                     </div>
