@@ -283,7 +283,7 @@
                                 <div class="d-flex justify-content-between align-items-start">
                                     <span class="ts-mnum">{{ $d->day }}</span>
                                     @if ($canEdit)
-                                        <button type="button" class="ts-add-mini" data-add data-date="{{ $ds }}" aria-label="Add trip">+</button>
+                                        <button type="button" class="ts-add-mini" data-add data-date="{{ $ds }}" aria-label="Add a trip on {{ $d->format('l, M j') }}">+</button>
                                     @endif
                                 </div>
                                 @if ($dayTankIds->isNotEmpty())
@@ -342,7 +342,7 @@
                             @endif
                         </div>
                         @if ($canEdit)
-                            <button type="button" class="ts-add ts-wk-add" data-add data-date="{{ $ds }}" aria-label="Add trip on {{ $d->format('D, M j') }}">+</button>
+                            <button type="button" class="ts-add ts-wk-add" data-add data-date="{{ $ds }}" aria-label="Add a trip on {{ $d->format('l, M j') }}">+</button>
                         @endif
                     </div>
 
@@ -404,7 +404,7 @@
                                                 @include('logistics._pill', ['tk' => $tk, 'group' => $group, 'date' => $ds])
                                             @endif
                                             @if ($canEdit)
-                                                <button type="button" class="ts-add" data-add data-tank="{{ $tk->id }}" data-date="{{ $ds }}" aria-label="Add trip">+</button>
+                                                <button type="button" class="ts-add" data-add data-tank="{{ $tk->id }}" data-date="{{ $ds }}" aria-label="Add a trip for {{ $tk->code }} on {{ $d->format('l, M j') }}">+</button>
                                             @endif
                                         </div>
                                     </td>
@@ -437,7 +437,7 @@
                             @endif
                         </div>
                         @if ($canEdit)
-                            <button type="button" class="ts-add ts-wk-add" data-add data-date="{{ $ds }}" aria-label="Add trip on {{ $d->format('D, M j') }}">+</button>
+                            <button type="button" class="ts-add ts-wk-add" data-add data-date="{{ $ds }}" aria-label="Add a trip on {{ $d->format('l, M j') }}">+</button>
                         @endif
                     </div>
 
@@ -487,7 +487,7 @@
                             </button>
                         @endif
                         @if ($canEdit)
-                            <button type="button" class="btn btn-secondary-custom btn-sm" data-add data-tank="{{ $tk->id }}" data-date="{{ $ds }}">+ Schedule trip</button>
+                            <button type="button" class="btn btn-secondary-custom btn-sm" data-add data-tank="{{ $tk->id }}" data-date="{{ $ds }}" aria-label="Add a trip for {{ $tk->code }} on {{ $date->format('l, M j') }}">+ Schedule trip</button>
                         @endif
                     </div>
 
