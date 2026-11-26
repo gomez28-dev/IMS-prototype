@@ -302,8 +302,16 @@
                                     @endforeach
                                 </div>
                                 @if ($canEdit)
+                                    @php
+                                        // The count badge is aria-hidden, so the day's
+                                        // load has to ride on the button's name.
+                                        $booked = $dayTankIds->count();
+                                        $bookedText = $booked === 0
+                                            ? 'No tankers booked.'
+                                            : ($booked === 1 ? '1 tanker booked.' : $booked . ' tankers booked.');
+                                    @endphp
                                     <button type="button" class="ts-mday-add d-md-none" data-add data-date="{{ $ds }}"
-                                            aria-label="Schedule a trip on {{ $d->format('l, M j') }}"></button>
+                                            aria-label="Schedule a trip on {{ $d->format('l, M j') }}. {{ $bookedText }}"></button>
                                 @endif
                             </div>
                         @endforeach
