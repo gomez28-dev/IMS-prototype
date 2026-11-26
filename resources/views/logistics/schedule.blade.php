@@ -51,7 +51,27 @@
     .ts-mpills { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 0.3rem; }
     .ts-add-mini { border: 0; background: transparent; color: #94a3b8; font-size: 0.95rem; line-height: 1; padding: 0 2px; }
     .ts-add-mini:hover { color: var(--brand-color); }
-    @media (max-width: 767px) { .ts-month-wrap { overflow-x: auto; } .ts-month-wrap > div { min-width: 640px; } }
+    /* Month on a phone: seven columns at 360px only hold a day number, so
+       the grid drops to bare numbers plus a count and never scrolls
+       sideways. The tankers for each day are listed under it (see the
+       markup), so the line-up is still one glance and no tap away. */
+    .ts-mcount { display: none; }
+    @media (max-width: 767.98px) {
+        .ts-month-wrap { overflow: visible; }
+        .ts-month-head { gap: 3px; margin-bottom: 0.15rem; }
+        .ts-month-head div { font-size: 0.62rem; padding-bottom: 0.1rem; }
+        .ts-month-grid { gap: 3px; }
+        .ts-mday { min-height: 0; padding: 0.3rem 0.15rem 0.25rem; text-align: center; border-radius: 8px; }
+        .ts-mday > .d-flex { justify-content: center !important; }
+        .ts-mday .ts-add-mini, .ts-mday .ts-mpills { display: none; }
+        .ts-mnum { font-size: 0.8rem; }
+        .ts-mcount {
+            display: block;
+            width: 16px; height: 16px; margin: 1px auto 0;
+            border-radius: 999px; background: rgba(255, 69, 0, 0.14);
+            color: #c2410c; font-size: 0.6rem; font-weight: 700; line-height: 16px;
+        }
+    }
 
     /* Week */
     .ts-table { min-width: 900px; }
@@ -77,6 +97,61 @@
     .ts-stop:first-of-type { border-top: 0; }
     .ts-stop-n { width: 22px; height: 22px; border-radius: 50%; background: var(--brand-color); color: #fff; font-size: 0.68rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
     .ts-line .form-select, .ts-line .form-control { min-width: 0; }
+    /* Week view on a phone: the matrix is replaced by day cards (see the
+       markup), so these rules only style that list. */
+    @media (max-width: 767.98px) {
+        .ts-wk-add {
+            flex: 0 0 auto;
+            min-width: 40px;
+            min-height: 40px;
+            padding: 0;
+            font-size: 1.1rem;
+            border-radius: 10px;
+        }
+        .ts-wk-today {
+            margin-left: 0.4rem;
+            padding: 0.12rem 0.45rem;
+            border-radius: 999px;
+            background: #fef3c7;
+            color: #b45309;
+            font-size: 0.6rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+        .ts-wk-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            padding: 0.3rem 0;
+            border-top: 1px solid #eef0f3;
+        }
+        .ts-wk-row:first-of-type { border-top: 0; padding-top: 0; }
+        .ts-wk-main { min-width: 0; }
+        .ts-wk-name {
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: #111827;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .ts-wk-sub {
+            font-size: 0.7rem;
+            color: #6b7280;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        /* The pill is the row's action, so give it a thumb-sized target. */
+        .ts-wk-row .ts-pill {
+            flex: 0 0 auto;
+            min-height: 36px;
+            padding: 0.3rem 0.7rem;
+        }
+        .ts-wk-none { padding: 0.1rem 0 0.2rem; font-size: 0.75rem; color: #9aa5b4; }
+    }
 </style>
 
 @php
@@ -193,6 +268,9 @@
                                         <button type="button" class="ts-add-mini" data-add data-date="{{ $ds }}" aria-label="Add trip">+</button>
                                     @endif
                                 </div>
+                                @if ($dayTankIds->isNotEmpty())
+                                    <span class="ts-mcount" aria-hidden="true">{{ $dayTankIds->count() }}</span>
+                                @endif
                                 <div class="ts-mpills">
                                     @foreach ($dayTankIds as $tankId)
                                         @php $tk = $tankers->firstWhere('id', $tankId); @endphp
@@ -212,10 +290,59 @@
             </div>
         </div>
 
+        {{-- Phones: the seven column grid only has room for day numbers, so
+             the days that have trips or wet stock deliveries are listed
+             under it, one row per tanker, with the pill that opens that
+             tanker's line-up. --}}
+        <div class="rec-cards rec-compact ts-month-cards">
+            @foreach ($days as $d)
+                @php
+                    $ds = $d->toDateString();
+                    $tripGroups = $trips->where('sched_date', $ds)->groupBy('storage_tank_id');
+                    $dlGroups   = $wsDeliveries->where('sched_date', $ds)->groupBy('storage_tank_id');
+                    $dayTankIds = $tripGroups->keys()->merge($dlGroups->keys())->unique();
+                @endphp
+                @continue($dayTankIds->isEmpty())
+                <div class="rec-card">
+                    <div class="rec-card-head">
+                        <div class="rec-card-title">
+                            {{ $d->format('D, M j') }}
+                            @if ($d->isToday())
+                                <span class="ts-wk-today">Today</span>
+                            @endif
+                        </div>
+                        @if ($canEdit)
+                            <button type="button" class="ts-add ts-wk-add" data-add data-date="{{ $ds }}" aria-label="Add trip on {{ $d->format('D, M j') }}">+</button>
+                        @endif
+                    </div>
+
+                    @foreach ($dayTankIds as $tankId)
+                        @php
+                            $tk = $tankers->firstWhere('id', $tankId);
+                            $group = $tripGroups->get($tankId, collect());
+                            $dl = $dlCount($tankId, $ds);
+                        @endphp
+                        @if ($tk)
+                            <div class="ts-wk-row">
+                                <div class="ts-wk-main">
+                                    <div class="ts-wk-name">{{ $tk->name }}</div>
+                                    <div class="ts-wk-sub">
+                                        {{ $tk->warehouse }} &middot; {{ number_format((int) $tk->max_capacity) }} L
+                                        @if ($dl > 0) &middot; {{ $dl }} wet stock @endif
+                                    </div>
+                                </div>
+                                @include('logistics._pill', ['tk' => $tk, 'group' => $group, 'date' => $ds])
+                            </div>
+                        @endif
+                    @endforeach
+                </div>
+            @endforeach
+        </div>
+
     {{-- ===================== WEEK ===================== --}}
     @elseif ($view === 'week')
         <div class="card card-custom ts-card border-0 shadow-sm">
-            <div class="table-responsive">
+            <div class="table-responsive d-none d-md-block">
                 <table class="table table-custom ts-table mb-0">
                     <thead>
                         <tr>
@@ -259,6 +386,55 @@
             </div>
         </div>
 
+        {{-- Phones: the week matrix is 900px wide, so each day becomes a card
+             listing the tankers that have a trip or a wet stock delivery that
+             day. The pill still opens that tanker's line-up; the + opens the
+             trip modal with the date already filled in. --}}
+        <div class="rec-cards rec-compact ts-week-cards">
+            @foreach ($days as $d)
+                @php
+                    $ds = $d->toDateString();
+                    $tripGroups = $trips->where('sched_date', $ds)->groupBy('storage_tank_id');
+                    $dlGroups   = $wsDeliveries->where('sched_date', $ds)->groupBy('storage_tank_id');
+                    $dayTankIds = $tripGroups->keys()->merge($dlGroups->keys())->unique();
+                @endphp
+                <div class="rec-card">
+                    <div class="rec-card-head">
+                        <div class="rec-card-title">
+                            {{ $d->format('D, M j') }}
+                            @if ($d->isToday())
+                                <span class="ts-wk-today">Today</span>
+                            @endif
+                        </div>
+                        @if ($canEdit)
+                            <button type="button" class="ts-add ts-wk-add" data-add data-date="{{ $ds }}" aria-label="Add trip on {{ $d->format('D, M j') }}">+</button>
+                        @endif
+                    </div>
+
+                    @forelse ($dayTankIds as $tankId)
+                        @php
+                            $tk = $tankers->firstWhere('id', $tankId);
+                            $group = $tripGroups->get($tankId, collect());
+                            $dl = $dlCount($tankId, $ds);
+                        @endphp
+                        @if ($tk)
+                            <div class="ts-wk-row">
+                                <div class="ts-wk-main">
+                                    <div class="ts-wk-name">{{ $tk->name }}</div>
+                                    <div class="ts-wk-sub">
+                                        {{ $tk->warehouse }} &middot; {{ number_format((int) $tk->max_capacity) }} L
+                                        @if ($dl > 0) &middot; {{ $dl }} wet stock @endif
+                                    </div>
+                                </div>
+                                @include('logistics._pill', ['tk' => $tk, 'group' => $group, 'date' => $ds])
+                            </div>
+                        @endif
+                    @empty
+                        <div class="ts-wk-none">No trips scheduled.</div>
+                    @endforelse
+                </div>
+            @endforeach
+        </div>
     {{-- ===================== DAY ===================== --}}
     @else
         @php $ds = $date->toDateString(); @endphp

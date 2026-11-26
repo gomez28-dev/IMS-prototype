@@ -799,6 +799,100 @@ html {
         text-align: center;
         color: #6b7280;
     }
+
+    /* ---- Dense two-line rows (opt-in: `.rec-cards.rec-compact`) ----------
+       Line 1 is the record's identity and its status pill; line 2 is the three
+       facts the list is scanned for. The per-product block stays visible under
+       them, so nothing about a purchase order's contents needs a tap — it just
+       loses its panel, its bottom margin and the Amount total that line 2 now
+       carries. Only a list that opts in with the class changes, so the other
+       cards keep their roomier layout until they are converted too. */
+    .rec-compact {
+        padding: 0.6rem;
+    }
+
+    .rec-compact .rec-card {
+        padding: 0.65rem 0.7rem;
+        margin-bottom: 0.5rem;
+        border-radius: 0.8rem;
+    }
+
+    .rec-compact .rec-card-head {
+        margin-bottom: 0.2rem;
+    }
+
+    .rec-compact .rec-card-title {
+        font-size: 0.9rem;
+    }
+
+    /* Supplier · Amount · Terms on one line: the supplier takes the leftover
+       width and ellipses; the two figures keep their track and never wrap. */
+    .rec-facts {
+        display: flex;
+        align-items: baseline;
+        gap: 0.3rem;
+        min-width: 0;
+        margin-bottom: 0.25rem;
+        font-size: 0.75rem;
+        color: #6b7280;
+        white-space: nowrap;
+    }
+
+    .rec-facts > * {
+        flex: 0 0 auto;
+    }
+
+    .rec-facts > .rec-fact-grow {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* Terms are the one text value that can run long ("VAT EX CASH"), so they
+       shrink and ellipse before the supplier runs out of room. The amount is
+       fixed: a figure is never ellipsed. */
+    .rec-facts > span:last-child {
+        flex: 0 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .rec-facts .rec-sep {
+        color: #d1d5db;
+    }
+
+    /* The product lines sit straight on the card: at this density the panel
+       costs more height than it buys. */
+    .rec-compact .rec-block {
+        padding: 0;
+        margin-bottom: 0;
+        border: 0;
+        background: transparent;
+        font-size: 0.76rem;
+    }
+
+    .rec-compact .rec-line {
+        line-height: 1.2;
+    }
+
+    .rec-compact .rec-line + .rec-line {
+        margin-top: 0.1rem;
+    }
+
+    /* Actions stay 40px tall for a thumb and are allowed to drop to one line:
+       the smaller type and side padding buy the width for it. */
+    .rec-compact .rec-actions {
+        gap: 0.35rem;
+        margin-top: 0.45rem;
+    }
+
+    .rec-compact .rec-actions .btn {
+        min-height: 40px;
+        padding: 0 0.55rem;
+        font-size: 0.72rem;
+    }
 }
 
 /* --------------------------------------------------------------------------

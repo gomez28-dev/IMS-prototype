@@ -424,7 +424,7 @@
                 {{-- Phones: the same rows as stacked cards (shared .rec-cards
                      pattern). The table above stays for tablet and desktop,
                      where eight columns fit. --}}
-                <div class="rec-cards">
+                <div class="rec-cards rec-compact">
                     @forelse ($purchaseOrders as $po)
                         @php $state = $poState($po); @endphp
                         <div class="rec-card">
@@ -438,12 +438,13 @@
                                 <span class="badge rounded-pill px-2 py-1 {{ $state['class'] }}">{{ $state['label'] }}</span>
                             </div>
 
-                            <div class="rec-meta">
-                                <div class="rec-span"><span class="rec-k">Supplier:</span> <span class="rec-v">{{ $po->supplier_name ?: ($po->client->name ?? '-') }}</span></div>
-                                <div><span class="rec-k">Terms:</span> <span class="rec-v">{{ $state['terms'] !== '' ? $state['terms'] : '-' }}</span></div>
-                                @if ($po->items->isEmpty())
-                                    <div class="rec-r"><span class="rec-k">Amount:</span> <span class="rec-v">{{ $state['amount'] > 0 ? number_format($state['amount'], 2) : '-' }}</span></div>
-                                @endif
+                            {{-- One line: the three facts this list is scanned for. --}}
+                            <div class="rec-facts">
+                                <span class="rec-fact-grow"><span class="rec-k">Supplier</span> <span class="rec-v">{{ $po->supplier_name ?: ($po->client->name ?? '-') }}</span></span>
+                                <span class="rec-sep">&middot;</span>
+                                <span><span class="rec-k">Amt</span> <span class="rec-v">{{ $state['amount'] > 0 ? number_format($state['amount'], 2) : '-' }}</span></span>
+                                <span class="rec-sep">&middot;</span>
+                                <span><span class="rec-k">Terms</span> <span class="rec-v">{{ $state['terms'] !== '' ? $state['terms'] : '-' }}</span></span>
                             </div>
 
                             <div class="rec-block">
@@ -458,10 +459,6 @@
                                         <span class="fw-semibold">{{ number_format($po->qty_ordered) }} L</span>
                                     </div>
                                 @endforelse
-                                <div class="rec-total">
-                                    <span>Amount</span>
-                                    <span>{{ $state['amount'] > 0 ? number_format($state['amount'], 2) : '-' }}</span>
-                                </div>
                             </div>
 
                             <div class="rec-actions">
