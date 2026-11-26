@@ -196,14 +196,14 @@
         <i class="bi bi-calendar3 me-1"></i> Monthly Summary &mdash; {{ $now->format('F Y') }}
     </span>
 </div>
-<div class="row g-4 mb-4">
+<div class="row g-4 mb-4 stat-grid">
     <div class="col-xl-3 col-md-6">
         <div class="card card-custom p-3 border-0 h-100">
-            <div class="d-flex align-items-center gap-3">
+            <div class="d-flex align-items-center gap-3 stat-head">
                 <div class="stat-icon" style="background:#fff1ee;color:#f04a1a;"><i class="bi bi-journal-text"></i></div>
                 <span class="stat-title">Total Orders</span>
             </div>
-            <div class="d-flex flex-grow-1 align-items-center justify-content-center py-3">
+            <div class="d-flex flex-grow-1 align-items-center justify-content-center py-3 stat-big-row">
                 <span class="stat-big">{{ number_format($totalOrders) }}</span>
             </div>
         </div>
@@ -212,7 +212,7 @@
     @foreach ($statCards as $card)
     <div class="col-xl-3 col-md-6">
         <div class="card card-custom p-3 border-0 h-100">
-            <div class="d-flex align-items-center gap-3 mb-3">
+            <div class="d-flex align-items-center gap-3 mb-3 stat-head">
                 <div class="stat-icon" style="{{ $card['tint'] }}"><i class="bi {{ $card['icon'] }}"></i></div>
                 <span class="stat-title">{{ $card['title'] }}</span>
             </div>
@@ -233,9 +233,9 @@
 
 <!-- Search & Filtering -->
 <div class="mb-4">
-    <form method="GET" action="{{ route('dashboard') }}" class="row g-2 align-items-center">
+    <form method="GET" action="{{ route('dashboard') }}" class="row g-2 align-items-center ims-toolbar">
         <input type="hidden" name="tab" value="{{ $activeTab }}">
-        <div class="col-md-7 col-sm-8 col-12">
+        <div class="col-md-7 col-sm-8 col-12 ims-toolbar-search">
             <div class="input-group">
                 <span class="input-group-text bg-white border-end-0">
                     <i class="bi bi-search text-muted"></i>
@@ -246,13 +246,13 @@
         <div class="col-auto">
             <button type="submit" class="btn btn-primary-custom">Search</button>
             @if ($searchQuery !== '')
-                <a href="{{ route('dashboard', ['clear' => 1]) }}" class="btn btn-secondary-custom">Clear</a>
+                <a href="{{ route('dashboard', ['clear' => 1]) }}" class="btn btn-secondary-custom" title="Clear search" aria-label="Clear search"><i class="bi bi-x-lg d-md-none"></i><span class="d-none d-md-inline">Clear</span></a>
             @endif
         </div>
         @if (Auth::user()->canEditModule1())
-        <div class="col-auto ms-md-auto">
-            <a href="{{ route('order.create') }}" class="btn btn-primary-custom shadow-sm d-flex align-items-center justify-content-center">
-                <i class="bi bi-plus-lg me-2"></i> New Order
+        <div class="col-auto ms-md-auto ims-toolbar-primary">
+            <a href="{{ route('order.create') }}" class="btn btn-primary-custom shadow-sm d-flex align-items-center justify-content-center" title="New Order" aria-label="New Order">
+                <i class="bi bi-plus-lg me-sm-2"></i><span class="d-none d-sm-inline">New Order</span>
             </a>
         </div>
         @endif

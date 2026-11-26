@@ -188,14 +188,14 @@
         </style>
 
         {{-- Stat cards: one headline count, then volume split by product. --}}
-        <div class="row g-4 mb-4">
+        <div class="row g-4 mb-4 stat-grid">
             <div class="col-xl-3 col-md-6">
                 <div class="card card-custom p-3 border-0 h-100">
-                    <div class="d-flex align-items-center gap-3">
+                    <div class="d-flex align-items-center gap-3 stat-head">
                         <div class="stat-icon" style="background:#fff1ee;color:#f04a1a;"><i class="bi bi-journal-text"></i></div>
                         <span class="stat-title">Total Orders</span>
                     </div>
-                    <div class="d-flex flex-grow-1 align-items-center justify-content-center py-3">
+                    <div class="d-flex flex-grow-1 align-items-center justify-content-center py-3 stat-big-row">
                         <span class="stat-big">{{ number_format($stats['total']) }}</span>
                     </div>
                 </div>
@@ -204,7 +204,7 @@
             @foreach ($statCards as $card)
                 <div class="col-xl-3 col-md-6">
                     <div class="card card-custom p-3 border-0 h-100">
-                        <div class="d-flex align-items-center gap-3 mb-3">
+                        <div class="d-flex align-items-center gap-3 mb-3 stat-head">
                             <div class="stat-icon" style="{{ $card['tint'] }}"><i class="bi {{ $card['icon'] }}"></i></div>
                             <span class="stat-title">{{ $card['title'] }}</span>
                         </div>
@@ -233,10 +233,10 @@
              Search button under the input and dropped Create P.O. onto a line
              of its own, so the input group is given an explicit width and keeps
              the button beside it. --}}
-        <div class="toolbar-row d-flex justify-content-between align-items-center gap-2 mb-3">
+        <div class="toolbar-row ims-toolbar d-flex justify-content-between align-items-center gap-2 mb-3">
             <form method="GET" action="{{ route('stock-orders.purchase-orders.index') }}"
                   class="d-flex gap-2 align-items-center">
-                <div class="input-group filter-search">
+                <div class="input-group filter-search ims-toolbar-search">
                     <span class="input-group-text bg-white border-end-0">
                         <i class="bi bi-search text-muted"></i>
                     </span>
@@ -246,13 +246,13 @@
                 <button type="submit" class="btn btn-primary-custom">Search</button>
                 @if (request('search'))
                     <a href="{{ route('stock-orders.purchase-orders.index') }}"
-                       class="btn btn-outline-secondary">Reset</a>
+                       class="btn btn-outline-secondary" title="Reset search" aria-label="Reset search"><i class="bi bi-x-lg d-md-none"></i><span class="d-none d-md-inline">Reset</span></a>
                 @endif
             </form>
 
             @if (Auth::user()->canEditStockOrders())
-                <a href="{{ route('stock-orders.create-supplier-po') }}" class="btn btn-primary-custom shadow-sm">
-                    <i class="bi bi-plus-lg me-1"></i> Create P.O.
+                <a href="{{ route('stock-orders.create-supplier-po') }}" class="btn btn-primary-custom shadow-sm d-flex align-items-center justify-content-center ims-toolbar-primary" title="Create P.O." aria-label="Create P.O.">
+                    <i class="bi bi-plus-lg me-sm-2"></i><span class="d-none d-sm-inline">Create P.O.</span>
                 </a>
             @endif
         </div>
