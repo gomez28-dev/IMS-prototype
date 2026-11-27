@@ -103,6 +103,7 @@ class TripScheduleController extends Controller
                     'so_number'   => $first->so_number,
                     'account'     => $first->account,
                     'location'    => $first->location,
+                    'date_needed' => $first->date_needed,
                     'tanker'      => $tankers->firstWhere('id', $first->storage_tank_id),
                     'liters'      => $rows->sum('quantity'),
                     'products'    => $rows->map(fn ($r) => $r->comp_product ?: $r->product_type)
@@ -168,6 +169,9 @@ class TripScheduleController extends Controller
                 'location'     => $first->location,
                 'date'         => $first->delivery_date
                     ? Carbon::parse($first->delivery_date)->toDateString()
+                    : null,
+                'date_needed'  => $first->date_needed
+                    ? Carbon::parse($first->date_needed)->format('M j, Y')
                     : null,
                 'status_label' => $fulfilled ? 'Fulfilled' : ucfirst(strtolower($first->status)),
                 'fulfilled'    => $fulfilled,

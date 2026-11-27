@@ -107,7 +107,7 @@
                         @enderror
                     </div>
 
-                    <div class="row mb-3">
+                    <div class="row g-3 mb-3">
                         <div class="col-md-6">
                             <label for="so_number" class="form-label fw-medium text-secondary small">SO Number <span class="text-danger">*</span></label>
                             <input type="text" name="so_number" id="so_number" class="form-control @error('so_number') is-invalid @enderror" placeholder="e.g. SO-12345" value="{{ old('so_number', $order ? $order->so_number : '') }}" required>
@@ -124,7 +124,18 @@
                         </div>
                     </div>
 
-                    <div class="row mb-4">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label for="date_needed" class="form-label fw-medium text-secondary small">Date Needed (Delivery / Pick Up)</label>
+                            <input type="date" name="date_needed" id="date_needed" class="form-control @error('date_needed') is-invalid @enderror" value="{{ old('date_needed', $order && $order->date_needed ? $order->date_needed->format('Y-m-d') : '') }}">
+                            <div class="form-text extra-small">Optional. Leave blank if the date is not confirmed yet; you can add it later.</div>
+                            @error('date_needed')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-4">
                         <div class="col-md-6">
                             <label for="po_number" class="form-label fw-medium text-secondary small">PO Number</label>
                             <input type="text" name="po_number" id="po_number" class="form-control @error('po_number') is-invalid @enderror" placeholder="e.g. PO-12345 (optional)" value="{{ old('po_number', $order ? $order->po_number : '') }}">
@@ -141,17 +152,6 @@
                                 @endforeach
                             </select>
                             @error('sales_rep')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-                    </div>
-
-                    <div class="row mb-4">
-                        <div class="col-md-6">
-                            <label for="date_needed" class="form-label fw-medium text-secondary small">Date Needed (Delivery / Pick Up)</label>
-                            <input type="date" name="date_needed" id="date_needed" class="form-control @error('date_needed') is-invalid @enderror" value="{{ old('date_needed', $order && $order->date_needed ? $order->date_needed->format('Y-m-d') : '') }}">
-                            <div class="form-text extra-small">Optional. Leave blank if the date is not confirmed yet; you can add it later.</div>
-                            @error('date_needed')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
@@ -178,7 +178,7 @@
                         </div>
                     </div>
 
-                    <div class="row mb-3">
+                    <div class="row g-3 mb-3">
                         <div class="col-md-6">
                             <label for="status" class="form-label fw-medium text-secondary small">Status <span class="text-danger">*</span></label>
                             <select name="status" id="status" class="form-control form-select @error('status') is-invalid @enderror" required>

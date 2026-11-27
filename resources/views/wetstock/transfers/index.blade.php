@@ -42,42 +42,26 @@
 </style>
 <div class="row justify-content-center">
     <div class="col-12">
-        <div class="mb-4">
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb mb-1 small">
-                    <li class="breadcrumb-item"><a href="{{ route('wetstock.dashboard') }}" class="text-decoration-none text-secondary">Wet Stock</a></li>
-                    <li class="breadcrumb-item active" aria-current="page">Stock Transfers</li>
-                </ol>
-            </nav>
-            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-1">
-                <h3 class="fw-bold text-dark mb-0">
-                    <i class="bi bi-arrow-left-right text-primary me-2"></i>Stock Transfers & Cross-Site Logistics
-                </h3>
-                @if (Auth::user()->canEditModule2())
-                    <div class="d-flex flex-wrap gap-2">
-                        <button type="button" data-type="transfer" class="js-open-transfer btn btn-primary-custom btn-sm rounded-pill px-3 shadow-sm d-flex align-items-center">
-                            <i class="bi bi-arrow-left-right me-1"></i> Intra-Site Transfer
-                        </button>
-                        <button type="button" data-type="borrow" class="js-open-transfer btn btn-secondary-custom btn-sm rounded-pill px-3 shadow-sm d-flex align-items-center">
-                            <i class="bi bi-box-arrow-in-up-right me-1 text-primary"></i> Borrow Stock
-                        </button>
-                        <button type="button" data-type="return" class="js-open-transfer btn btn-outline-success btn-sm rounded-pill px-3 d-flex align-items-center fw-semibold">
-                            <i class="bi bi-arrow-counterclockwise me-1"></i> Return Stock
-                        </button>
-                    </div>
-                @endif
-            </div>
-            <p class="text-muted small mb-3">Record intra-site depot/tanker transfers, cross-site borrowings, and stock returns.</p>
-
-            <div class="d-flex justify-content-end">
-                <a href="{{ route('wetstock.dashboard') }}" class="btn btn-light border shadow-sm rounded-pill px-3 py-1 d-flex align-items-center flex-shrink-0">
-                    <i class="bi bi-arrow-left-circle me-2 text-primary"></i><span class="fw-medium text-dark small">Back to Dashboard</span>
+        <div class="mb-3">
+            <div class="d-flex justify-content-between align-items-center gap-2 mb-2 wt-top-bar">
+                <nav aria-label="breadcrumb" style="min-width: 0;">
+                    <ol class="breadcrumb mb-0 small">
+                        <li class="breadcrumb-item"><a href="{{ route('wetstock.dashboard') }}" class="text-decoration-none text-secondary">Wet Stock</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">Stock Transfers</li>
+                    </ol>
+                </nav>
+                <a href="{{ route('wetstock.dashboard') }}" class="btn btn-light border shadow-sm rounded-pill px-3 py-1 d-inline-flex align-items-center flex-shrink-0 wt-back-btn">
+                    <i class="bi bi-arrow-left-circle me-1 me-sm-2 text-primary"></i><span class="fw-medium text-dark small">Back to Dashboard</span>
                 </a>
             </div>
+            <h3 class="fw-bold text-dark mb-1">
+                <i class="bi bi-arrow-left-right text-primary me-2"></i>Stock Transfers & Cross-Site Logistics
+            </h3>
+            <p class="text-muted small mb-0">Record intra-site depot/tanker transfers, cross-site borrowings, and stock returns.</p>
         </div>
 
         <!-- 3 Nav Tabs -->
-        <ul class="nav nav-tabs nav-fill border-bottom mb-4" id="transferTabs" role="tablist">
+        <ul class="nav nav-tabs nav-fill border-bottom mb-3" id="transferTabs" role="tablist">
             <li class="nav-item" role="presentation">
                 <a class="nav-link d-flex align-items-center justify-content-center gap-2 py-2 small fw-medium {{ $activeType === 'transfer' ? 'active text-primary' : 'text-secondary' }}" href="{{ route('wetstock.transfers.index', ['type' => 'transfer']) }}">
                     <i class="bi bi-arrow-left-right text-primary"></i>
@@ -106,6 +90,24 @@
                 </a>
             </li>
         </ul>
+
+        @if (Auth::user()->canEditModule2())
+            <div class="d-flex justify-content-end mb-3 wt-create-wrap">
+                @if ($activeType === 'transfer')
+                    <button type="button" data-type="transfer" class="js-open-transfer btn btn-primary-custom btn-sm rounded-pill px-3 shadow-sm d-inline-flex align-items-center">
+                        <i class="bi bi-arrow-left-right me-1"></i> Intra-Site Transfer
+                    </button>
+                @elseif ($activeType === 'borrow')
+                    <button type="button" data-type="borrow" class="js-open-transfer btn btn-secondary-custom btn-sm rounded-pill px-3 shadow-sm d-inline-flex align-items-center">
+                        <i class="bi bi-box-arrow-in-up-right me-1 text-primary"></i> Borrow Stock
+                    </button>
+                @elseif ($activeType === 'return')
+                    <button type="button" data-type="return" class="js-open-transfer btn btn-outline-success btn-sm rounded-pill px-3 d-inline-flex align-items-center fw-semibold">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i> Return Stock
+                    </button>
+                @endif
+            </div>
+        @endif
 
         {{-- Contextual Note Boxes for Borrow & Return --}}
         @if ($activeType === 'borrow')
@@ -151,7 +153,7 @@
                     <span class="ms-1 badge bg-dark text-white">All Records</span>
                 @endif
             </span>
-            <form method="GET" action="{{ route('wetstock.transfers.index') }}" class="d-flex gap-2 align-items-center">
+            <form method="GET" action="{{ route('wetstock.transfers.index') }}" class="d-flex flex-wrap gap-2 align-items-center wt-month-form">
                 <input type="hidden" name="type" value="{{ $activeType }}">
                 @if ($searchQuery)
                     <input type="hidden" name="search" value="{{ $searchQuery }}">
@@ -188,7 +190,7 @@
         @endif
 
         <!-- Filters Card -->
-        <div class="card card-custom border-0 shadow-sm mb-4">
+        <div class="card card-custom border-0 shadow-sm mb-4 wt-filter-card">
             <div class="card-body p-3">
                 <form method="GET" action="{{ route('wetstock.transfers.index') }}" class="row g-2 align-items-end">
                     <input type="hidden" name="type" value="{{ $activeType }}">

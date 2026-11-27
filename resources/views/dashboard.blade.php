@@ -289,15 +289,6 @@
         </a>
     </li>
     <li class="nav-item" role="presentation">
-        <a class="nav-link d-flex align-items-center justify-content-center gap-2 py-2 small fw-medium {{ $activeTab === 'declined' ? 'active text-primary' : 'text-secondary' }}" href="{{ route('dashboard', ['tab' => 'declined', 'search' => $searchQuery ?: null]) }}">
-            <i class="bi bi-x-circle text-danger"></i>
-            <span>Declined</span>
-            @if ($declinedCount > 0)
-                <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill" style="font-size: 0.7rem;">{{ $declinedCount }}</span>
-            @endif
-        </a>
-    </li>
-    <li class="nav-item" role="presentation">
         <a class="nav-link d-flex align-items-center justify-content-center gap-2 py-2 small fw-medium {{ $activeTab === 'cancelled' ? 'active text-primary' : 'text-secondary' }}" href="{{ route('dashboard', ['tab' => 'cancelled', 'search' => $searchQuery ?: null]) }}">
             <i class="bi bi-slash-circle text-secondary"></i>
             <span>Cancelled</span>
@@ -491,6 +482,10 @@
                                             <div class="exp-value">{{ $order->date ? $order->date->format('Y-m-d') : '—' }}</div>
                                         </div>
                                         <div class="exp-item">
+                                            <div class="exp-label">Date Needed</div>
+                                            <div class="exp-value">{{ $order->date_needed ? $order->date_needed->format('Y-m-d') : '—' }}</div>
+                                        </div>
+                                        <div class="exp-item">
                                             <div class="exp-label">{{ $order->isFuelTrade() ? 'Supplier PO#' : 'PO#' }}</div>
                                             <div class="exp-value">{{ $order->isFuelTrade() && $order->linkedPurchaseOrder ? $order->linkedPurchaseOrder->po_number : ($order->po_number ?: '—') }}</div>
                                         </div>
@@ -571,9 +566,10 @@
                         {!! $soBadge($order) !!}
                     </div>
 
-                    <div class="rec-meta">
-                        <div class="rec-span"><span class="rec-k">PO#:</span> <span class="rec-v">{{ $order->po_number ?: '—' }}</span></div>
-                        <div><span class="rec-k">Date:</span> <span class="rec-v">{{ $order->date ? $order->date->format('Y-m-d') : '—' }}</span></div>
+                    <div class="rec-meta rec-meta-order">
+                        <div><span class="rec-k">PO#:</span> <span class="rec-v">{{ $order->po_number ?: '—' }}</span></div>
+                        <div class="rec-r"><span class="rec-k">Date Needed:</span> <span class="rec-v">{{ $order->date_needed ? $order->date_needed->format('Y-m-d') : '—' }}</span></div>
+                        <div><span class="rec-k">Order Date:</span> <span class="rec-v">{{ $order->date ? $order->date->format('Y-m-d') : '—' }}</span></div>
                         <div class="rec-r"><span class="rec-k">Qty Ordered:</span> <span class="rec-v">{{ number_format($order->effective_qty_ordered) }}</span></div>
                         <div>
                             <span class="rec-k">Price:</span> <span class="rec-v">{{ $price['text'] ?? '—' }}</span>
@@ -637,18 +633,15 @@
                         <a href="{{ route('order.deliveries', $order->id) }}" class="btn btn-sm btn-outline-primary rounded-3">
                             <i class="bi bi-truck me-1"></i> Deliveries
                         </a>
-                        <a href="{{ route('order.receipt', $order->id) }}" class="btn btn-sm btn-outline-success rounded-3" title="Download SO Receipt">
-                            <i class="bi bi-file-earmark-pdf"></i>
-                        </a>
                         @if (Auth::user()->canEditModule1())
-                            <a href="{{ route('order.edit', $order->id) }}" class="btn btn-sm btn-outline-secondary rounded-3" title="Edit Order">
+                            <a href="{{ route('order.edit', $order->id) }}" class="btn btn-sm btn-outline-secondary rounded-3 rec-action-icon" title="Edit Order" aria-label="Edit Order">
                                 <i class="bi bi-pencil"></i>
                             </a>
                         @endif
                         @if (Auth::user()->isAdmin())
-                            <form method="POST" action="{{ route('order.delete', $order->id) }}" onsubmit="return confirm('Are you sure you want to delete this order? This will also delete all associated deliveries.');">
+                            <form method="POST" action="{{ route('order.delete', $order->id) }}" class="rec-action-icon" onsubmit="return confirm('Are you sure you want to delete this order? This will also delete all associated deliveries.');">
                                 @csrf
-                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-3" title="Delete Order">
+                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-3" title="Delete Order" aria-label="Delete Order">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </form>

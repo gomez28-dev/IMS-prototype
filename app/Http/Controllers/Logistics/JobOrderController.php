@@ -149,6 +149,7 @@ class JobOrderController extends Controller
                         ->filter()->unique()->map(fn ($p) => Order::PRODUCT_TYPES[$p] ?? $p)->implode(' / '),
                     'liters'      => $rows->sum('quantity'),
                     'required'    => $required ? Carbon::parse($required)->startOfDay() : null,
+                    'date_needed' => $first->date_needed ? Carbon::parse($first->date_needed)->startOfDay() : null,
                     'has_date'    => (bool) $first->delivery_date,
                     'trip'        => $trip ? (object) [
                         'trip_no'    => $trip->trip_no,
@@ -185,6 +186,7 @@ class JobOrderController extends Controller
                     'products'    => Order::PRODUCT_TYPES[$delivery->product_type] ?? '-',
                     'liters'      => (int) $delivery->qty_out,
                     'required'    => $required ? Carbon::parse($required)->startOfDay() : null,
+                    'date_needed' => $delivery->date_needed ? Carbon::parse($delivery->date_needed)->startOfDay() : null,
                     'has_date'    => (bool) $delivery->delivery_date,
                 ];
             });

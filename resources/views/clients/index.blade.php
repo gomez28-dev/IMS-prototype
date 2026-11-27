@@ -15,7 +15,7 @@
 
 <!-- Tabs toggle -->
 @if (Auth::user()->isAdmin())
-<div class="d-flex flex-row align-items-center gap-4 mb-4 border-bottom pb-2">
+<div class="d-flex flex-row align-items-center gap-4 mb-4 border-bottom pb-2 ims-acct-tabs">
     <a class="fw-semibold text-decoration-none pb-1 {{ request()->routeIs('accounts.*') ? 'text-dark border-bottom border-2 border-primary' : 'text-muted' }}" href="{{ route('accounts.index') }}">
         <i class="bi bi-people me-1"></i> System Accounts
     </a>
@@ -68,29 +68,29 @@
             </table>
         </div>
 
-        <!-- Mobile cards -->
-        <div class="d-md-none p-3">
+        <!-- Mobile compact rows -->
+        <div class="rec-cards rec-compact ims-compact-list">
             @if ($clients->isNotEmpty())
                 @foreach ($clients as $client)
-                <div class="card border-0 bg-light mb-3 rounded-4 shadow-sm">
-                    <div class="card-body p-4">
-                        <h5 class="fw-bold text-dark mb-3">{{ $client->name }}</h5>
-                        <div class="d-flex gap-2">
-                            <a href="{{ route('clients.edit', $client->id) }}" class="btn btn-sm btn-outline-secondary rounded-3 px-3 py-2 flex-fill text-center">
-                                <i class="bi bi-pencil me-1"></i> Edit
-                            </a>
-                            <form method="POST" action="{{ route('clients.destroy', $client->id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this client?');">
-                                @csrf
-                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-3 px-3 py-2">
-                                    <i class="bi bi-trash"></i> Delete
-                                </button>
-                            </form>
-                        </div>
+                <div class="rec-card ims-compact-row">
+                    <div class="ims-compact-main">
+                        <div class="ims-compact-title">{{ $client->name }}</div>
+                    </div>
+                    <div class="ims-compact-actions">
+                        <a href="{{ route('clients.edit', $client->id) }}" class="btn btn-sm btn-outline-secondary ims-icon-btn" title="Edit Client" aria-label="Edit {{ $client->name }}">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <form method="POST" action="{{ route('clients.destroy', $client->id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this client?');">
+                            @csrf
+                            <button type="submit" class="btn btn-sm btn-outline-danger ims-icon-btn" title="Delete Client" aria-label="Delete {{ $client->name }}">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
                     </div>
                 </div>
                 @endforeach
             @else
-                <div class="text-center py-5 text-muted">
+                <div class="rec-empty">
                     <i class="bi bi-building fs-1 d-block mb-3 text-secondary"></i>
                     No clients found.
                 </div>

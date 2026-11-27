@@ -118,14 +118,29 @@
         <i class="bi bi-arrow-left me-1"></i> Back to Dashboard
     </a>
 </div>
-<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
+<div class="d-flex justify-content-between align-items-center mb-4 gap-3 flex-wrap">
     <div>
         <h2 class="fw-bold text-dark mb-1">Reports</h2>
         <p class="text-muted small mb-0">Filter and export order and delivery data.</p>
     </div>
+    <button type="button"
+            class="btn btn-secondary-custom shadow-sm d-md-none reports-filter-toggle"
+            id="reportsFilterToggle"
+            data-bs-toggle="collapse"
+            data-bs-target="#reportsFilterCollapse"
+            aria-expanded="false"
+            aria-controls="reportsFilterCollapse">
+        <i class="bi bi-funnel text-primary"></i>
+        <span>Filter</span>
+        @if ($activeFilter || $type || $account)
+            <span class="badge rounded-pill bg-primary text-white" style="font-size: 0.65rem;">Active</span>
+        @endif
+        <i class="bi bi-chevron-down small" id="reportsFilterChevron"></i>
+    </button>
 </div>
 
-<div class="card card-custom p-4 mb-4 border-0">
+<div class="collapse reports-filter-collapse" id="reportsFilterCollapse">
+<div class="card card-custom p-4 mb-4 border-0 reports-filter-card">
     <form method="GET" action="{{ route('reports.index') }}" class="row g-3 align-items-end" id="filter-form">
         <div class="col-12 mb-2">
             <div class="d-flex flex-wrap gap-2">
@@ -205,19 +220,20 @@
         </div>
     </form>
 </div>
+</div>
 
 @if ($activeFilter)
 {{-- Product-aware summary cards. The figures are read off every order the
      list can show, so "Total Orders" and "Showing N order(s)" are the same
      number, and each card's rows add up to its own total. --}}
-<div class="row g-4 mb-5">
+<div class="row g-4 mb-4 stat-grid">
     <div class="col-xl-3 col-md-6">
         <div class="card card-custom p-3 border-0 h-100">
-            <div class="d-flex align-items-center gap-3">
+            <div class="d-flex align-items-center gap-3 stat-head">
                 <div class="stat-icon" style="background:#fff1ee;color:#f04a1a;"><i class="bi bi-journal-text"></i></div>
                 <span class="stat-title">Total Orders</span>
             </div>
-            <div class="d-flex flex-grow-1 align-items-center justify-content-center py-3">
+            <div class="d-flex flex-grow-1 align-items-center justify-content-center py-3 stat-big-row">
                 <span class="stat-big">{{ number_format($totalOrders) }}</span>
             </div>
         </div>
@@ -226,7 +242,7 @@
     @foreach ($statCards as $card)
     <div class="col-xl-3 col-md-6">
         <div class="card card-custom p-3 border-0 h-100">
-            <div class="d-flex align-items-center gap-3 mb-3">
+            <div class="d-flex align-items-center gap-3 mb-3 stat-head">
                 <div class="stat-icon" style="{{ $card['tint'] }}"><i class="bi {{ $card['icon'] }}"></i></div>
                 <span class="stat-title">{{ $card['title'] }}</span>
             </div>
@@ -374,11 +390,11 @@
                                     {!! $soBadge($order) !!}
                                 </span>
                             </div>
-                            <div class="row mb-3 small text-muted">
-                                <div class="col-6">
+                            <div class="d-flex justify-content-between align-items-baseline flex-wrap gap-2 mb-3 small text-muted">
+                                <div class="text-nowrap">
                                     <span class="fw-medium">Date:</span> {{ $order->date ? $order->date->format('Y-m-d') : '' }}
                                 </div>
-                                <div class="col-6 text-end">
+                                <div class="text-nowrap">
                                     <span class="fw-medium">Qty Ordered:</span> {{ number_format($order->effective_qty_ordered) }}
                                 </div>
                             </div>
@@ -476,6 +492,33 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Initialize filter mode on page load
     setFilterMode(filterModeInput.value || 'range');
+
+    const filterCollapseEl = document.getElementById('reportsFilterCollapse');
+    const filterChevronEl = document.getElementById('reportsFilterChevron');
+    const filterFormEl = document.getElementById('filter-form');
+
+    if (filterCollapseEl) {
+        filterCollapseEl.addEventListener('show.bs.collapse', function () {
+            if (filterChevronEl) {
+                filterChevronEl.classList.remove('bi-chevron-down');
+                filterChevronEl.classList.add('bi-chevron-up');
+            }
+        });
+        filterCollapseEl.addEventListener('hide.bs.collapse', function () {
+            if (filterChevronEl) {
+                filterChevronEl.classList.remove('bi-chevron-up');
+                filterChevronEl.classList.add('bi-chevron-down');
+            }
+        });
+
+        if (filterFormEl) {
+            filterFormEl.addEventListener('submit', function () {
+                if (window.innerWidth < 768 && window.bootstrap && filterCollapseEl.classList.contains('show')) {
+                    window.bootstrap.Collapse.getOrCreateInstance(filterCollapseEl).hide();
+                }
+            });
+        }
+    }
 });
 </script>
 @endsection

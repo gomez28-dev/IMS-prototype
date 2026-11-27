@@ -77,6 +77,9 @@
                             <td>
                                 <span class="jo-tag {{ $cls }}">{{ $txt }}</span>
                                 <div class="text-muted" style="font-size: 0.68rem;">{{ $j->has_date ? 'Delivery date' : 'Date needed (no delivery date yet)' }}</div>
+                                @if ($j->has_date && $j->date_needed)
+                                    <div class="text-muted" style="font-size: 0.68rem;">Date needed: {{ $j->date_needed->format('M j, Y') }}</div>
+                                @endif
                             </td>
                             <td><div class="fw-semibold">DR# {{ $j->dr ?: '-' }}</div><div class="small text-muted">SO# {{ $j->so ?: '-' }}</div></td>
                             <td><div class="fw-semibold">{{ $j->client }}</div><div class="small text-muted">{{ $j->location }}</div></td>
@@ -108,7 +111,12 @@
                     @forelse ($scheduled as $j)
                         @php [$cls, $txt] = $tag($j); @endphp
                         <tr>
-                            <td><span class="jo-tag ok">{{ $j->required ? $j->required->format('M j, Y') : '-' }}</span></td>
+                            <td>
+                                <span class="jo-tag ok">{{ $j->required ? $j->required->format('M j, Y') : '-' }}</span>
+                                @if ($j->date_needed)
+                                    <div class="text-muted" style="font-size: 0.68rem;">Date needed: {{ $j->date_needed->format('M j, Y') }}</div>
+                                @endif
+                            </td>
                             <td><div class="fw-semibold">DR# {{ $j->dr ?: '-' }}</div><div class="small text-muted">SO# {{ $j->so ?: '-' }}</div></td>
                             <td><div class="fw-semibold">{{ $j->client }}</div><div class="small text-muted">{{ $j->location }}</div></td>
                             <td><div>{{ $j->products ?: '-' }}</div><div class="small text-muted">{{ number_format($j->liters) }} L</div></td>
@@ -135,6 +143,9 @@
                             <td>
                                 <span class="jo-tag {{ $cls }}">{{ $txt }}</span>
                                 <div class="text-muted" style="font-size: 0.68rem;">{{ $j->has_date ? 'Delivery date' : 'Date needed' }}</div>
+                                @if ($j->has_date && $j->date_needed)
+                                    <div class="text-muted" style="font-size: 0.68rem;">Date needed: {{ $j->date_needed->format('M j, Y') }}</div>
+                                @endif
                             </td>
                             <td><div class="fw-semibold">DR# {{ $j->dr ?: '-' }}</div><div class="small text-muted">SO# {{ $j->so ?: '-' }}</div></td>
                             <td><div class="fw-semibold">{{ $j->client }}</div><div class="small text-muted">{{ $j->location }}</div></td>
@@ -165,6 +176,9 @@
                 <div class="rec-meta">
                     <div><span class="rec-k">DR#:</span> <span class="rec-v">{{ $j->dr ?: '-' }}</span></div>
                     <div class="rec-r"><span class="rec-k">SO#:</span> <span class="rec-v">{{ $j->so ?: '-' }}</span></div>
+                    @if ($j->date_needed)
+                        <div class="rec-span"><span class="rec-k">Date needed:</span> <span class="rec-v">{{ $j->date_needed->format('M j, Y') }}</span></div>
+                    @endif
                     <div><span class="rec-k">Product:</span> <span class="rec-v">{{ $j->products ?: '-' }}</span></div>
                     <div class="rec-r"><span class="rec-k">Volume:</span> <span class="rec-v">{{ number_format($j->liters) }} L</span></div>
                     @if ($tab !== 'waiting')

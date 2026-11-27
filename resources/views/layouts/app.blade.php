@@ -1332,8 +1332,8 @@
                     @yield('content')
                 </div>
 
-                <footer class="footer mt-auto py-4 bg-white border-top text-center text-muted small">
-                    <div class="container">
+                <footer class="footer app-footer mt-auto py-4 bg-white border-top text-center text-muted small">
+                    <div class="container px-3 text-center">
                         &copy; 2026 Doyen Group of Companies. All rights reserved.
                     </div>
                 </footer>
@@ -1350,8 +1350,8 @@
             @endif
             @yield('content')
         </div>
-        <footer class="footer mt-auto py-4 bg-white border-top text-center text-muted small">
-            <div class="container">
+        <footer class="footer app-footer mt-auto py-4 bg-white border-top text-center text-muted small">
+            <div class="container px-3 text-center">
                 &copy; 2026 Doyen Group of Companies. All rights reserved.
             </div>
         </footer>
@@ -1434,7 +1434,7 @@
         }
 
         return !!document.querySelector(
-            '.modal.show, .modal[style*="display: block"], .offcanvas.show, dialog[open], .dropdown-menu.show'
+            '.modal.show, .modal[style*="display: block"], .offcanvas.show, dialog[open], .dropdown-menu.show, .reports-filter-collapse.show'
         );
     }
 

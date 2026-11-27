@@ -17,7 +17,7 @@
                 <h3 class="fw-bold text-dark mb-0">
                     <span><i class="bi bi-patch-check text-primary me-2"></i>ATL Details &mdash; {{ $order->formatted_so_number }}</span>
                 </h3>
-                <p class="text-muted small mb-0 mt-1">{{ $order->account }}</p>
+                <p class="text-muted small mb-0 mt-1">{{ $order->account }}@if ($order->date_needed) &middot; Date Needed: <span class="fw-semibold text-dark">{{ $order->date_needed->format('M d, Y') }}</span>@endif</p>
             </div>
             <div class="d-flex gap-2">
                 {{-- Mark Picked Up lives on the ATL rows now - one action per

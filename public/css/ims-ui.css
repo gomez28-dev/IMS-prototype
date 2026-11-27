@@ -572,19 +572,18 @@ html {
         width: 100%;
     }
 
-    /* Status tab strips (Pending / Hold / Approved / Declined / Cancelled).
-       `nav-fill` split the strip into five equal columns, so on a phone each
-       tab had about 70px and the last two were clipped by the card edge.
-       Wrapping turns the five into chips two to a row (the odd one out spans
-       the row), so every status is on screen and none hides behind a swipe. */
+    /* Status tab strips (Pending / Hold / Approved / Cancelled).
+       Four equal-size cells in a 2x2 grid on phones, matching the summary
+       cards above them while keeping icons, badges and active styling. */
     .nav.nav-tabs.tabs-scroll {
-        flex-wrap: wrap;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-auto-rows: 1fr;
         gap: 0.35rem;
         border-bottom: 0 !important;
     }
 
     .nav.nav-tabs.tabs-scroll > .nav-item {
-        flex: 1 1 45%;
         min-width: 0;
     }
 
@@ -1104,5 +1103,556 @@ html {
     body .ims-toolbar > .btn.ims-toolbar-primary {
         width: 42px;
         padding: 0;
+    }
+}
+
+/* --------------------------------------------------------------------------
+   12. Module-specific phone refinements (footer, order cards, deliveries,
+       clients/accounts, reports collapsible filters, wet stock, transfers)
+   -------------------------------------------------------------------------- */
+
+.app-footer {
+    font-size: 0.78rem;
+}
+
+@media (min-width: 768px) {
+    /* Desktop keeps the Reports filter card permanently expanded. */
+    .reports-filter-collapse.collapse:not(.show) {
+        display: block;
+    }
+}
+
+@media (max-width: 767.98px) {
+    /* Footer: centered and slightly smaller on phones so it stays one line. */
+    .app-footer {
+        font-size: 0.72rem !important;
+        padding-top: 0.9rem !important;
+        padding-bottom: 0.9rem !important;
+    }
+
+    /* Orders Dashboard cards: PO# + Date Needed row, compact Edit/Delete
+       buttons so Deliveries stretches across the freed space. */
+    .rec-meta.rec-meta-order {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .rec-actions > .btn.rec-action-icon,
+    .rec-actions > form.rec-action-icon {
+        flex: 0 0 auto;
+        width: 42px;
+    }
+
+    .rec-actions > form.rec-action-icon > .btn {
+        width: 42px;
+        padding: 0;
+    }
+
+    .rec-cards .form-select-sm {
+        min-height: 40px;
+    }
+
+    /* Deliveries page: 2x2 summary grid matching Dashboard, handling both
+       fuel-breakdown cards and single-figure (Fuel Trade / legacy) cards. */
+    body .deliv-summary.stat-grid > [class*="col"] {
+        display: flex;
+    }
+
+    body .deliv-summary.stat-grid .stat-card {
+        width: 100%;
+        padding: 0.55rem;
+        border-radius: 0.9rem;
+        display: flex;
+        flex-direction: column;
+    }
+
+    body .deliv-summary.stat-grid .order-info-card .badge {
+        font-size: 0.58rem !important;
+        padding: 0.25em 0.5em !important;
+    }
+
+    body .deliv-summary.stat-grid .order-info-card h4 {
+        font-size: 0.78rem;
+        line-height: 1.25;
+        margin-bottom: 0.3rem !important;
+        overflow-wrap: anywhere;
+    }
+
+    body .deliv-summary.stat-grid .order-info-card p {
+        font-size: 0.62rem !important;
+        line-height: 1.3;
+        margin-top: auto;
+    }
+
+    body .deliv-summary.stat-grid .stat-row {
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 0.2rem;
+    }
+
+    body .deliv-summary.stat-grid .pbadge {
+        width: 15px;
+        height: 15px;
+        border-radius: 4px;
+        font-size: 0.52rem;
+    }
+
+    body .deliv-summary.stat-grid .stat-row .stat-name {
+        min-width: 0;
+        font-size: 0.6rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    body .deliv-summary.stat-grid .stat-big {
+        font-size: 1.45rem;
+        white-space: nowrap;
+        padding: 0.25rem 0;
+        margin: auto 0;
+    }
+
+    /* Deliveries page header (Fuel Trade Pick Up & ATL / Deliveries). */
+    .deliv-list-head {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .deliv-list-title {
+        font-size: 0.96rem;
+        line-height: 1.25;
+        flex: 1 0 auto;
+    }
+
+    .deliv-list-actions {
+        flex: 1 0 auto;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        gap: 0.4rem !important;
+    }
+
+    .deliv-list-actions .btn {
+        min-height: 40px;
+        padding: 0.35rem 0.75rem;
+        font-size: 0.78rem;
+        white-space: nowrap;
+        justify-content: center;
+    }
+
+    .deliv-list-actions .btn-ft-locked {
+        white-space: normal;
+        text-align: center;
+    }
+
+    .ims-acct-tabs {
+        gap: 1rem !important;
+    }
+
+    .ims-acct-tabs > a {
+        font-size: 0.82rem;
+        white-space: nowrap;
+    }
+
+    /* Compact client & system account rows with 40px icon-only buttons. */
+    .ims-compact-list {
+        padding: 0.6rem;
+    }
+
+    .ims-compact-list .ims-compact-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.65rem;
+        padding: 0.55rem 0.7rem;
+        margin-bottom: 0.45rem;
+        border-radius: 0.8rem;
+    }
+
+    .ims-compact-list .ims-compact-row:last-child {
+        margin-bottom: 0;
+    }
+
+    .ims-compact-main {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .ims-compact-title {
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: #111827;
+        line-height: 1.25;
+        overflow-wrap: anywhere;
+    }
+
+    .ims-compact-sub {
+        font-size: 0.72rem;
+        color: #6b7280;
+        line-height: 1.3;
+        overflow-wrap: anywhere;
+    }
+
+    .ims-compact-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+        margin-top: 0.3rem;
+    }
+
+    .ims-compact-badges .badge {
+        font-size: 0.62rem;
+        padding: 0.2em 0.5em !important;
+    }
+
+    .ims-compact-actions {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+
+    .ims-compact-actions .ims-icon-btn {
+        width: 40px;
+        height: 40px;
+        min-width: 40px;
+        min-height: 40px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0.55rem;
+        font-size: 0.9rem;
+    }
+
+    /* Reports collapsible filter toggle & compact inner controls. */
+    .reports-filter-toggle {
+        min-height: 40px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+        font-size: 0.82rem;
+        padding: 0.4rem 0.9rem;
+    }
+
+    .reports-filter-card {
+        padding: 0.9rem !important;
+    }
+
+    .reports-filter-card .btn-mode-tab {
+        flex: 1 1 auto;
+        min-height: 40px;
+        padding: 0.4rem 0.6rem !important;
+        font-size: 0.76rem;
+        white-space: nowrap;
+    }
+
+    .reports-filter-card .btn {
+        min-height: 40px;
+    }
+
+    /* Wet Stock Dashboard: top header, 3-up summary cards, equal tabs, 2-col units. */
+    .ws-wh-card {
+        padding: 0.65rem !important;
+    }
+
+    .ws-wh-head {
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        gap: 0.5rem !important;
+    }
+
+    .ws-wh-title {
+        font-size: 0.95rem;
+        line-height: 1.2;
+        min-width: 0;
+        margin-right: 0 !important;
+    }
+
+    .ws-wh-meta {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        flex: 0 0 auto;
+    }
+
+    .ws-units-badge {
+        height: 40px;
+        display: inline-flex;
+        align-items: center;
+        padding: 0 0.65rem !important;
+        font-size: 0.68rem !important;
+        white-space: nowrap;
+    }
+
+    .ws-manage-btn {
+        width: 40px;
+        height: 40px;
+        min-width: 40px;
+        min-height: 40px;
+        padding: 0 !important;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.95rem;
+    }
+
+    .ws-sum-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-auto-rows: 1fr;
+        gap: 0.35rem;
+        margin: 0 0 0.75rem !important;
+    }
+
+    .ws-sum-grid > [class*="col"] {
+        width: auto;
+        max-width: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .ws-sum-grid .ws-sum2 {
+        padding: 0.42rem 0.35rem;
+        border-radius: 0.65rem;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .ws-sum-grid .ws-sum2-head {
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 0.2rem 0.25rem;
+        padding-bottom: 0.3rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .ws-sum-grid .ws-sum2-ico {
+        width: 18px;
+        height: 18px;
+        border-radius: 5px;
+        font-size: 0.62rem;
+    }
+
+    .ws-sum-grid .ws-sum2 .k {
+        font-size: 0.54rem;
+        line-height: 1.15;
+        letter-spacing: 0.02em;
+        min-width: 0;
+    }
+
+    .ws-sum-grid .ws-sum2 .t {
+        flex: 0 0 100%;
+        font-size: 0.76rem;
+        line-height: 1.15;
+        margin-top: 0.1rem;
+        white-space: nowrap;
+    }
+
+    .ws-sum-grid .ws-sum2 .t small {
+        font-size: 0.58rem;
+    }
+
+    .ws-sum-grid .ws-pr {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        padding: 0.15rem 0;
+        font-size: 0.6rem;
+        line-height: 1.25;
+        border-bottom: 1px dashed #f1f5f9;
+    }
+
+    .ws-sum-grid .ws-pr:last-child {
+        border-bottom: 0;
+    }
+
+    .ws-sum-grid .ws-pr > span:first-child {
+        gap: 0.22rem !important;
+        min-width: 0;
+        font-size: 0.56rem;
+    }
+
+    .ws-sum-grid .ws-pr b {
+        text-align: right;
+        font-size: 0.66rem;
+        white-space: nowrap;
+    }
+
+    .ws-sum-grid .ws-pc {
+        width: 13px;
+        height: 13px;
+        border-radius: 3px;
+        font-size: 0.48rem;
+    }
+
+    .ws-unit-tabs {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.45rem;
+    }
+
+    .ws-unit-tabs > .nav-item {
+        min-width: 0;
+    }
+
+    .ws-unit-tabs .nav-link {
+        width: 100%;
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        font-size: 0.76rem;
+        padding: 0.35rem 0.5rem !important;
+    }
+
+    .wsu-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 8px !important;
+    }
+
+    .wsu-grid .wsu {
+        padding: 8px 9px;
+        gap: 5px;
+        border-radius: 9px;
+    }
+
+    .wsu-grid .wsu-name {
+        font-size: 0.76rem;
+    }
+
+    .wsu-grid .wsu-badge {
+        font-size: 0.54rem !important;
+        padding: 0.2em 0.42em;
+    }
+
+    .wsu-grid .wsu-pill {
+        font-size: 0.58rem;
+        padding: 0.08rem 0.38rem;
+    }
+
+    .wsu-grid .wsu-sub {
+        font-size: 0.56rem;
+    }
+
+    .wsu-grid .wsu-cap-row {
+        flex-wrap: wrap;
+        gap: 2px 4px !important;
+    }
+
+    .wsu-grid .wsu-liters {
+        font-size: 0.94rem;
+    }
+
+    .wsu-grid .wsu-liters small {
+        font-size: 0.62rem;
+    }
+
+    .wsu-grid .wsu-meter {
+        height: 5px;
+    }
+
+    .wsu-grid .wsu-flag {
+        font-size: 0.58rem;
+        padding: 0.12rem 0.45rem;
+    }
+
+    .wsu-grid .wsu-prod {
+        font-size: 0.62rem;
+        column-gap: 4px;
+    }
+
+    .wsu-grid .wsu-prod-l {
+        white-space: nowrap;
+    }
+
+    .wsu-grid .wsu-foot {
+        flex-wrap: wrap;
+        gap: 4px;
+        padding-top: 6px;
+        font-size: 0.62rem;
+        line-height: 1.25;
+    }
+
+    .wsu-grid .wsu-foot .btn {
+        min-height: 40px;
+        padding: 0.25rem 0.55rem;
+        font-size: 0.68rem;
+        margin-left: auto;
+    }
+
+    /* Stock Transfers, Borrows & Returns: 3 equal tabs in one row + compact top bar. */
+    .wt-back-btn {
+        min-height: 40px;
+        font-size: 0.74rem;
+        padding: 0.3rem 0.65rem !important;
+    }
+
+    .wt-top-bar .breadcrumb {
+        font-size: 0.72rem;
+    }
+
+    #transferTabs.nav-tabs {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-auto-rows: 1fr;
+        gap: 0.35rem;
+        border-bottom: 0 !important;
+    }
+
+    #transferTabs > .nav-item {
+        min-width: 0;
+    }
+
+    #transferTabs .nav-link {
+        height: 100%;
+        flex-direction: column;
+        justify-content: center;
+        text-align: center;
+        gap: 0.2rem !important;
+        min-height: 56px;
+        padding: 0.45rem 0.25rem !important;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.6rem;
+        font-size: 0.68rem;
+        line-height: 1.18;
+    }
+
+    #transferTabs .nav-link.active {
+        border-color: var(--brand);
+        background: #fff5f1;
+        box-shadow: inset 0 0 0 1px var(--brand);
+    }
+
+    .wt-create-wrap .btn {
+        min-height: 40px;
+    }
+
+    .wt-month-form .form-select,
+    .wt-month-form .btn,
+    .wt-filter-card .form-control,
+    .wt-filter-card .form-select,
+    .wt-filter-card .input-group-text,
+    .wt-filter-card .btn {
+        min-height: 40px;
+    }
+
+    .wt-month-form .btn,
+    .wt-filter-card .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 400px) {
+    .rec-meta.rec-meta-order {
+        font-size: 0.73rem;
+        gap: 0.18rem 0.45rem;
+    }
+}
+
+@media (max-width: 390px) {
+    .deliv-list-actions .btn-ft-atl-pdf {
+        width: 100%;
     }
 }

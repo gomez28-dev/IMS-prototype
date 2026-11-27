@@ -201,7 +201,7 @@
 @endphp
 
 <!-- Order Summary: info card + 3 stat cards (same layout as the Orders Dashboard) -->
-<div class="deliv-summary row g-3 mb-4">
+<div class="deliv-summary stat-grid row g-3 mb-4">
     <div class="col-md-6 col-lg-3">
         <div class="stat-card order-info-card">
             <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
@@ -276,18 +276,18 @@
 @php
     $ftDelivery = $order->linkedPurchaseOrder?->deliveries?->first();
 @endphp
-<div class="compact-bar d-flex justify-content-between align-items-center mb-3">
-    <h5 class="fw-bold mb-0 text-dark">
+<div class="compact-bar deliv-list-head d-flex justify-content-between align-items-center mb-3">
+    <h5 class="fw-bold mb-0 text-dark deliv-list-title">
         <i class="bi {{ $order->isFuelTrade() ? 'bi-fuel-pump' : 'bi-truck' }} me-2 text-primary"></i>
         {{ $order->isFuelTrade() ? 'Fuel Trade Pick Up & ATL' : 'Deliveries' }}
     </h5>
     @if ($order->isFuelTrade())
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 deliv-list-actions">
             @if ($ftDelivery)
-                <button type="button" class="btn btn-outline-primary shadow-sm d-flex align-items-center" data-bs-toggle="modal" data-bs-target="#atlDetailModal">
+                <button type="button" class="btn btn-outline-primary shadow-sm d-none d-md-flex align-items-center" data-bs-toggle="modal" data-bs-target="#atlDetailModal">
                     <i class="bi bi-eye me-2"></i> View ATL Details
                 </button>
-                <a href="{{ route('stock-orders.atl-pdf', $ftDelivery->id) }}" class="btn btn-primary-custom shadow-sm d-flex align-items-center" target="_blank">
+                <a href="{{ route('stock-orders.atl-pdf', $ftDelivery->id) }}" class="btn btn-primary-custom shadow-sm d-flex align-items-center btn-ft-atl-pdf" target="_blank">
                     <i class="bi bi-file-earmark-pdf me-2"></i> Download ATL PDF
                 </a>
             @else
@@ -303,7 +303,7 @@
                         </span>
                     @endif
                 @else
-                    <button type="button" class="btn btn-secondary shadow-sm d-flex align-items-center opacity-75" disabled title="Awaiting Accounting clearance ({{ $order->clearing_status }})">
+                    <button type="button" class="btn btn-secondary shadow-sm d-flex align-items-center opacity-75 btn-ft-locked" disabled title="Awaiting Accounting clearance ({{ $order->clearing_status }})">
                         <i class="bi bi-lock-fill me-2"></i> Locked: Pending Accounting Clearance
                     </button>
                 @endif
@@ -311,9 +311,11 @@
         </div>
     @else
         @if (Auth::user()->canEditModule1())
-        <a href="{{ route('delivery.create', $order->id) }}" class="btn btn-primary-custom shadow-sm d-flex align-items-center">
-            <i class="bi bi-plus-lg me-2"></i> Add Delivery
-        </a>
+        <div class="d-flex gap-2 deliv-list-actions">
+            <a href="{{ route('delivery.create', $order->id) }}" class="btn btn-primary-custom shadow-sm d-flex align-items-center">
+                <i class="bi bi-plus-lg me-2"></i> Add Delivery
+            </a>
+        </div>
         @endif
     @endif
 </div>

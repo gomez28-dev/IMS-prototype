@@ -241,6 +241,7 @@
                             {{ $u->account }}@if ($u->location) &middot; {{ $u->location }}@endif
                             @if ($u->products) &middot; {{ $u->products }}@endif
                             &middot; {{ number_format($u->liters) }} L
+                            @if ($u->date_needed) &middot; Needed {{ \Carbon\Carbon::parse($u->date_needed)->format('M j, Y') }}@endif
                         </div>
                     </div>
                     @if ($canEdit)
@@ -755,6 +756,7 @@ document.addEventListener('DOMContentLoaded', function () {
         h += '<div class="fw-bold">DR# ' + esc(x.dr_number || '-') + ' <span class="text-muted fw-normal">&middot; SO# ' + esc(x.so_number || '-') + '</span></div>';
         h += '<div class="small">' + esc(x.client || '-') + '</div>';
         if (x.location) h += '<div class="small text-muted"><i class="bi bi-geo-alt me-1"></i>' + esc(x.location) + '</div>';
+        if (x.date_needed) h += '<div class="small text-muted"><i class="bi bi-calendar-event me-1"></i>Date needed: ' + esc(x.date_needed) + '</div>';
         h += '</div><span class="ts-badge ' + (x.fulfilled ? 'dot-done' : 'dot-idle') + '">' + esc(x.status_label || 'Assigned') + '</span></div>';
 
         if (x.lines.length) {

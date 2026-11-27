@@ -166,10 +166,6 @@ class OrderController extends Controller
                 'nullable', 'string', 'in:'.Order::BUY_BACK_FULFILLMENT_PICKUP.','.Order::BUY_BACK_FULFILLMENT_DELIVERY,
             ],
             // Optional for every category, and saved empty when left blank.
-            // The date the fuel is needed was removed from the SO: the M3 ATL
-            // form's Authorized Pick Up Date is the only date the delivery
-            // side reads now, so a stale client still posting date_needed is
-            // simply ignored by validate() dropping it.
             'terms' => ['required', 'string', 'max:64'],
             'vat_type' => ['required', 'string', Rule::in(array_keys(Order::VAT_TYPES))],
         ], $this->itemRules()), $this->itemMessages(), $this->itemAttributes());

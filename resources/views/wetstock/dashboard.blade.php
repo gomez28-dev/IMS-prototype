@@ -182,16 +182,16 @@
             ];
         @endphp
 
-        <div class="card card-custom p-3 mb-4 border-0 shadow-sm">
-            <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom flex-wrap gap-2">
-                <div class="d-flex align-items-center">
-                    <h5 class="fw-bold text-dark mb-0 me-3"><i class="bi bi-building text-primary me-2"></i>{{ $warehouse->name }} Warehouse</h5>
-                    <span class="badge bg-light text-dark border rounded-pill px-3 py-1 fw-normal">{{ $active->count() }} Active Units</span>
+        <div class="card card-custom p-3 mb-4 border-0 shadow-sm ws-wh-card">
+            <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom flex-wrap gap-2 ws-wh-head">
+                <div class="d-flex align-items-center ws-wh-left">
+                    <h5 class="fw-bold text-dark mb-0 me-3 ws-wh-title"><i class="bi bi-building text-primary me-2"></i>{{ $warehouse->name }} Warehouse</h5>
+                    <span class="badge bg-light text-dark border rounded-pill px-3 py-1 fw-normal ws-units-badge">{{ $active->count() }} Active Units</span>
                 </div>
-                <button type="button" class="btn btn-sm btn-outline-dark rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#units-{{ $warehouse->id }}"><i class="bi bi-gear me-1"></i> Add/Manage Tank</button>
+                <button type="button" class="btn btn-sm btn-outline-dark rounded-pill px-3 ws-manage-btn" data-bs-toggle="modal" data-bs-target="#units-{{ $warehouse->id }}" title="Add/Manage Tank" aria-label="Add/Manage Tank"><i class="bi bi-gear"></i><span class="d-none d-md-inline ms-1">Add/Manage Tank</span></button>
             </div>
 
-            <div class="row g-2 mb-3">
+            <div class="row g-2 mb-3 ws-sum-grid">
                 @foreach ($metrics as [$mLabel, $mKey, $mIcon, $mFg, $mBg])
                     <div class="col-12 col-md-4">
                         <div class="ws-sum2">
@@ -228,7 +228,7 @@
                     @endif
                 </p>
             @else
-                <ul class="nav nav-pills gap-2 mb-3">
+                <ul class="nav nav-pills gap-2 mb-3 ws-unit-tabs">
                     <li class="nav-item"><button class="nav-link active py-1 px-3 small" data-bs-toggle="pill" data-bs-target="#dep-{{ $warehouse->id }}" data-ws-wh="{{ $warehouse->id }}" data-ws-tab="dep" type="button"><i class="bi bi-box-seam me-1"></i>Depots <span class="badge bg-light text-dark ms-1">{{ $depots->count() }}</span></button></li>
                     <li class="nav-item"><button class="nav-link py-1 px-3 small" data-bs-toggle="pill" data-bs-target="#trk-{{ $warehouse->id }}" data-ws-wh="{{ $warehouse->id }}" data-ws-tab="trk" type="button"><i class="bi bi-truck me-1"></i>Tanker Trucks <span class="badge bg-light text-dark ms-1">{{ $tankers->count() }}</span></button></li>
                 </ul>
@@ -251,7 +251,7 @@
                                             <span class="badge wsu-badge {{ $bb }}">{{ $bl }}</span>
                                         </div>
 
-                                        <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <div class="d-flex justify-content-between align-items-center gap-2 wsu-cap-row">
                                             @if ($u->product)
                                                 <span class="wsu-pill" style="background:{{ $col }};">{{ $u->product_name }}</span>
                                             @else
@@ -302,7 +302,7 @@
                                             <span class="badge wsu-badge {{ $bb }}">{{ $bl }}</span>
                                         </div>
 
-                                        <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <div class="d-flex justify-content-between align-items-center gap-2 wsu-cap-row">
                                             <span class="wsu-sub">{{ $n }} compartment{{ $n === 1 ? '' : 's' }}</span>
                                             <span class="wsu-sub">{{ number_format($u->cap) }} L max</span>
                                         </div>
